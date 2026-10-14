@@ -1,0 +1,54 @@
+[
+ {
+  "id": "Demo_Rifle-support",
+  "weapon": "Demo_Rifle",
+  "action": "idle",
+  "metric": "hands.l_gap_cm",
+  "rule": {
+   "op": "<=",
+   "value": 1.0
+  },
+  "about": "the left palm on the handguard",
+  "source": "demo",
+  "status": "open"
+ },
+ {
+  "id": "Demo_Rifle-view",
+  "weapon": "Demo_Rifle",
+  "action": "idle",
+  "metric": "view.cover_lower_left",
+  "rule": {
+   "op": "<=",
+   "value": "view_lower_left"
+  },
+  "about": "the arms leave the lower left clear",
+  "source": "demo",
+  "status": "open"
+ },
+ {
+  "id": "Demo_Rifle-facts",
+  "weapon": "Demo_Rifle",
+  "action": "idle",
+  "metric": "facts.false",
+  "rule": {
+   "op": "==",
+   "value": 0
+  },
+  "about": "the magazine under the receiver, behind the barrel",
+  "source": "demo",
+  "status": "open"
+ },
+ {
+  "id": "Demo_Knife-fist",
+  "weapon": "Demo_Knife",
+  "action": "idle",
+  "metric": "fist.angle_deg",
+  "rule": {
+   "op": "<=",
+   "value": 10
+  },
+  "about": "the hilt along the fist's channel",
+  "source": "demo",
+  "status": "open"
+ }
+]

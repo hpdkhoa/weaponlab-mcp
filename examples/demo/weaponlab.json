@@ -1,0 +1,11 @@
+{
+ "probe": {
+  "command": [
+   "python",
+   "probe/demo_probe.py",
+   "{job}"
+  ],
+  "timeout_s": 60,
+  "busy": []
+ }
+}

@@ -1,0 +1,12 @@
+[
+ {
+  "id": "Demo_Rifle",
+  "name": "Demo Rifle",
+  "kind": "Rifle"
+ },
+ {
+  "id": "Demo_Knife",
+  "name": "Demo Knife",
+  "kind": "Melee"
+ }
+]

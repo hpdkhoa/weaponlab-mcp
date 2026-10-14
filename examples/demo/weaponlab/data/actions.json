@@ -1,0 +1,20 @@
+{
+ "*": {
+  "idle": {
+   "seconds": 1.6
+  },
+  "fire": {
+   "run": "fire",
+   "seconds": 1.5
+  }
+ },
+ "Melee": {
+  "idle": {
+   "seconds": 1.6
+  },
+  "swing": {
+   "run": "fire",
+   "seconds": 3.0
+  }
+ }
+}

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "weaponlab-mcp"
+version = "0.1.0"
+description = "An MCP server that finds and fixes first-person weapon bugs behind a gate: your game's probe measures, the Gate judges, Rig Lab and Motion Lab read and mend."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Khoa Hoang" }]
+requires-python = ">=3.10"
+keywords = ["mcp", "game-development", "first-person", "animation", "blender", "unreal", "testing"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = ["mcp>=2.0,<3", "numpy>=1.24"]
+
+[project.scripts]
+weaponlab-mcp = "weaponlab.server:main"
+weaponlab = "weaponlab.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/weaponlab"]

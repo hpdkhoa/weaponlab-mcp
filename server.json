@@ -1,0 +1,33 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.hpdkhoa/weaponlab-mcp",
+  "title": "Weapon Lab",
+  "description": "Find and fix first-person weapon bugs behind a gate: your game's probe measures, the Gate judges",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/hpdkhoa/weaponlab-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "weaponlab-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "WEAPONLAB_PROJECT",
+          "description": "The project folder holding weaponlab.json; the current folder if not set",
+          "isRequired": false
+        },
+        {
+          "name": "WEAPONLAB_BLENDER",
+          "description": "Blender's executable for Motion Lab, if it is not on the PATH or in the usual install folder",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

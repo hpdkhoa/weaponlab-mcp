@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+weaponlab/work/
+examples/demo/weaponlab/work/

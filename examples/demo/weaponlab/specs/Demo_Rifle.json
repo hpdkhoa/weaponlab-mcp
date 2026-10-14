@@ -1,0 +1,86 @@
+{
+ "id": "Demo_Rifle",
+ "name": "Demo Rifle",
+ "family": "Rifle",
+ "real_model": "a toy rifle",
+ "support": "two_hand",
+ "assets": {
+  "gun": "/Demo/Demo_Rifle"
+ },
+ "marks": {
+  "grip_r": {
+   "at": [
+    0,
+    0,
+    -3
+   ],
+   "status": "measured",
+   "source": "demo"
+  },
+  "support_l": {
+   "at": [
+    0,
+    25,
+    -3
+   ],
+   "status": "measured",
+   "source": "demo"
+  }
+ },
+ "anchors": {
+  "magazine": {
+   "role": "part",
+   "triangles": 12,
+   "extents": [
+    12.46,
+    6.98,
+    2.92
+   ],
+   "unique": true,
+   "source": "rig_pieces on an idle dump"
+  },
+  "barrel": {
+   "role": "gun",
+   "triangles": 12,
+   "extents": [
+    20.02,
+    2.36,
+    2.12
+   ],
+   "source": "rig_pieces on an idle dump"
+  }
+ },
+ "actions": {
+  "idle": {
+   "beats": [
+    {
+     "name": "hold",
+     "hand": "l",
+     "mark": "support_l"
+    }
+   ]
+  }
+ },
+ "facts": [
+  {
+   "id": "magazine_behind_barrel",
+   "claim": "the magazine sits behind the barrel",
+   "check": {
+    "kind": "order",
+    "ahead": "barrel",
+    "behind": "magazine"
+   },
+   "source": "every rifle"
+  },
+  {
+   "id": "magazine_under_barrel",
+   "claim": "the magazine hangs below the barrel",
+   "check": {
+    "kind": "below",
+    "anchor": "magazine",
+    "under": "barrel"
+   },
+   "source": "every rifle"
+  }
+ ]
+}

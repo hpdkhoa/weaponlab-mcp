@@ -1,0 +1,9 @@
+{
+ "hands.l_gap_cm": {
+  "provider": "probe",
+  "unit": "cm",
+  "better": "lower",
+  "tolerance": 0.5,
+  "about": "the left palm's distance to the gun's surface"
+ }
+}
