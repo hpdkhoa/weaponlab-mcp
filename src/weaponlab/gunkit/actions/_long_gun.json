@@ -1,0 +1,62 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "_long_gun",
+ "name": "the clips every two-handed long gun shares: held, walked, run, fired, raised and put away",
+ "parts": {},
+ "marks": ["grip", "support", "muzzle", "trigger"],
+ "manuals": [
+  {"title": "TC 3-22.9, Rifle and Carbine (US Army, 2016)", "covers": "carry positions, ready positions, the rifle and carbine drills", "status": "to read"}
+ ],
+ "sources": [
+  "hand clip timings are estimates until checked against the manuals (status 'to read'); each event says why",
+  "walking: about 2.75 steps a second at the game's 5 m/s walk (the gait in ToangTown's PocCharacter), so a stride of two steps is 0.73 s; running: 3.3 steps a second, a stride 0.6 s"
+ ],
+ "gun_clips": {},
+ "hand_clips": {
+  "idle": {"seconds": 3.0, "loop": true,
+   "gun": [
+    {"from": 0.0, "to": 1.4, "move": [0.0, 0.0, 0.35], "ease": "inout"},
+    {"from": 1.4, "to": 3.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}
+   ],
+   "events": [],
+   "expect": [{"at": [0.0, 3.0], "on": {"r": "grip", "l": "support"}}]},
+  "walk": {"seconds": 0.73, "loop": true,
+   "gun": [
+    {"from": 0.0, "to": 0.18, "move": [0.6, 0.0, -0.8], "ease": "inout"},
+    {"from": 0.18, "to": 0.365, "move": [0.0, 0.0, 0.0], "ease": "inout"},
+    {"from": 0.365, "to": 0.55, "move": [-0.6, 0.0, -0.8], "ease": "inout"},
+    {"from": 0.55, "to": 0.73, "move": [0.0, 0.0, 0.0], "ease": "inout"}
+   ],
+   "events": [],
+   "expect": [{"at": [0.0, 0.73], "on": {"r": "grip", "l": "support"}}]},
+  "run": {"seconds": 0.6, "loop": true,
+   "gun": [
+    {"from": 0.0, "to": 0.15, "roll": 25.0, "pitch": -28.0, "yaw": 18.0, "move": [3.0, -6.0, -12.0], "ease": "inout"},
+    {"from": 0.15, "to": 0.3, "roll": 25.0, "pitch": -26.0, "yaw": 18.0, "move": [3.5, -6.0, -10.5], "ease": "inout"},
+    {"from": 0.3, "to": 0.45, "roll": 25.0, "pitch": -28.0, "yaw": 18.0, "move": [2.5, -6.0, -12.0], "ease": "inout"},
+    {"from": 0.45, "to": 0.6, "roll": 25.0, "pitch": -26.0, "yaw": 18.0, "move": [3.0, -6.0, -10.5], "ease": "inout"}
+   ],
+   "events": [],
+   "expect": [{"at": [0.0, 0.6], "on": {"r": "grip", "l": "support"}}]},
+  "fire": {"seconds": 0.25,
+   "gun": [
+    {"from": 0.0, "to": 0.03, "pitch": 1.5, "move": [0.0, -1.6, 0.4], "ease": "out"},
+    {"from": 0.03, "to": 0.25, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "spring"}
+   ],
+   "events": [],
+   "expect": [{"at": [0.0, 0.25], "on": {"r": "grip", "l": "support"}}]},
+  "equip": {"seconds": 0.7,
+   "gun": [
+    {"from": 0.0, "to": 0.0, "roll": 10.0, "pitch": -45.0, "move": [0.0, -10.0, -32.0]},
+    {"from": 0.0, "to": 0.7, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "out"}
+   ],
+   "events": [],
+   "expect": [{"at": [0.6, 0.7], "on": {"r": "grip", "l": "support"}}]},
+  "holster": {"seconds": 0.55,
+   "gun": [
+    {"from": 0.0, "to": 0.55, "roll": 10.0, "pitch": -45.0, "move": [0.0, -10.0, -32.0], "ease": "in"}
+   ],
+   "events": [],
+   "expect": []}
+ }
+}
