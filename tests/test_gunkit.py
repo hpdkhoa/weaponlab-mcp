@@ -104,3 +104,24 @@ def test_every_hand_clip_of_every_action_runs_on_a_fitting_gun():
             assert T.gun_clip(a, f, cid)["frames"], (aid, cid)
         for cid in a["hand_clips"]:
             assert T.hand_clip(a, f, cid)["frames"], (aid, cid)
+
+
+@pytest.mark.parametrize("action_id", A.ids())
+def test_every_proxy_rigs_into_facts_its_action_takes(action_id):
+    """Each action's proxy gun, planned into facts (its parts at their shapes' centres), fits its action, and every clip
+    turns into bone tracks."""
+    from weaponlab.gunkit import proxy as P
+    from weaponlab.gunkit import rigplan as R
+    px = P.proxy(action_id)
+    centres = {}
+    for s in px["shapes"]:
+        if s["part"]:
+            centres.setdefault(s["part"], s["at"])
+    facts = R.plan(px["partsmap"], centres)
+    a = A.load(action_id)
+    assert F.check(facts, a) == [], action_id
+    for cid in a["gun_clips"]:
+        tr = R.tracks(facts, T.gun_clip(a, facts, cid))
+        assert tr["frames"] and all(b in {x["name"] for x in facts["bones"]} for b in tr["frames"][0]["bones"])
+    for cid in a["hand_clips"]:
+        assert R.tracks(facts, T.hand_clip(a, facts, cid))["frames"]
