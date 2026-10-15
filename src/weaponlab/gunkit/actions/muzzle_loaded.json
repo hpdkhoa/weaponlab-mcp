@@ -1,0 +1,56 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "muzzle_loaded",
+ "name": "a shoulder-fired launcher loaded at the muzzle with a rocket-propelled grenade, its hammer cocked by hand (RPG-7)",
+ "extends": "_long_gun",
+ "guns": ["RPG rocket launcher"],
+ "manuals": [
+  {"title": "a public-domain handbook of the RPG-7 (a US Army foreign weapons handbook)", "covers": "loading the grenade, the hammer, the safety, the back blast", "status": "to find"}
+ ],
+ "parts": {
+  "hammer": {"kind": "turn", "what": "the hammer, cocked back by the thumb"},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "rocket": {"kind": "free", "what": "the grenade: in the tube's mouth at rest, gone when fired, a new one brought by the hand"}
+ },
+ "marks": ["grip", "support", "hammer", "muzzle"],
+ "sources": ["the grenade's booster goes into the tube until its notch meets the stud at the muzzle"],
+ "gun_clips": {
+  "fire": {"seconds": 0.4, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the shot"},
+   {"part": "hammer", "from": 0.0, "to": 0.015, "value": 0.0, "ease": "in", "why": "the hammer falls"},
+   {"part": "rocket", "from": 0.02, "to": 0.12, "offset": [0.0, 300.0, 0.0], "ease": "in", "why": "the booster throws the grenade out"},
+   {"part": "trigger", "from": 0.2, "to": 0.3, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "reload": {"seconds": 4.0, "beats": [
+   {"part": "rocket", "from": 0.0, "to": 0.0, "offset": [0.0, 300.0, 0.0], "why": "the tube is empty"},
+   {"part": "hammer", "from": 3.3, "to": 3.45, "value": 1.0, "ease": "out", "why": "the hammer cocked by the thumb"}]},
+  "reload_empty": {"seconds": 4.0, "beats": [
+   {"part": "rocket", "from": 0.0, "to": 0.0, "offset": [0.0, 300.0, 0.0], "why": "empty"},
+   {"part": "hammer", "from": 3.3, "to": 3.45, "value": 1.0, "ease": "out", "why": "cocked"}]}
+ },
+ "hand_clips": {
+  "reload": {"seconds": 4.0,
+   "gun": [{"from": 0.1, "to": 0.6, "roll": 0.0, "pitch": 25.0, "yaw": 25.0, "move": [6.0, -10.0, -14.0], "ease": "inout"},
+           {"from": 3.0, "to": 3.6, "roll": 0.0, "pitch": 0.0, "yaw": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.2, "to": 0.9, "go": {"place": "chest_l"}, "why": "the launcher lowered off the shoulder, the support hand to the grenade bag"},
+    {"hand": "l", "from": 0.9, "to": 1.1, "go": {"place": "chest_l", "offset": [0.0, 0.0, 3.0]}, "carry": "rocket", "why": "a grenade drawn"},
+    {"hand": "l", "from": 1.1, "to": 2.0, "go": {"mark": "muzzle", "offset": [0.0, 30.0, 0.0]}, "why": "to the muzzle, booster first"},
+    {"hand": "l", "from": 2.0, "to": 2.5, "go": {"mark": "muzzle", "offset": [0.0, 12.0, 0.0]}, "seat": "rocket", "why": "pushed in, the notch on the stud"},
+    {"hand": "l", "from": 2.6, "to": 3.1, "go": {"mark": "support"}, "why": "back to the front grip"},
+    {"hand": "r", "from": 3.2, "to": 3.3, "go": {"mark": "hammer"}, "grasp": "thumb", "why": "the thumb cocks the hammer"},
+    {"hand": "r", "from": 3.45, "to": 3.6, "go": {"mark": "grip"}, "why": "back on the grip"}],
+   "expect": [{"at": 2.5, "seated": "rocket"}, {"at": [3.7, 4.0], "on": {"r": "grip", "l": "support"}}]},
+  "reload_empty": {"seconds": 4.0,
+   "gun": [{"from": 0.1, "to": 0.6, "roll": 0.0, "pitch": 25.0, "yaw": 25.0, "move": [6.0, -10.0, -14.0], "ease": "inout"},
+           {"from": 3.0, "to": 3.6, "roll": 0.0, "pitch": 0.0, "yaw": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.2, "to": 0.9, "go": {"place": "chest_l"}, "why": "to the bag"},
+    {"hand": "l", "from": 0.9, "to": 1.1, "go": {"place": "chest_l", "offset": [0.0, 0.0, 3.0]}, "carry": "rocket", "why": "drawn"},
+    {"hand": "l", "from": 1.1, "to": 2.0, "go": {"mark": "muzzle", "offset": [0.0, 30.0, 0.0]}, "why": "to the muzzle"},
+    {"hand": "l", "from": 2.0, "to": 2.5, "go": {"mark": "muzzle", "offset": [0.0, 12.0, 0.0]}, "seat": "rocket", "why": "in"},
+    {"hand": "l", "from": 2.6, "to": 3.1, "go": {"mark": "support"}, "why": "back"},
+    {"hand": "r", "from": 3.2, "to": 3.3, "go": {"mark": "hammer"}, "grasp": "thumb", "why": "cocked"},
+    {"hand": "r", "from": 3.45, "to": 3.6, "go": {"mark": "grip"}, "why": "on the grip"}],
+   "expect": []}
+ }
+}

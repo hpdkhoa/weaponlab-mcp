@@ -1,0 +1,596 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "bow",
+ "name": "a recurve bow held in the left hand: an arrow nocked, the string drawn to the anchor, loosed",
+ "home": {
+  "l": {
+   "mark": "grip"
+  },
+  "r": {
+   "part": "string",
+   "mark": "nock"
+  }
+ },
+ "guns": [
+  "Recurve bow"
+ ],
+ "manuals": [
+  {
+   "title": "a public-domain archery handbook (a national archery body's coaching manual of the period)",
+   "covers": "nocking, the draw, the anchor, the release",
+   "status": "to find"
+  }
+ ],
+ "parts": {
+  "string": {
+   "kind": "slide",
+   "what": "the string's nocking point drawn back toward the anchor; 1 at full draw",
+   "travel_cm": 65.0
+  },
+  "limb_top": {
+   "kind": "turn",
+   "what": "the upper limb bending",
+   "required": false
+  },
+  "limb_bottom": {
+   "kind": "turn",
+   "what": "the lower limb bending",
+   "required": false
+  },
+  "arrow": {
+   "kind": "free",
+   "what": "the arrow on the rest, its nock on the string"
+  }
+ },
+ "marks": [
+  "grip",
+  "nock",
+  "rest"
+ ],
+ "sources": [
+  "the bow's own grip is the left hand's (mark grip, the handle); the right hand works the string (mark nock rides the string)",
+  "a recurve's draw length about 70 cm for an adult (an estimate)"
+ ],
+ "gun_clips": {
+  "fire": {
+   "seconds": 0.35,
+   "beats": [
+    {
+     "part": "string",
+     "from": 0.0,
+     "to": 0.0,
+     "value": 1.0,
+     "why": "at full draw"
+    },
+    {
+     "part": "limb_top",
+     "from": 0.0,
+     "to": 0.0,
+     "value": 1.0,
+     "why": "bent"
+    },
+    {
+     "part": "limb_bottom",
+     "from": 0.0,
+     "to": 0.0,
+     "value": 1.0,
+     "why": "bent"
+    },
+    {
+     "part": "string",
+     "from": 0.0,
+     "to": 0.02,
+     "value": 0.0,
+     "ease": "in",
+     "why": "loosed"
+    },
+    {
+     "part": "limb_top",
+     "from": 0.0,
+     "to": 0.02,
+     "value": 0.0,
+     "ease": "in",
+     "why": "the limbs spring back"
+    },
+    {
+     "part": "limb_bottom",
+     "from": 0.0,
+     "to": 0.02,
+     "value": 0.0,
+     "ease": "in",
+     "why": "the limbs spring back"
+    },
+    {
+     "part": "arrow",
+     "from": 0.0,
+     "to": 0.05,
+     "offset": [
+      0.0,
+      500.0,
+      0.0
+     ],
+     "ease": "in",
+     "why": "the arrow is gone"
+    }
+   ]
+  },
+  "charge": {
+   "seconds": 1.5,
+   "beats": [
+    {
+     "part": "string",
+     "from": 0.2,
+     "to": 1.2,
+     "value": 1.0,
+     "ease": "inout",
+     "why": "drawn steadily to the anchor"
+    },
+    {
+     "part": "limb_top",
+     "from": 0.2,
+     "to": 1.2,
+     "value": 1.0,
+     "ease": "inout",
+     "why": "bending"
+    },
+    {
+     "part": "limb_bottom",
+     "from": 0.2,
+     "to": 1.2,
+     "value": 1.0,
+     "ease": "inout",
+     "why": "bending"
+    }
+   ]
+  },
+  "reload": {
+   "seconds": 1.8,
+   "beats": [
+    {
+     "part": "arrow",
+     "from": 0.0,
+     "to": 0.0,
+     "offset": [
+      0.0,
+      500.0,
+      0.0
+     ],
+     "why": "no arrow"
+    }
+   ]
+  },
+  "reload_empty": {
+   "seconds": 1.8,
+   "beats": [
+    {
+     "part": "arrow",
+     "from": 0.0,
+     "to": 0.0,
+     "offset": [
+      0.0,
+      500.0,
+      0.0
+     ],
+     "why": "no arrow"
+    }
+   ]
+  }
+ },
+ "hand_clips": {
+  "idle": {
+   "seconds": 3.0,
+   "loop": true,
+   "gun": [
+    {
+     "from": 0.0,
+     "to": 1.5,
+     "move": [
+      0.0,
+      0.0,
+      0.4
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 1.5,
+     "to": 3.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.0,
+     "to": 0.0,
+     "go": {
+      "part": "string",
+      "mark": "nock"
+     },
+     "grasp": "hook",
+     "why": "three fingers on the string at the nock"
+    }
+   ],
+   "expect": []
+  },
+  "walk": {
+   "seconds": 0.73,
+   "loop": true,
+   "gun": [
+    {
+     "from": 0.0,
+     "to": 0.365,
+     "move": [
+      0.6,
+      0.0,
+      -0.8
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 0.365,
+     "to": 0.73,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.0,
+     "to": 0.0,
+     "go": {
+      "part": "string",
+      "mark": "nock"
+     },
+     "grasp": "hook",
+     "why": "on the string"
+    }
+   ],
+   "expect": []
+  },
+  "run": {
+   "seconds": 0.6,
+   "loop": true,
+   "gun": [
+    {
+     "from": 0.0,
+     "to": 0.3,
+     "pitch": -30.0,
+     "move": [
+      6.0,
+      -10.0,
+      -20.0
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 0.3,
+     "to": 0.6,
+     "pitch": -28.0,
+     "move": [
+      6.0,
+      -10.0,
+      -18.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.0,
+     "to": 0.2,
+     "go": {
+      "place": "low_ready"
+     },
+     "why": "the right hand off the string while running"
+    }
+   ],
+   "expect": []
+  },
+  "charge": {
+   "seconds": 1.5,
+   "gun": [
+    {
+     "from": 0.1,
+     "to": 0.4,
+     "roll": -8.0,
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.0,
+     "to": 0.15,
+     "go": {
+      "part": "string",
+      "mark": "nock"
+     },
+     "grasp": "hook",
+     "why": "on the string; it rides the string to the anchor"
+    }
+   ],
+   "expect": [
+    {
+     "at": [
+      1.2,
+      1.5
+     ],
+     "on": {
+      "r": "nock"
+     }
+    }
+   ]
+  },
+  "fire": {
+   "seconds": 0.35,
+   "gun": [
+    {
+     "from": 0.0,
+     "to": 0.05,
+     "pitch": 2.0,
+     "move": [
+      0.0,
+      1.5,
+      0.0
+     ],
+     "ease": "out"
+    },
+    {
+     "from": 0.05,
+     "to": 0.35,
+     "pitch": 0.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "spring"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.0,
+     "to": 0.12,
+     "go": {
+      "place": "anchor",
+      "offset": [
+       -3.0,
+       -4.0,
+       -1.0
+      ]
+     },
+     "grasp": "open",
+     "why": "the fingers relax: the hand jumps back past the anchor"
+    }
+   ],
+   "expect": []
+  },
+  "reload": {
+   "seconds": 1.8,
+   "gun": [
+    {
+     "from": 0.1,
+     "to": 0.4,
+     "roll": -15.0,
+     "pitch": -10.0,
+     "ease": "inout"
+    },
+    {
+     "from": 1.4,
+     "to": 1.8,
+     "roll": 0.0,
+     "pitch": 0.0,
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.0,
+     "to": 0.45,
+     "go": {
+      "place": "quiver"
+     },
+     "why": "to the quiver"
+    },
+    {
+     "hand": "r",
+     "from": 0.45,
+     "to": 0.6,
+     "go": {
+      "place": "quiver",
+      "offset": [
+       0.0,
+       0.0,
+       6.0
+      ]
+     },
+     "carry": "arrow",
+     "why": "an arrow drawn by the nock"
+    },
+    {
+     "hand": "r",
+     "from": 0.6,
+     "to": 1.15,
+     "go": {
+      "mark": "rest",
+      "offset": [
+       0.0,
+       -40.0,
+       3.0
+      ]
+     },
+     "why": "laid over the rest"
+    },
+    {
+     "hand": "r",
+     "from": 1.15,
+     "to": 1.35,
+     "go": {
+      "part": "string",
+      "mark": "nock"
+     },
+     "seat": "arrow",
+     "why": "nocked on the string"
+    },
+    {
+     "hand": "r",
+     "from": 1.35,
+     "to": 1.5,
+     "go": {
+      "part": "string",
+      "mark": "nock"
+     },
+     "grasp": "hook",
+     "why": "the fingers set on the string"
+    }
+   ],
+   "expect": [
+    {
+     "at": 1.35,
+     "seated": "arrow"
+    }
+   ]
+  },
+  "reload_empty": {
+   "seconds": 1.8,
+   "gun": [
+    {
+     "from": 0.1,
+     "to": 0.4,
+     "roll": -15.0,
+     "pitch": -10.0,
+     "ease": "inout"
+    },
+    {
+     "from": 1.4,
+     "to": 1.8,
+     "roll": 0.0,
+     "pitch": 0.0,
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.0,
+     "to": 0.45,
+     "go": {
+      "place": "quiver"
+     },
+     "why": "to the quiver"
+    },
+    {
+     "hand": "r",
+     "from": 0.45,
+     "to": 0.6,
+     "go": {
+      "place": "quiver",
+      "offset": [
+       0.0,
+       0.0,
+       6.0
+      ]
+     },
+     "carry": "arrow",
+     "why": "an arrow"
+    },
+    {
+     "hand": "r",
+     "from": 0.6,
+     "to": 1.15,
+     "go": {
+      "mark": "rest",
+      "offset": [
+       0.0,
+       -40.0,
+       3.0
+      ]
+     },
+     "why": "over the rest"
+    },
+    {
+     "hand": "r",
+     "from": 1.15,
+     "to": 1.35,
+     "go": {
+      "part": "string",
+      "mark": "nock"
+     },
+     "seat": "arrow",
+     "why": "nocked"
+    },
+    {
+     "hand": "r",
+     "from": 1.35,
+     "to": 1.5,
+     "go": {
+      "part": "string",
+      "mark": "nock"
+     },
+     "grasp": "hook",
+     "why": "fingers set"
+    }
+   ],
+   "expect": []
+  },
+  "equip": {
+   "seconds": 0.7,
+   "gun": [
+    {
+     "from": 0.0,
+     "to": 0.0,
+     "pitch": -50.0,
+     "move": [
+      6.0,
+      -10.0,
+      -35.0
+     ]
+    },
+    {
+     "from": 0.0,
+     "to": 0.7,
+     "pitch": 0.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "out"
+    }
+   ],
+   "events": [],
+   "expect": []
+  },
+  "holster": {
+   "seconds": 0.55,
+   "gun": [
+    {
+     "from": 0.0,
+     "to": 0.55,
+     "pitch": -50.0,
+     "move": [
+      6.0,
+      -10.0,
+      -35.0
+     ],
+     "ease": "in"
+    }
+   ],
+   "events": [],
+   "expect": []
+  }
+ }
+}

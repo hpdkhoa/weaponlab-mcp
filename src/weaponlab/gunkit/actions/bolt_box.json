@@ -1,0 +1,111 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "bolt_box",
+ "name": "a turn-bolt worked by hand after each shot, fed from a detachable box magazine (M24A2)",
+ "extends": "_long_gun",
+ "guns": ["M24A2"],
+ "manuals": [
+  {"title": "TM 9-1005-306-10, Operator's Manual, Rifle 7.62 mm M24 Sniper Weapon System", "covers": "loading, unloading, working the bolt, the safety", "status": "to read"},
+  {"title": "FM 23-10, Sniper Training (US Army, 1994)", "covers": "the M24's bolt manipulation from the shoulder, the cheek weld kept", "status": "to read"}
+ ],
+ "parts": {
+  "bolt": {"kind": "slide", "what": "the bolt, drawn back along the bore", "travel_cm": 11.0},
+  "bolt_lift": {"kind": "turn", "what": "the bolt turned up by its knob to unlock (about 60 degrees on a Remington 700 action), round the bore"},
+  "release": {"kind": "slide", "what": "the magazine release in front of the trigger guard", "travel_cm": 0.4, "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "magazine": {"kind": "free", "what": "the detachable box magazine"}
+ },
+ "marks": ["grip", "support", "knob", "port", "mag_well", "mag_grab", "mag_lips", "release"],
+ "sources": [
+  "the knob rides the bolt: lifted with it (bolt_lift), drawn with it (bolt); facts mark_parts knob: [bolt_lift, bolt]",
+  "a trained shooter works a bolt in under a second without leaving the cheek weld (FM 23-10, to confirm; the game's CycleTime 1 s)"
+ ],
+ "gun_clips": {
+  "fire": {"seconds": 0.2, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the shot"},
+   {"part": "trigger", "from": 0.1, "to": 0.18, "value": 0.0, "ease": "inout", "why": "the trigger let out; the bolt stays shut until worked"}]},
+  "cycle": {"seconds": 1.0, "beats": [
+   {"part": "bolt_lift", "from": 0.12, "to": 0.22, "value": 1.0, "ease": "out", "why": "the knob lifted: the lugs unlock, the cocking piece cams back"},
+   {"part": "bolt", "from": 0.22, "to": 0.42, "value": 1.0, "ease": "out", "why": "drawn sharply back: the extractor throws the case"},
+   {"part": "bolt", "from": 0.47, "to": 0.64, "value": 0.0, "ease": "inout", "why": "pushed forward: it strips the next round"},
+   {"part": "bolt_lift", "from": 0.64, "to": 0.74, "value": 0.0, "ease": "in", "why": "turned down: locked"}]},
+  "charge": {"seconds": 1.0, "beats": [
+   {"part": "bolt_lift", "from": 0.12, "to": 0.22, "value": 1.0, "ease": "out", "why": "lifted"},
+   {"part": "bolt", "from": 0.22, "to": 0.42, "value": 1.0, "ease": "out", "why": "drawn"},
+   {"part": "bolt", "from": 0.47, "to": 0.64, "value": 0.0, "ease": "inout", "why": "home"},
+   {"part": "bolt_lift", "from": 0.64, "to": 0.74, "value": 0.0, "ease": "in", "why": "down"}]},
+  "check_chamber": {"seconds": 2.0, "beats": [
+   {"part": "bolt_lift", "from": 0.25, "to": 0.38, "value": 1.0, "ease": "out", "why": "lifted"},
+   {"part": "bolt", "from": 0.38, "to": 0.7, "value": 0.4, "ease": "inout", "why": "drawn part way: the round in the chamber shows, not extracted"},
+   {"part": "bolt", "from": 1.25, "to": 1.45, "value": 0.0, "ease": "inout", "why": "pushed home"},
+   {"part": "bolt_lift", "from": 1.45, "to": 1.55, "value": 0.0, "ease": "in", "why": "turned down"}]},
+  "reload": {"seconds": 2.6, "beats": [
+   {"part": "release", "from": 0.4, "to": 0.45, "value": 1.0, "ease": "out", "why": "the release pressed"},
+   {"part": "release", "from": 0.6, "to": 0.65, "value": 0.0, "ease": "in", "why": "it springs back"}]},
+  "reload_empty": {"seconds": 3.4, "beats": [
+   {"part": "bolt_lift", "from": 0.0, "to": 0.0, "value": 1.0, "why": "the shooter left the bolt open on the last case"},
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "open"},
+   {"part": "release", "from": 0.4, "to": 0.45, "value": 1.0, "ease": "out", "why": "the release pressed"},
+   {"part": "release", "from": 0.6, "to": 0.65, "value": 0.0, "ease": "in", "why": "it springs back"},
+   {"part": "bolt", "from": 2.45, "to": 2.62, "value": 0.0, "ease": "inout", "why": "pushed home: the top round chambered"},
+   {"part": "bolt_lift", "from": 2.62, "to": 2.72, "value": 0.0, "ease": "in", "why": "turned down"}]},
+  "check_mag": {"seconds": 2.4, "beats": [
+   {"part": "release", "from": 0.45, "to": 0.5, "value": 1.0, "ease": "out", "why": "pressed"},
+   {"part": "release", "from": 0.65, "to": 0.7, "value": 0.0, "ease": "in", "why": "back"}]}
+ },
+ "hand_clips": {
+  "cycle": {"seconds": 1.0,
+   "gun": [{"from": 0.05, "to": 0.2, "roll": 5.0, "ease": "inout"}, {"from": 0.75, "to": 0.95, "roll": 0.0, "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.0, "to": 0.12, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "the hand leaves the grip to the knob, the cheek stays on the stock"},
+    {"hand": "r", "from": 0.76, "to": 0.95, "go": {"mark": "grip"}, "why": "back to the grip, the finger to the trigger"}],
+   "expect": [{"at": [0.25, 0.6], "on": {"r": "knob", "l": "support"}}, {"at": [0.95, 1.0], "on": {"r": "grip"}}]},
+  "charge": {"seconds": 1.0,
+   "gun": [{"from": 0.05, "to": 0.2, "roll": 5.0, "ease": "inout"}, {"from": 0.75, "to": 0.95, "roll": 0.0, "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.0, "to": 0.12, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "to the knob"},
+    {"hand": "r", "from": 0.76, "to": 0.95, "go": {"mark": "grip"}, "why": "back to the grip"}],
+   "expect": [{"at": [0.25, 0.6], "on": {"r": "knob"}}]},
+  "check_chamber": {"seconds": 2.0,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 30.0, "pitch": 6.0, "move": [0.0, -5.0, 5.0], "ease": "inout"},
+           {"from": 1.6, "to": 2.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.1, "to": 0.25, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "to the knob"},
+    {"hand": "r", "from": 1.58, "to": 1.8, "go": {"mark": "grip"}, "why": "back to the grip"}],
+   "expect": [{"at": [0.8, 1.2], "visible": "port"}]},
+  "reload": {"seconds": 2.6,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 15.0, "pitch": 10.0, "move": [0.0, -4.0, 4.0], "ease": "inout"},
+           {"from": 2.2, "to": 2.6, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.1, "to": 0.4, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "the support hand under the magazine, a finger on the release"},
+    {"hand": "l", "from": 0.45, "to": 0.8, "go": {"place": "pouch_l"}, "carry": "magazine", "why": "out and to the pouch"},
+    {"hand": "l", "from": 0.8, "to": 1.0, "go": {"place": "pouch_l", "offset": [0.0, 0.0, -2.0]}, "why": "a full one drawn"},
+    {"hand": "l", "from": 1.0, "to": 1.45, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -4.0]}, "why": "up under the well"},
+    {"hand": "l", "from": 1.45, "to": 1.6, "go": {"mark": "mag_grab"}, "seat": "magazine", "ease": "out", "why": "seated, a tug"},
+    {"hand": "l", "from": 1.7, "to": 2.05, "go": {"mark": "support"}, "why": "back to the fore-end"}],
+   "expect": [{"at": 1.6, "seated": "magazine"}]},
+  "reload_empty": {"seconds": 3.4,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 15.0, "pitch": 10.0, "move": [0.0, -4.0, 4.0], "ease": "inout"},
+           {"from": 3.0, "to": 3.4, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.1, "to": 0.4, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "the support hand under the magazine"},
+    {"hand": "l", "from": 0.45, "to": 0.8, "go": {"place": "pouch_l"}, "carry": "magazine", "why": "to the pouch"},
+    {"hand": "l", "from": 0.8, "to": 1.0, "go": {"place": "pouch_l", "offset": [0.0, 0.0, -2.0]}, "why": "a full one"},
+    {"hand": "l", "from": 1.0, "to": 1.45, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -4.0]}, "why": "up under the well"},
+    {"hand": "l", "from": 1.45, "to": 1.6, "go": {"mark": "mag_grab"}, "seat": "magazine", "ease": "out", "why": "seated"},
+    {"hand": "l", "from": 1.7, "to": 2.05, "go": {"mark": "support"}, "why": "back to the fore-end"},
+    {"hand": "r", "from": 2.1, "to": 2.4, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "to the open bolt's knob"},
+    {"hand": "r", "from": 2.76, "to": 2.98, "go": {"mark": "grip"}, "why": "back to the grip"}],
+   "expect": [{"at": 1.6, "seated": "magazine"}, {"at": [3.0, 3.4], "on": {"r": "grip", "l": "support"}}]},
+  "check_mag": {"seconds": 2.4,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 20.0, "pitch": 10.0, "move": [0.0, -4.0, 5.0], "ease": "inout"},
+           {"from": 2.0, "to": 2.4, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.15, "to": 0.45, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "under the magazine"},
+    {"hand": "l", "from": 0.5, "to": 0.9, "go": {"mark": "mag_grab", "offset": [2.0, -2.0, -12.0]}, "carry": "magazine", "why": "drawn down and tipped to the eye"},
+    {"hand": "l", "from": 1.35, "to": 1.6, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -3.0]}, "why": "back under the well"},
+    {"hand": "l", "from": 1.6, "to": 1.75, "go": {"mark": "mag_grab"}, "seat": "magazine", "ease": "out", "why": "seated"},
+    {"hand": "l", "from": 1.8, "to": 2.1, "go": {"mark": "support"}, "why": "back to the fore-end"}],
+   "expect": [{"at": [0.95, 1.3], "visible": "mag_lips"}]}
+ }
+}

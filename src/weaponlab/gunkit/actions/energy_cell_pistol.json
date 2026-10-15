@@ -1,0 +1,53 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "energy_cell_pistol",
+ "name": "a fictional energy pistol fed by a cell in the grip, worked as a pistol's magazine (plasma pistol)",
+ "extends": "_pistol",
+ "guns": ["PP-1 Plasma pistol"],
+ "manuals": [],
+ "parts": {
+  "latch": {"kind": "slide", "what": "the cell release", "travel_cm": 0.4, "required": false},
+  "vent": {"kind": "turn", "what": "a heat vent that opens on a shot (a design choice)", "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "cell": {"kind": "free", "what": "the power cell in the grip"}
+ },
+ "marks": ["grip", "support", "mag_well", "mag_grab", "indicator", "latch"],
+ "sources": ["fictional: sizes from a real service pistol; the hands work the cell as a pistol's magazine"],
+ "gun_clips": {
+  "fire": {"seconds": 0.2, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.015, "value": 1.0, "ease": "in", "why": "the shot"},
+   {"part": "vent", "from": 0.015, "to": 0.05, "value": 1.0, "ease": "out", "why": "the vent opens"},
+   {"part": "vent", "from": 0.1, "to": 0.18, "value": 0.0, "ease": "inout", "why": "it closes"},
+   {"part": "trigger", "from": 0.08, "to": 0.15, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "reload": {"seconds": 2.0, "beats": [
+   {"part": "latch", "from": 0.3, "to": 0.34, "value": 1.0, "ease": "out", "why": "pressed"},
+   {"part": "latch", "from": 0.5, "to": 0.55, "value": 0.0, "ease": "in", "why": "back"}]},
+  "reload_empty": {"seconds": 2.0, "beats": [
+   {"part": "latch", "from": 0.15, "to": 0.19, "value": 1.0, "ease": "out", "why": "pressed"},
+   {"part": "latch", "from": 0.35, "to": 0.4, "value": 0.0, "ease": "in", "why": "back"},
+   {"part": "cell", "from": 0.19, "to": 0.5, "offset": [0.0, -2.0, -55.0], "ease": "in", "why": "the spent cell falls"}]}
+ },
+ "hand_clips": {
+  "reload": {"seconds": 2.0,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 10.0, "pitch": 15.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
+           {"from": 1.6, "to": 2.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.05, "to": 0.3, "go": {"part": "cell", "mark": "mag_grab"}, "grasp": "cup", "why": "under the cell"},
+    {"hand": "l", "from": 0.36, "to": 0.7, "go": {"place": "pouch_l"}, "carry": "cell", "why": "to the pouch"},
+    {"hand": "l", "from": 0.7, "to": 0.85, "go": {"place": "pouch_l", "offset": [0.0, 0.0, -2.0]}, "why": "a charged one"},
+    {"hand": "l", "from": 0.85, "to": 1.25, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -4.0]}, "why": "to the grip"},
+    {"hand": "l", "from": 1.25, "to": 1.38, "go": {"mark": "mag_grab"}, "seat": "cell", "grasp": "palm", "ease": "out", "why": "seated"},
+    {"hand": "l", "from": 1.4, "to": 1.65, "go": {"mark": "support"}, "why": "round the grip"}],
+   "expect": [{"at": 1.38, "seated": "cell"}]},
+  "reload_empty": {"seconds": 2.0,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 10.0, "pitch": 15.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
+           {"from": 1.6, "to": 2.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.1, "to": 0.5, "go": {"place": "pouch_l"}, "why": "to the pouch"},
+    {"hand": "l", "from": 0.5, "to": 0.62, "go": {"place": "pouch_l", "offset": [0.0, 0.0, -2.0]}, "carry": "cell", "why": "a charged one"},
+    {"hand": "l", "from": 0.62, "to": 1.0, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -4.0]}, "why": "to the grip"},
+    {"hand": "l", "from": 1.0, "to": 1.12, "go": {"mark": "mag_grab"}, "seat": "cell", "grasp": "palm", "ease": "out", "why": "seated"},
+    {"hand": "l", "from": 1.15, "to": 1.45, "go": {"mark": "support"}, "why": "round the grip"}],
+   "expect": [{"at": 1.12, "seated": "cell"}]}
+ }
+}

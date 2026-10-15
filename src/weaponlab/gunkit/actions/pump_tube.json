@@ -1,0 +1,85 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "pump_tube",
+ "name": "a pump (slide) action over a tube magazine, loaded a shell at a time through the port underneath (Model 12)",
+ "extends": "_long_gun",
+ "guns": ["Model 12 trench gun"],
+ "manuals": [
+  {"title": "a public-domain manual for the Winchester Model 12 trench gun (a US Army handbook of the 1940s)", "covers": "working the slide, loading the magazine tube, the slide release", "status": "to find"}
+ ],
+ "parts": {
+  "pump": {"kind": "slide", "what": "the slide handle (fore-end), drawn back by the support hand", "travel_cm": 9.0},
+  "bolt": {"kind": "slide", "what": "the breech bolt, drawn back with the slide", "travel_cm": 9.0},
+  "carrier": {"kind": "turn", "what": "the carrier (lifter) raising a shell to the chamber", "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "shell": {"kind": "free", "what": "one shell in the hand on its way to the loading port", "required": false}
+ },
+ "marks": ["grip", "support", "port", "load_port"],
+ "sources": [
+  "the support hand rides the slide (facts mark_parts support: pump)",
+  "a pump stroke takes about a third of a second when worked hard",
+  "the game loads one shell per reload clip and plays it again for each (single loading)"
+ ],
+ "gun_clips": {
+  "fire": {"seconds": 0.2, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the shot"},
+   {"part": "trigger", "from": 0.1, "to": 0.18, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "cycle": {"seconds": 0.55, "beats": [
+   {"part": "pump", "from": 0.05, "to": 0.2, "value": 1.0, "ease": "out", "why": "the slide jerked back: the bolt unlocks and draws, the hull thrown"},
+   {"part": "bolt", "from": 0.05, "to": 0.2, "value": 1.0, "ease": "out", "why": "the bolt with it"},
+   {"part": "carrier", "from": 0.15, "to": 0.22, "value": 1.0, "ease": "out", "why": "the carrier lifts the next shell"},
+   {"part": "pump", "from": 0.25, "to": 0.4, "value": 0.0, "ease": "inout", "why": "driven forward: the shell chambered"},
+   {"part": "bolt", "from": 0.25, "to": 0.4, "value": 0.0, "ease": "inout", "why": "home"},
+   {"part": "carrier", "from": 0.3, "to": 0.36, "value": 0.0, "ease": "in", "why": "down"}]},
+  "charge": {"seconds": 0.55, "beats": [
+   {"part": "pump", "from": 0.05, "to": 0.2, "value": 1.0, "ease": "out", "why": "back"},
+   {"part": "bolt", "from": 0.05, "to": 0.2, "value": 1.0, "ease": "out", "why": "back"},
+   {"part": "carrier", "from": 0.15, "to": 0.22, "value": 1.0, "ease": "out", "why": "up"},
+   {"part": "pump", "from": 0.25, "to": 0.4, "value": 0.0, "ease": "inout", "why": "forward"},
+   {"part": "bolt", "from": 0.25, "to": 0.4, "value": 0.0, "ease": "inout", "why": "home"},
+   {"part": "carrier", "from": 0.3, "to": 0.36, "value": 0.0, "ease": "in", "why": "down"}]},
+  "check_chamber": {"seconds": 1.8, "beats": [
+   {"part": "pump", "from": 0.35, "to": 0.6, "value": 0.3, "ease": "inout", "why": "the slide eased back a little (the slide release pressed on a cocked gun): the shell's rim shows"},
+   {"part": "bolt", "from": 0.35, "to": 0.6, "value": 0.3, "ease": "inout", "why": "the bolt with it"},
+   {"part": "pump", "from": 1.1, "to": 1.25, "value": 0.0, "ease": "inout", "why": "closed"},
+   {"part": "bolt", "from": 1.1, "to": 1.25, "value": 0.0, "ease": "inout", "why": "home"}]},
+  "reload": {"seconds": 1.3, "beats": []},
+  "reload_empty": {"seconds": 1.9, "beats": [
+   {"part": "pump", "from": 1.35, "to": 1.5, "value": 1.0, "ease": "out", "why": "a stroke to chamber the first shell"},
+   {"part": "bolt", "from": 1.35, "to": 1.5, "value": 1.0, "ease": "out", "why": "back"},
+   {"part": "pump", "from": 1.55, "to": 1.7, "value": 0.0, "ease": "inout", "why": "forward"},
+   {"part": "bolt", "from": 1.55, "to": 1.7, "value": 0.0, "ease": "inout", "why": "home"}]}
+ },
+ "hand_clips": {
+  "cycle": {"seconds": 0.55,
+   "gun": [{"from": 0.05, "to": 0.15, "pitch": 1.0, "ease": "out"}, {"from": 0.35, "to": 0.55, "pitch": 0.0, "ease": "inout"}],
+   "events": [],
+   "expect": [{"at": [0.0, 0.55], "on": {"r": "grip", "l": "support"}}]},
+  "charge": {"seconds": 0.55, "gun": [], "events": [], "expect": []},
+  "check_chamber": {"seconds": 1.8,
+   "gun": [{"from": 0.1, "to": 0.35, "roll": 30.0, "pitch": 8.0, "move": [0.0, -5.0, 5.0], "ease": "inout"},
+           {"from": 1.4, "to": 1.8, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [],
+   "expect": [{"at": [0.7, 1.0], "visible": "port"}]},
+  "reload": {"seconds": 1.3,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": -70.0, "pitch": 5.0, "move": [0.0, -4.0, 2.0], "ease": "inout"},
+           {"from": 1.05, "to": 1.3, "roll": -70.0, "pitch": 5.0, "move": [0.0, -4.0, 2.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.0, "to": 0.35, "go": {"place": "chest_l"}, "why": "the support hand to the shell carrier on the chest"},
+    {"hand": "l", "from": 0.35, "to": 0.45, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "carry": "shell", "why": "one shell"},
+    {"hand": "l", "from": 0.45, "to": 0.8, "go": {"mark": "load_port", "offset": [0.0, -3.0, -3.0]}, "why": "the gun rolled on its side, the shell to the port"},
+    {"hand": "l", "from": 0.8, "to": 0.95, "go": {"mark": "load_port", "offset": [0.0, 4.0, 0.0]}, "seat": "shell", "grasp": "thumb", "why": "pushed in past the carrier and the shell latch with the thumb"},
+    {"hand": "l", "from": 1.0, "to": 1.2, "go": {"mark": "load_port", "offset": [0.0, 0.0, -4.0]}, "why": "the thumb out, ready for the next"}],
+   "expect": []},
+  "reload_empty": {"seconds": 1.9,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": -70.0, "pitch": 5.0, "move": [0.0, -4.0, 2.0], "ease": "inout"},
+           {"from": 1.0, "to": 1.25, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.0, "to": 0.35, "go": {"place": "chest_l"}, "why": "to the shells"},
+    {"hand": "l", "from": 0.35, "to": 0.45, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "carry": "shell", "why": "one shell"},
+    {"hand": "l", "from": 0.45, "to": 0.8, "go": {"mark": "load_port", "offset": [0.0, -3.0, -3.0]}, "why": "to the port"},
+    {"hand": "l", "from": 0.8, "to": 0.95, "go": {"mark": "load_port", "offset": [0.0, 4.0, 0.0]}, "seat": "shell", "grasp": "thumb", "why": "in"},
+    {"hand": "l", "from": 1.0, "to": 1.3, "go": {"part": "pump", "mark": "support"}, "why": "back to the slide to work it"}],
+   "expect": [{"at": [1.35, 1.75], "on": {"l": "support"}}]}
+ }
+}

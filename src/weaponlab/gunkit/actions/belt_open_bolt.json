@@ -1,0 +1,90 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "belt_open_bolt",
+ "name": "a belt-fed machine gun firing from an open bolt: a feed cover that lifts, a charging handle on the right that does not move when it fires (M60)",
+ "extends": "_long_gun",
+ "guns": ["M60"],
+ "manuals": [
+  {"title": "FM 3-22.68, Crew-Served Machine Guns, 5.56-mm and 7.62-mm (US Army, 2003)", "covers": "the M60: loading the belt, the cover, charging, clearing", "status": "to read"}
+ ],
+ "parts": {
+  "bolt": {"kind": "slide", "what": "the bolt and operating rod; 1 is back on the sear (ready), 0 forward", "travel_cm": 13.0},
+  "handle": {"kind": "slide", "what": "the charging handle, pulled back to cock and pushed forward again by hand", "travel_cm": 13.0},
+  "cover": {"kind": "turn", "what": "the feed cover, lifted on its hinge at the rear (about 80 degrees)"},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "belt": {"kind": "free", "what": "the end of the belt, laid on the feed tray"}
+ },
+ "marks": ["grip", "support", "handle", "cover_latch", "tray", "port"],
+ "sources": [
+  "the M60 fires about 550 rounds a minute: a cycle of 0.11 s (FM 3-22.68, to confirm)",
+  "the belt's first round goes into the tray groove, the cover is closed on it; the bolt must be back first"
+ ],
+ "gun_clips": {
+  "fire": {"seconds": 0.25, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "back on the sear"},
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the sear lets go"},
+   {"part": "bolt", "from": 0.02, "to": 0.065, "value": 0.0, "ease": "in", "why": "forward: fed and fired"},
+   {"part": "bolt", "from": 0.065, "to": 0.11, "value": 1.0, "ease": "out", "why": "back onto the sear"},
+   {"part": "trigger", "from": 0.13, "to": 0.2, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "charge": {"seconds": 1.6, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 0.0, "why": "forward"},
+   {"part": "handle", "from": 0.4, "to": 0.7, "value": 1.0, "ease": "out", "why": "the handle pulled back, palm up"},
+   {"part": "bolt", "from": 0.4, "to": 0.7, "value": 1.0, "ease": "out", "why": "the bolt comes back and is caught"},
+   {"part": "handle", "from": 0.85, "to": 1.15, "value": 0.0, "ease": "inout", "why": "the handle pushed forward again by hand"}]},
+  "reload": {"seconds": 6.0, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "ready: back"},
+   {"part": "cover", "from": 0.8, "to": 1.1, "value": 1.0, "ease": "out", "why": "the latch pressed, the cover lifted"},
+   {"part": "belt", "from": 0.0, "to": 0.0, "offset": [0.0, 0.0, 0.0], "why": "the old belt's end where it lies"},
+   {"part": "cover", "from": 4.4, "to": 4.6, "value": 0.0, "ease": "in", "why": "closed on the new belt"}]},
+  "reload_empty": {"seconds": 6.0, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "back"},
+   {"part": "cover", "from": 0.8, "to": 1.1, "value": 1.0, "ease": "out", "why": "lifted"},
+   {"part": "cover", "from": 4.4, "to": 4.6, "value": 0.0, "ease": "in", "why": "closed"}]},
+  "check_chamber": {"seconds": 2.6, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "back"},
+   {"part": "cover", "from": 0.6, "to": 0.9, "value": 1.0, "ease": "out", "why": "lifted to look at the tray and the chamber"},
+   {"part": "cover", "from": 1.9, "to": 2.1, "value": 0.0, "ease": "in", "why": "closed"}]}
+ },
+ "hand_clips": {
+  "charge": {"seconds": 1.6,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": -10.0, "move": [0.0, -3.0, 0.0], "ease": "inout"},
+           {"from": 1.2, "to": 1.6, "roll": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.1, "to": 0.38, "go": {"part": "handle", "mark": "handle"}, "grasp": "palm", "why": "the strong hand to the handle, palm up"},
+    {"hand": "r", "from": 1.18, "to": 1.45, "go": {"mark": "grip"}, "why": "back to the grip"}],
+   "expect": []},
+  "reload": {"seconds": 6.0,
+   "gun": [{"from": 0.1, "to": 0.6, "roll": 0.0, "pitch": 5.0, "move": [0.0, -8.0, 4.0], "ease": "inout"},
+           {"from": 5.4, "to": 6.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.2, "to": 0.75, "go": {"mark": "cover_latch"}, "grasp": "thumb", "why": "the support hand to the cover latch"},
+    {"hand": "l", "from": 1.15, "to": 1.6, "go": {"mark": "tray", "offset": [-6.0, 0.0, 3.0]}, "why": "the old belt end lifted out"},
+    {"hand": "l", "from": 1.7, "to": 2.6, "go": {"place": "chest_l"}, "why": "to the ammunition box or bag for a new belt"},
+    {"hand": "l", "from": 2.6, "to": 2.8, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "carry": "belt", "why": "the belt's end taken"},
+    {"hand": "l", "from": 2.8, "to": 3.6, "go": {"mark": "tray", "offset": [-4.0, 0.0, 3.0]}, "why": "the belt end to the tray, open side down"},
+    {"hand": "l", "from": 3.6, "to": 4.0, "go": {"mark": "tray"}, "seat": "belt", "why": "the first round in the tray groove"},
+    {"hand": "l", "from": 4.1, "to": 4.4, "go": {"part": "cover", "mark": "cover_latch"}, "grasp": "palm", "why": "the palm on the cover"},
+    {"hand": "l", "from": 4.6, "to": 5.3, "go": {"mark": "support"}, "why": "back to the gun's support (a bipod or the handguard)"}],
+   "expect": [{"at": 4.0, "seated": "belt"}, {"at": [5.4, 6.0], "on": {"r": "grip", "l": "support"}}]},
+  "reload_empty": {"seconds": 6.0,
+   "gun": [{"from": 0.1, "to": 0.6, "roll": 0.0, "pitch": 5.0, "move": [0.0, -8.0, 4.0], "ease": "inout"},
+           {"from": 5.4, "to": 6.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.2, "to": 0.75, "go": {"mark": "cover_latch"}, "grasp": "thumb", "why": "to the latch"},
+    {"hand": "l", "from": 1.7, "to": 2.6, "go": {"place": "chest_l"}, "why": "to the ammunition"},
+    {"hand": "l", "from": 2.6, "to": 2.8, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "carry": "belt", "why": "the belt's end"},
+    {"hand": "l", "from": 2.8, "to": 3.6, "go": {"mark": "tray", "offset": [-4.0, 0.0, 3.0]}, "why": "to the tray"},
+    {"hand": "l", "from": 3.6, "to": 4.0, "go": {"mark": "tray"}, "seat": "belt", "why": "laid in"},
+    {"hand": "l", "from": 4.1, "to": 4.4, "go": {"part": "cover", "mark": "cover_latch"}, "grasp": "palm", "why": "the cover closed"},
+    {"hand": "l", "from": 4.6, "to": 5.3, "go": {"mark": "support"}, "why": "back"}],
+   "expect": [{"at": 4.0, "seated": "belt"}]},
+  "check_chamber": {"seconds": 2.6,
+   "gun": [{"from": 0.1, "to": 0.5, "pitch": 5.0, "move": [0.0, -8.0, 4.0], "ease": "inout"},
+           {"from": 2.2, "to": 2.6, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.15, "to": 0.55, "go": {"mark": "cover_latch"}, "grasp": "thumb", "why": "to the latch"},
+    {"hand": "l", "from": 1.7, "to": 1.9, "go": {"part": "cover", "mark": "cover_latch"}, "grasp": "palm", "why": "on the cover to close it"},
+    {"hand": "l", "from": 2.1, "to": 2.45, "go": {"mark": "support"}, "why": "back"}],
+   "expect": [{"at": [1.0, 1.6], "visible": "tray"}]}
+ }
+}

@@ -1,0 +1,75 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "break_open",
+ "name": "a single-shot break-open launcher: the barrel tips down on its hinge, the case is pulled out, a round pushed in, the barrel closed (M79)",
+ "extends": "_long_gun",
+ "guns": ["M79 grenade launcher"],
+ "manuals": [
+  {"title": "FM 23-31, 40-mm Grenade Launchers M203 and M79 (US Army)", "covers": "opening the M79, extracting, loading, the safety", "status": "to read"}
+ ],
+ "parts": {
+  "barrel": {"kind": "turn", "what": "the barrel tipped down on its hinge (about 45 degrees)"},
+  "latch": {"kind": "turn", "what": "the barrel latch on top, pushed right", "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "round": {"kind": "free", "what": "the grenade round: the spent case out, a new one in"}
+ },
+ "marks": ["grip", "support", "latch", "breech", "port"],
+ "sources": ["the breech and its round ride the barrel (facts mark_parts breech: barrel)"],
+ "gun_clips": {
+  "fire": {"seconds": 0.25, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the shot"},
+   {"part": "trigger", "from": 0.12, "to": 0.2, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "reload": {"seconds": 3.2, "beats": [
+   {"part": "latch", "from": 0.2, "to": 0.28, "value": 1.0, "ease": "out", "why": "the thumb pushes the latch right"},
+   {"part": "barrel", "from": 0.3, "to": 0.55, "value": 1.0, "ease": "out", "why": "the barrel falls open"},
+   {"part": "latch", "from": 0.5, "to": 0.55, "value": 0.0, "ease": "in", "why": "the latch back"},
+   {"part": "barrel", "from": 2.6, "to": 2.8, "value": 0.0, "ease": "in", "why": "closed with a snap"}]},
+  "reload_empty": {"seconds": 3.2, "beats": [
+   {"part": "latch", "from": 0.2, "to": 0.28, "value": 1.0, "ease": "out", "why": "the latch"},
+   {"part": "barrel", "from": 0.3, "to": 0.55, "value": 1.0, "ease": "out", "why": "open"},
+   {"part": "latch", "from": 0.5, "to": 0.55, "value": 0.0, "ease": "in", "why": "back"},
+   {"part": "barrel", "from": 2.6, "to": 2.8, "value": 0.0, "ease": "in", "why": "closed"}]},
+  "check_chamber": {"seconds": 2.0, "beats": [
+   {"part": "latch", "from": 0.2, "to": 0.28, "value": 1.0, "ease": "out", "why": "the latch"},
+   {"part": "barrel", "from": 0.3, "to": 0.55, "value": 0.6, "ease": "out", "why": "opened enough to see the round's base"},
+   {"part": "latch", "from": 0.5, "to": 0.55, "value": 0.0, "ease": "in", "why": "back"},
+   {"part": "barrel", "from": 1.4, "to": 1.55, "value": 0.0, "ease": "in", "why": "closed"}]}
+ },
+ "hand_clips": {
+  "reload": {"seconds": 3.2,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 5.0, "pitch": -10.0, "move": [0.0, -6.0, 0.0], "ease": "inout"},
+           {"from": 2.8, "to": 3.2, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.3, "to": 0.55, "go": {"part": "barrel", "mark": "support"}, "why": "the support hand rides the barrel down"},
+    {"hand": "l", "from": 0.65, "to": 0.95, "go": {"part": "barrel", "mark": "breech"}, "grasp": "pinch", "why": "fingers to the case rim at the breech"},
+    {"hand": "l", "from": 0.95, "to": 1.25, "go": {"place": "drop"}, "carry": "round", "why": "the spent case pulled out and dropped"},
+    {"hand": "l", "from": 1.25, "to": 1.6, "go": {"place": "chest_l"}, "why": "to the round on the vest"},
+    {"hand": "l", "from": 1.6, "to": 1.75, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "why": "a new round drawn (the hand still holds the round part: the old case is now the new round)"},
+    {"hand": "l", "from": 1.75, "to": 2.2, "go": {"part": "barrel", "mark": "breech", "offset": [0.0, -6.0, 0.0]}, "why": "to the open breech"},
+    {"hand": "l", "from": 2.2, "to": 2.4, "go": {"part": "barrel", "mark": "breech"}, "seat": "round", "why": "pushed in"},
+    {"hand": "l", "from": 2.45, "to": 2.6, "go": {"part": "barrel", "mark": "support"}, "why": "under the barrel"},
+    {"hand": "l", "from": 2.6, "to": 2.8, "go": {"mark": "support"}, "why": "it closes the barrel and stays"}],
+   "expect": [{"at": 2.4, "seated": "round"}]},
+  "reload_empty": {"seconds": 3.2,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 5.0, "pitch": -10.0, "move": [0.0, -6.0, 0.0], "ease": "inout"},
+           {"from": 2.8, "to": 3.2, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.3, "to": 0.55, "go": {"part": "barrel", "mark": "support"}, "why": "rides the barrel down"},
+    {"hand": "l", "from": 0.65, "to": 0.95, "go": {"part": "barrel", "mark": "breech"}, "grasp": "pinch", "why": "to the case"},
+    {"hand": "l", "from": 0.95, "to": 1.25, "go": {"place": "drop"}, "carry": "round", "why": "out and dropped"},
+    {"hand": "l", "from": 1.25, "to": 1.6, "go": {"place": "chest_l"}, "why": "to the vest"},
+    {"hand": "l", "from": 1.6, "to": 1.75, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "why": "a round drawn"},
+    {"hand": "l", "from": 1.75, "to": 2.2, "go": {"part": "barrel", "mark": "breech", "offset": [0.0, -6.0, 0.0]}, "why": "to the breech"},
+    {"hand": "l", "from": 2.2, "to": 2.4, "go": {"part": "barrel", "mark": "breech"}, "seat": "round", "why": "in"},
+    {"hand": "l", "from": 2.45, "to": 2.6, "go": {"part": "barrel", "mark": "support"}, "why": "under the barrel"},
+    {"hand": "l", "from": 2.6, "to": 2.8, "go": {"mark": "support"}, "why": "closed"}],
+   "expect": []},
+  "check_chamber": {"seconds": 2.0,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 5.0, "pitch": -5.0, "move": [0.0, -6.0, 2.0], "ease": "inout"},
+           {"from": 1.6, "to": 2.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.3, "to": 0.55, "go": {"part": "barrel", "mark": "support"}, "why": "rides the barrel"},
+    {"hand": "l", "from": 1.4, "to": 1.55, "go": {"mark": "support"}, "why": "closes it"}],
+   "expect": [{"at": [0.7, 1.2], "visible": "breech"}]}
+ }
+}

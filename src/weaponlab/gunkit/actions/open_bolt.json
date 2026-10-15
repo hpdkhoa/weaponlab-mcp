@@ -1,0 +1,93 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "open_bolt",
+ "name": "an open-bolt submachine gun: the bolt rests back on the sear, runs forward and fires, comes back; a handle on the bolt (MP 40 on the left, MAC-11 on top)",
+ "extends": "_long_gun",
+ "guns": ["MP 40", "MAC-11"],
+ "manuals": [
+  {"title": "a public-domain handbook of the MP 40 (a US War Department foreign weapons handbook)", "covers": "cocking, the safety notch, the magazine", "status": "to find"}
+ ],
+ "parts": {
+  "bolt": {"kind": "slide", "what": "the bolt with its handle; 1 is back on the sear (cocked), 0 forward", "travel_cm": 11.0},
+  "release": {"kind": "slide", "what": "the magazine catch button on the magazine housing", "travel_cm": 0.4, "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "magazine": {"kind": "free", "what": "the stick magazine"}
+ },
+ "marks": ["grip", "support", "handle", "port", "mag_well", "mag_grab", "mag_lips", "release"],
+ "sources": [
+  "the MP 40 fires at about 500 rounds a minute: a cycle of 0.12 s (Wikipedia, MP 40)",
+  "open bolt: the bolt is back while the gun is ready; the gun clips start with it at 1 unless the gun was fired dry"
+ ],
+ "gun_clips": {
+  "fire": {"seconds": 0.25, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "cocked: back on the sear"},
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the sear lets go"},
+   {"part": "bolt", "from": 0.02, "to": 0.06, "value": 0.0, "ease": "in", "why": "the bolt runs forward, strips and fires"},
+   {"part": "bolt", "from": 0.06, "to": 0.12, "value": 1.0, "ease": "out", "why": "blown back onto the sear"},
+   {"part": "trigger", "from": 0.13, "to": 0.2, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "reload": {"seconds": 2.4, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "cocked"},
+   {"part": "release", "from": 0.35, "to": 0.4, "value": 1.0, "ease": "out", "why": "the catch pressed"},
+   {"part": "release", "from": 0.55, "to": 0.6, "value": 0.0, "ease": "in", "why": "back"}]},
+  "reload_empty": {"seconds": 2.4, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "an open-bolt gun ends a string back on the sear"},
+   {"part": "release", "from": 0.35, "to": 0.4, "value": 1.0, "ease": "out", "why": "the catch pressed"},
+   {"part": "release", "from": 0.55, "to": 0.6, "value": 0.0, "ease": "in", "why": "back"}]},
+  "charge": {"seconds": 1.2, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 0.0, "why": "the bolt forward (uncocked)"},
+   {"part": "bolt", "from": 0.4, "to": 0.62, "value": 1.0, "ease": "out", "why": "the handle drawn back until the sear holds it"}]},
+  "check_chamber": {"seconds": 1.6, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "cocked: the empty chamber shows through the port"}]},
+  "check_mag": {"seconds": 2.2, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "cocked"},
+   {"part": "release", "from": 0.4, "to": 0.45, "value": 1.0, "ease": "out", "why": "pressed"},
+   {"part": "release", "from": 0.6, "to": 0.65, "value": 0.0, "ease": "in", "why": "back"}]}
+ },
+ "hand_clips": {
+  "reload": {"seconds": 2.4,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 20.0, "pitch": 10.0, "move": [0.0, -4.0, 4.0], "ease": "inout"},
+           {"from": 2.0, "to": 2.4, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.1, "to": 0.38, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "the support hand from the housing to the magazine"},
+    {"hand": "l", "from": 0.42, "to": 0.75, "go": {"place": "pouch_l"}, "carry": "magazine", "why": "out and to the pouch"},
+    {"hand": "l", "from": 0.75, "to": 0.95, "go": {"place": "pouch_l", "offset": [0.0, 0.0, -2.0]}, "why": "a full one drawn"},
+    {"hand": "l", "from": 0.95, "to": 1.4, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -4.0]}, "why": "up the housing"},
+    {"hand": "l", "from": 1.4, "to": 1.55, "go": {"mark": "mag_grab"}, "seat": "magazine", "ease": "out", "why": "seated with a click"},
+    {"hand": "l", "from": 1.65, "to": 2.0, "go": {"mark": "support"}, "why": "back on the housing (not the magazine: it feeds badly held)"}],
+   "expect": [{"at": 1.55, "seated": "magazine"}]},
+  "reload_empty": {"seconds": 2.4,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 20.0, "pitch": 10.0, "move": [0.0, -4.0, 4.0], "ease": "inout"},
+           {"from": 2.0, "to": 2.4, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.1, "to": 0.38, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "to the magazine"},
+    {"hand": "l", "from": 0.42, "to": 0.75, "go": {"place": "dump"}, "carry": "magazine", "why": "the empty one into the dump pouch"},
+    {"hand": "l", "from": 0.75, "to": 0.95, "go": {"place": "pouch_l", "offset": [0.0, 0.0, -2.0]}, "why": "a full one"},
+    {"hand": "l", "from": 0.95, "to": 1.4, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -4.0]}, "why": "up the housing"},
+    {"hand": "l", "from": 1.4, "to": 1.55, "go": {"mark": "mag_grab"}, "seat": "magazine", "ease": "out", "why": "seated"},
+    {"hand": "l", "from": 1.65, "to": 2.0, "go": {"mark": "support"}, "why": "back on the housing"}],
+   "expect": [{"at": 1.55, "seated": "magazine"}]},
+  "charge": {"seconds": 1.2,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 10.0, "move": [0.0, -2.0, 2.0], "ease": "inout"},
+           {"from": 0.85, "to": 1.2, "roll": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.1, "to": 0.38, "go": {"part": "bolt", "mark": "handle"}, "grasp": "pinch", "why": "the support hand to the handle"},
+    {"hand": "l", "from": 0.65, "to": 0.68, "go": {"part": "bolt", "mark": "handle", "value": 1.0}, "why": "the bolt caught on the sear; the hand lets go"},
+    {"hand": "l", "from": 0.75, "to": 1.05, "go": {"mark": "support"}, "why": "back on the housing"}],
+   "expect": []},
+  "check_chamber": {"seconds": 1.6,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 30.0, "pitch": 8.0, "move": [0.0, -5.0, 5.0], "ease": "inout"},
+           {"from": 1.2, "to": 1.6, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [],
+   "expect": [{"at": [0.6, 1.0], "visible": "port"}]},
+  "check_mag": {"seconds": 2.2,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 20.0, "pitch": 10.0, "move": [0.0, -4.0, 5.0], "ease": "inout"},
+           {"from": 1.8, "to": 2.2, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.15, "to": 0.43, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "to the magazine"},
+    {"hand": "l", "from": 0.47, "to": 0.85, "go": {"mark": "mag_grab", "offset": [2.0, -2.0, -14.0]}, "carry": "magazine", "why": "out and tipped to the eye"},
+    {"hand": "l", "from": 1.25, "to": 1.5, "go": {"mark": "mag_grab", "offset": [0.0, 0.0, -3.0]}, "why": "back up"},
+    {"hand": "l", "from": 1.5, "to": 1.62, "go": {"mark": "mag_grab"}, "seat": "magazine", "ease": "out", "why": "seated"},
+    {"hand": "l", "from": 1.65, "to": 1.95, "go": {"mark": "support"}, "why": "back on the housing"}],
+   "expect": [{"at": [0.9, 1.2], "visible": "mag_lips"}]}
+ }
+}

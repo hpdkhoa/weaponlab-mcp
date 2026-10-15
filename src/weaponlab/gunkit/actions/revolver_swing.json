@@ -1,0 +1,96 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "revolver_swing",
+ "name": "a double-action revolver with a cylinder that swings out to the left on its crane; empties pushed out by the ejector rod; a speed loader",
+ "extends": "_pistol",
+ "guns": [".357 revolver"],
+ "manuals": [
+  {"title": "FM 23-35, Combat Training with Pistols and Revolvers (US Army, 1988)", "covers": "the revolver: opening the cylinder, ejecting, loading, the speed loader", "status": "to read"}
+ ],
+ "parts": {
+  "crane": {"kind": "turn", "what": "the crane, the cylinder swung out to the left round the crane's pin (about 75 degrees)"},
+  "cylinder": {"kind": "turn", "what": "the cylinder turning a chamber on each pull (60 degrees for six)"},
+  "latch": {"kind": "slide", "what": "the cylinder latch on the left, pushed forward", "travel_cm": 0.5, "required": false},
+  "ejector": {"kind": "slide", "what": "the ejector rod and star, pushed back through the cylinder", "travel_cm": 3.5, "required": false},
+  "hammer": {"kind": "turn", "what": "the hammer, raised by the trigger and let fall", "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "loader": {"kind": "free", "what": "a speed loader with six rounds, in the hand during a reload only", "required": false}
+ },
+ "marks": ["grip", "support", "latch", "cylinder_face", "ejector", "port"],
+ "sources": [
+  "the cylinder face and the ejector ride the crane (facts mark_parts cylinder_face: crane, ejector: crane)",
+  "port: a chamber mouth at the cylinder's rear face, what the check shows"
+ ],
+ "gun_clips": {
+  "fire": {"seconds": 0.3, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.12, "value": 1.0, "ease": "inout", "why": "a double-action pull, long and heavy"},
+   {"part": "hammer", "from": 0.0, "to": 0.11, "value": 1.0, "ease": "in", "why": "the pull raises the hammer"},
+   {"part": "cylinder", "from": 0.0, "to": 0.11, "value": 1.0, "ease": "inout", "why": "and turns the next chamber in line"},
+   {"part": "hammer", "from": 0.11, "to": 0.12, "value": 0.0, "ease": "in", "why": "it falls: the shot"},
+   {"part": "trigger", "from": 0.15, "to": 0.25, "value": 0.0, "ease": "inout", "why": "let out"},
+   {"part": "cylinder", "from": 0.29, "to": 0.3, "value": 0.0, "ease": "snap", "why": "the next chamber is the new rest (a clip ends where it began)"}]},
+  "reload": {"seconds": 3.6, "beats": [
+   {"part": "latch", "from": 0.2, "to": 0.25, "value": 1.0, "ease": "out", "why": "the thumb pushes the latch forward"},
+   {"part": "crane", "from": 0.28, "to": 0.45, "value": 1.0, "ease": "out", "why": "the support hand's fingers push the cylinder out"},
+   {"part": "latch", "from": 0.4, "to": 0.45, "value": 0.0, "ease": "in", "why": "the latch back"},
+   {"part": "ejector", "from": 0.75, "to": 0.88, "value": 1.0, "ease": "out", "why": "muzzle up, the rod struck: the empties fall out"},
+   {"part": "ejector", "from": 0.92, "to": 1.0, "value": 0.0, "ease": "in", "why": "it springs back"},
+   {"part": "crane", "from": 2.75, "to": 2.9, "value": 0.0, "ease": "inout", "why": "the cylinder closed by the support thumb, it clicks"}]},
+  "reload_empty": {"seconds": 3.6, "beats": [
+   {"part": "latch", "from": 0.2, "to": 0.25, "value": 1.0, "ease": "out", "why": "the latch"},
+   {"part": "crane", "from": 0.28, "to": 0.45, "value": 1.0, "ease": "out", "why": "out"},
+   {"part": "latch", "from": 0.4, "to": 0.45, "value": 0.0, "ease": "in", "why": "back"},
+   {"part": "ejector", "from": 0.75, "to": 0.88, "value": 1.0, "ease": "out", "why": "the empties out"},
+   {"part": "ejector", "from": 0.92, "to": 1.0, "value": 0.0, "ease": "in", "why": "back"},
+   {"part": "crane", "from": 2.75, "to": 2.9, "value": 0.0, "ease": "inout", "why": "closed"}]},
+  "check_chamber": {"seconds": 2.2, "beats": [
+   {"part": "latch", "from": 0.2, "to": 0.25, "value": 1.0, "ease": "out", "why": "the latch"},
+   {"part": "crane", "from": 0.28, "to": 0.5, "value": 1.0, "ease": "out", "why": "the cylinder swung out to look at the chambers"},
+   {"part": "latch", "from": 0.4, "to": 0.45, "value": 0.0, "ease": "in", "why": "back"},
+   {"part": "crane", "from": 1.5, "to": 1.65, "value": 0.0, "ease": "inout", "why": "closed"}]}
+ },
+ "hand_clips": {
+  "reload": {"seconds": 3.6,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 30.0, "pitch": 10.0, "move": [3.0, -14.0, -2.0], "ease": "inout"},
+           {"from": 0.55, "to": 0.75, "roll": 30.0, "pitch": 70.0, "move": [3.0, -18.0, 4.0], "ease": "inout"},
+           {"from": 1.05, "to": 1.3, "roll": 20.0, "pitch": -60.0, "move": [3.0, -18.0, -6.0], "ease": "inout"},
+           {"from": 3.0, "to": 3.6, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.05, "to": 0.3, "go": {"part": "crane", "mark": "cylinder_face", "offset": [2.0, 1.0, 0.0]}, "grasp": "palm", "why": "the support fingers to the cylinder's right side, the thumb ready"},
+    {"hand": "r", "from": 0.5, "to": 0.7, "go": {"part": "crane", "mark": "ejector", "offset": [0.0, 1.5, 0.0]}, "grasp": "palm", "why": "the strong hand off the grip; its palm strikes the ejector rod (the gun held by the support hand)"},
+    {"hand": "r", "from": 1.0, "to": 1.45, "go": {"place": "belt_r"}, "why": "the strong hand to the speed loader pouch"},
+    {"hand": "r", "from": 1.45, "to": 1.6, "go": {"place": "belt_r", "offset": [0.0, 0.0, 2.0]}, "carry": "loader", "why": "the loader drawn"},
+    {"hand": "r", "from": 1.6, "to": 2.1, "go": {"part": "crane", "mark": "cylinder_face", "offset": [0.0, -4.0, 0.0]}, "why": "the rounds lined up with the chambers, the muzzle down"},
+    {"hand": "r", "from": 2.1, "to": 2.3, "go": {"part": "crane", "mark": "cylinder_face", "offset": [0.0, -1.0, 0.0]}, "grasp": "pinch", "why": "pushed in and the knob turned: the rounds drop free"},
+    {"hand": "r", "from": 2.35, "to": 2.6, "go": {"place": "drop"}, "seat": "loader", "why": "the empty loader let fall"},
+    {"hand": "l", "from": 2.6, "to": 2.75, "go": {"part": "crane", "mark": "cylinder_face", "offset": [2.0, 1.0, 0.0]}, "grasp": "thumb", "why": "the support thumb on the cylinder"},
+    {"hand": "r", "from": 2.6, "to": 3.0, "go": {"mark": "grip"}, "why": "the strong hand back to the grip"},
+    {"hand": "l", "from": 2.95, "to": 3.3, "go": {"mark": "support"}, "why": "the support hand wraps the grip"}],
+   "expect": [{"at": [3.3, 3.6], "on": {"r": "grip", "l": "support"}}]},
+  "reload_empty": {"seconds": 3.6,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 30.0, "pitch": 10.0, "move": [3.0, -14.0, -2.0], "ease": "inout"},
+           {"from": 0.55, "to": 0.75, "roll": 30.0, "pitch": 70.0, "move": [3.0, -18.0, 4.0], "ease": "inout"},
+           {"from": 1.05, "to": 1.3, "roll": 20.0, "pitch": -60.0, "move": [3.0, -18.0, -6.0], "ease": "inout"},
+           {"from": 3.0, "to": 3.6, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.05, "to": 0.3, "go": {"part": "crane", "mark": "cylinder_face", "offset": [2.0, 1.0, 0.0]}, "grasp": "palm", "why": "the support fingers to the cylinder"},
+    {"hand": "r", "from": 0.5, "to": 0.7, "go": {"part": "crane", "mark": "ejector", "offset": [0.0, 1.5, 0.0]}, "grasp": "palm", "why": "the palm on the ejector rod"},
+    {"hand": "r", "from": 1.0, "to": 1.45, "go": {"place": "belt_r"}, "why": "to the loader pouch"},
+    {"hand": "r", "from": 1.45, "to": 1.6, "go": {"place": "belt_r", "offset": [0.0, 0.0, 2.0]}, "carry": "loader", "why": "drawn"},
+    {"hand": "r", "from": 1.6, "to": 2.1, "go": {"part": "crane", "mark": "cylinder_face", "offset": [0.0, -4.0, 0.0]}, "why": "lined up"},
+    {"hand": "r", "from": 2.1, "to": 2.3, "go": {"part": "crane", "mark": "cylinder_face", "offset": [0.0, -1.0, 0.0]}, "grasp": "pinch", "why": "in, turned"},
+    {"hand": "r", "from": 2.35, "to": 2.6, "go": {"place": "drop"}, "seat": "loader", "why": "dropped"},
+    {"hand": "l", "from": 2.6, "to": 2.75, "go": {"part": "crane", "mark": "cylinder_face", "offset": [2.0, 1.0, 0.0]}, "grasp": "thumb", "why": "the thumb closes it"},
+    {"hand": "r", "from": 2.6, "to": 3.0, "go": {"mark": "grip"}, "why": "back to the grip"},
+    {"hand": "l", "from": 2.95, "to": 3.3, "go": {"mark": "support"}, "why": "round the grip"}],
+   "expect": []},
+  "check_chamber": {"seconds": 2.2,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 30.0, "pitch": 15.0, "move": [3.0, -14.0, 0.0], "ease": "inout"},
+           {"from": 1.8, "to": 2.2, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.05, "to": 0.3, "go": {"part": "crane", "mark": "cylinder_face", "offset": [2.0, 1.0, 0.0]}, "grasp": "palm", "why": "the fingers push it out and hold it"},
+    {"hand": "l", "from": 1.45, "to": 1.6, "go": {"part": "crane", "mark": "cylinder_face", "offset": [2.0, 1.0, 0.0], "value": 0.0}, "grasp": "thumb", "why": "closed with the thumb"},
+    {"hand": "l", "from": 1.65, "to": 1.95, "go": {"mark": "support"}, "why": "back round the grip"}],
+   "expect": [{"at": [0.7, 1.3], "visible": "port"}]}
+ }
+}

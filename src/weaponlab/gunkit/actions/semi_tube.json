@@ -1,0 +1,79 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "semi_tube",
+ "name": "a semi-automatic shotgun over a tube magazine: a bolt with a handle on the right, held open on the last shell, a bolt release button (tactical shotgun)",
+ "extends": "_long_gun",
+ "guns": ["Tactical shotgun"],
+ "manuals": [
+  {"title": "a public-domain manual for a military semi-automatic shotgun (the US Army's M1014 or a 1950s riot gun)", "covers": "loading the tube, the bolt release, loading the port on an empty gun", "status": "to find"}
+ ],
+ "parts": {
+  "bolt": {"kind": "slide", "what": "the bolt with its handle, back along the bore", "travel_cm": 9.0},
+  "release": {"kind": "slide", "what": "the bolt release button", "travel_cm": 0.3, "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "shell": {"kind": "free", "what": "one shell in the hand", "required": false}
+ },
+ "marks": ["grip", "support", "handle", "port", "load_port", "release"],
+ "sources": ["the handle rides the bolt (facts mark_parts handle: bolt)"],
+ "gun_clips": {
+  "fire": {"seconds": 0.25, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the shot"},
+   {"part": "bolt", "from": 0.02, "to": 0.07, "value": 1.0, "ease": "out", "why": "the bolt driven back"},
+   {"part": "bolt", "from": 0.07, "to": 0.13, "value": 0.0, "ease": "in", "why": "the next shell chambered"},
+   {"part": "trigger", "from": 0.13, "to": 0.21, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "fire_last": {"seconds": 0.25, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the last shell"},
+   {"part": "bolt", "from": 0.02, "to": 0.07, "value": 1.0, "ease": "out", "why": "back, and held open: the tube is empty"},
+   {"part": "trigger", "from": 0.13, "to": 0.21, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "charge": {"seconds": 1.2, "beats": [
+   {"part": "bolt", "from": 0.4, "to": 0.62, "value": 1.0, "ease": "out", "why": "the handle drawn back"},
+   {"part": "bolt", "from": 0.7, "to": 0.76, "value": 0.0, "ease": "in", "why": "let go: it chambers a shell"}]},
+  "check_chamber": {"seconds": 1.9, "beats": [
+   {"part": "bolt", "from": 0.5, "to": 0.8, "value": 0.3, "ease": "inout", "why": "drawn a little: the shell's brass shows"},
+   {"part": "bolt", "from": 1.2, "to": 1.3, "value": 0.0, "ease": "in", "why": "let go"}]},
+  "reload": {"seconds": 1.3, "beats": []},
+  "reload_empty": {"seconds": 1.7, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "value": 1.0, "why": "the bolt held open"},
+   {"part": "release", "from": 1.2, "to": 1.24, "value": 1.0, "ease": "out", "why": "the release pressed"},
+   {"part": "bolt", "from": 1.24, "to": 1.3, "value": 0.0, "ease": "in", "why": "the bolt flies home on the shell laid in the port"},
+   {"part": "release", "from": 1.3, "to": 1.36, "value": 0.0, "ease": "in", "why": "the button back"}]}
+ },
+ "hand_clips": {
+  "charge": {"seconds": 1.2,
+   "gun": [{"from": 0.05, "to": 0.35, "roll": -15.0, "move": [0.0, -3.0, 2.0], "ease": "inout"},
+           {"from": 0.85, "to": 1.2, "roll": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.1, "to": 0.38, "go": {"part": "bolt", "mark": "handle"}, "grasp": "pinch", "why": "under the gun to the handle"},
+    {"hand": "l", "from": 0.7, "to": 0.72, "go": {"part": "bolt", "mark": "handle", "value": 1.0}, "why": "let go at the rear"},
+    {"hand": "l", "from": 0.8, "to": 1.1, "go": {"mark": "support"}, "why": "back to the fore-end"}],
+   "expect": []},
+  "check_chamber": {"seconds": 1.9,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 35.0, "pitch": 8.0, "move": [0.0, -5.0, 5.0], "ease": "inout"},
+           {"from": 1.5, "to": 1.9, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.15, "to": 0.48, "go": {"part": "bolt", "mark": "handle"}, "grasp": "pinch", "why": "over the top to the handle"},
+    {"hand": "l", "from": 1.3, "to": 1.65, "go": {"mark": "support"}, "why": "back"}],
+   "expect": [{"at": [0.85, 1.15], "visible": "port"}]},
+  "reload": {"seconds": 1.3,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": -70.0, "pitch": 5.0, "move": [0.0, -4.0, 2.0], "ease": "inout"},
+           {"from": 1.05, "to": 1.3, "roll": -70.0, "pitch": 5.0, "move": [0.0, -4.0, 2.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.0, "to": 0.35, "go": {"place": "chest_l"}, "why": "to the shells"},
+    {"hand": "l", "from": 0.35, "to": 0.45, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "carry": "shell", "why": "one shell"},
+    {"hand": "l", "from": 0.45, "to": 0.8, "go": {"mark": "load_port", "offset": [0.0, -3.0, -3.0]}, "why": "to the port"},
+    {"hand": "l", "from": 0.8, "to": 0.95, "go": {"mark": "load_port", "offset": [0.0, 4.0, 0.0]}, "seat": "shell", "grasp": "thumb", "why": "pushed into the tube"},
+    {"hand": "l", "from": 1.0, "to": 1.2, "go": {"mark": "load_port", "offset": [0.0, 0.0, -4.0]}, "why": "ready for the next"}],
+   "expect": []},
+  "reload_empty": {"seconds": 1.7,
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 45.0, "pitch": 5.0, "move": [0.0, -4.0, 3.0], "ease": "inout"},
+           {"from": 1.35, "to": 1.7, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.0, "to": 0.35, "go": {"place": "chest_l"}, "why": "to the shells"},
+    {"hand": "l", "from": 0.35, "to": 0.45, "go": {"place": "chest_l", "offset": [0.0, 0.0, 2.0]}, "carry": "shell", "why": "one shell"},
+    {"hand": "l", "from": 0.45, "to": 0.85, "go": {"mark": "port", "offset": [-3.0, 0.0, 3.0]}, "why": "the gun rolled port up, the shell over the open port"},
+    {"hand": "l", "from": 0.85, "to": 1.0, "go": {"mark": "port"}, "seat": "shell", "why": "laid in the port"},
+    {"hand": "l", "from": 1.05, "to": 1.18, "go": {"mark": "release"}, "grasp": "thumb", "why": "the bolt release pressed"},
+    {"hand": "l", "from": 1.3, "to": 1.6, "go": {"mark": "support"}, "why": "back to the fore-end"}],
+   "expect": []}
+ }
+}

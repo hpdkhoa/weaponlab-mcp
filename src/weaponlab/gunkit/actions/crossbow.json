@@ -1,0 +1,69 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "crossbow",
+ "name": "a hunting crossbow: cocked by hand with a foot in the stirrup, a bolt laid in the flight groove",
+ "extends": "_long_gun",
+ "guns": ["Hunting crossbow"],
+ "manuals": [
+  {"title": "a public-domain crossbow hunting or safety handbook", "covers": "cocking with the stirrup, loading the bolt, the safety", "status": "to find"}
+ ],
+ "parts": {
+  "string": {"kind": "slide", "what": "the string drawn back to the latch; 1 cocked, 0 at rest", "travel_cm": 30.0},
+  "limb_l": {"kind": "turn", "what": "the left limb bending as the string is drawn", "required": false},
+  "limb_r": {"kind": "turn", "what": "the right limb bending as the string is drawn", "required": false},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "bolt": {"kind": "free", "what": "the bolt in the flight groove; gone when shot, a new one brought by the hand"}
+ },
+ "marks": ["grip", "support", "string", "stirrup", "groove"],
+ "sources": ["the string's two cocking points are where the hands take it (string mark rides the string)"],
+ "gun_clips": {
+  "fire": {"seconds": 0.3, "beats": [
+   {"part": "string", "from": 0.0, "to": 0.0, "value": 1.0, "why": "cocked"},
+   {"part": "limb_l", "from": 0.0, "to": 0.0, "value": 1.0, "why": "bent"},
+   {"part": "limb_r", "from": 0.0, "to": 0.0, "value": 1.0, "why": "bent"},
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the latch lets go"},
+   {"part": "string", "from": 0.02, "to": 0.035, "value": 0.0, "ease": "in", "why": "the string flies forward"},
+   {"part": "limb_l", "from": 0.02, "to": 0.035, "value": 0.0, "ease": "in", "why": "the limbs straighten"},
+   {"part": "limb_r", "from": 0.02, "to": 0.035, "value": 0.0, "ease": "in", "why": "the limbs straighten"},
+   {"part": "bolt", "from": 0.02, "to": 0.06, "offset": [0.0, 400.0, 0.0], "ease": "in", "why": "the bolt is gone"},
+   {"part": "trigger", "from": 0.15, "to": 0.25, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "reload": {"seconds": 4.5, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "offset": [0.0, 400.0, 0.0], "why": "no bolt"},
+   {"part": "string", "from": 1.2, "to": 2.4, "value": 1.0, "ease": "inout", "why": "drawn up with both hands, the boot in the stirrup"},
+   {"part": "limb_l", "from": 1.2, "to": 2.4, "value": 1.0, "ease": "inout", "why": "bending"},
+   {"part": "limb_r", "from": 1.2, "to": 2.4, "value": 1.0, "ease": "inout", "why": "bending"}]},
+  "reload_empty": {"seconds": 4.5, "beats": [
+   {"part": "bolt", "from": 0.0, "to": 0.0, "offset": [0.0, 400.0, 0.0], "why": "no bolt"},
+   {"part": "string", "from": 1.2, "to": 2.4, "value": 1.0, "ease": "inout", "why": "drawn"},
+   {"part": "limb_l", "from": 1.2, "to": 2.4, "value": 1.0, "ease": "inout", "why": "bending"},
+   {"part": "limb_r", "from": 1.2, "to": 2.4, "value": 1.0, "ease": "inout", "why": "bending"}]}
+ },
+ "hand_clips": {
+  "reload": {"seconds": 4.5,
+   "gun": [{"from": 0.1, "to": 0.9, "pitch": -80.0, "move": [0.0, 10.0, -60.0], "ease": "inout"},
+           {"from": 2.5, "to": 3.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.6, "to": 1.1, "go": {"part": "string", "mark": "string", "offset": [3.0, 0.0, 0.0]}, "grasp": "pinch", "why": "the bow nose down, the boot in the stirrup, the left hand to the string"},
+    {"hand": "r", "from": 0.6, "to": 1.1, "go": {"part": "string", "mark": "string", "offset": [-3.0, 0.0, 0.0]}, "grasp": "pinch", "why": "the right hand to the string's other side"},
+    {"hand": "r", "from": 2.5, "to": 2.8, "go": {"mark": "grip"}, "why": "the string latched, the right hand back to the grip"},
+    {"hand": "l", "from": 2.5, "to": 3.0, "go": {"place": "quiver"}, "why": "the left hand to the quiver"},
+    {"hand": "l", "from": 3.0, "to": 3.15, "go": {"place": "quiver", "offset": [0.0, 0.0, 3.0]}, "carry": "bolt", "why": "a bolt drawn"},
+    {"hand": "l", "from": 3.15, "to": 3.7, "go": {"mark": "groove", "offset": [0.0, 10.0, 2.0]}, "why": "laid in the groove"},
+    {"hand": "l", "from": 3.7, "to": 3.9, "go": {"mark": "groove"}, "seat": "bolt", "why": "slid back against the string"},
+    {"hand": "l", "from": 3.95, "to": 4.3, "go": {"mark": "support"}, "why": "back under the fore-end"}],
+   "expect": [{"at": 3.9, "seated": "bolt"}]},
+  "reload_empty": {"seconds": 4.5,
+   "gun": [{"from": 0.1, "to": 0.9, "pitch": -80.0, "move": [0.0, 10.0, -60.0], "ease": "inout"},
+           {"from": 2.5, "to": 3.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "l", "from": 0.6, "to": 1.1, "go": {"part": "string", "mark": "string", "offset": [3.0, 0.0, 0.0]}, "grasp": "pinch", "why": "to the string"},
+    {"hand": "r", "from": 0.6, "to": 1.1, "go": {"part": "string", "mark": "string", "offset": [-3.0, 0.0, 0.0]}, "grasp": "pinch", "why": "to the string"},
+    {"hand": "r", "from": 2.5, "to": 2.8, "go": {"mark": "grip"}, "why": "back to the grip"},
+    {"hand": "l", "from": 2.5, "to": 3.0, "go": {"place": "quiver"}, "why": "to the quiver"},
+    {"hand": "l", "from": 3.0, "to": 3.15, "go": {"place": "quiver", "offset": [0.0, 0.0, 3.0]}, "carry": "bolt", "why": "a bolt"},
+    {"hand": "l", "from": 3.15, "to": 3.7, "go": {"mark": "groove", "offset": [0.0, 10.0, 2.0]}, "why": "to the groove"},
+    {"hand": "l", "from": 3.7, "to": 3.9, "go": {"mark": "groove"}, "seat": "bolt", "why": "in"},
+    {"hand": "l", "from": 3.95, "to": 4.3, "go": {"mark": "support"}, "why": "back"}],
+   "expect": []}
+ }
+}

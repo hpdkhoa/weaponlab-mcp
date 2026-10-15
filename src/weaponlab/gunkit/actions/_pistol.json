@@ -1,0 +1,52 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "_pistol",
+ "name": "the clips every handgun held in two hands shares: the strong hand on the grip, the support hand wrapped round it",
+ "parts": {},
+ "marks": ["grip", "support", "muzzle", "trigger"],
+ "manuals": [
+  {"title": "FM 23-35, Combat Training with Pistols and Revolvers (US Army, 1988)", "covers": "the grip, the ready positions, the draw, the M1911A1 and the revolver", "status": "to read"},
+  {"title": "FM 3-23.35, Combat Training with Pistols M9 and M11 (US Army, 2003)", "covers": "the two-hand grip, reloads, the press check", "status": "to read"}
+ ],
+ "sources": [
+  "support: the support hand's palm on the grip's open side, its fingers over the strong hand's (FM 23-35, the two-hand grip)",
+  "hand clip timings are estimates until checked against the manuals"
+ ],
+ "gun_clips": {},
+ "hand_clips": {
+  "idle": {"seconds": 3.0, "loop": true,
+   "gun": [{"from": 0.0, "to": 1.4, "move": [0.0, 0.0, 0.3], "ease": "inout"}, {"from": 1.4, "to": 3.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [], "expect": [{"at": [0.0, 3.0], "on": {"r": "grip", "l": "support"}}]},
+  "walk": {"seconds": 0.73, "loop": true,
+   "gun": [
+    {"from": 0.0, "to": 0.18, "move": [0.5, 0.0, -0.7], "ease": "inout"},
+    {"from": 0.18, "to": 0.365, "move": [0.0, 0.0, 0.0], "ease": "inout"},
+    {"from": 0.365, "to": 0.55, "move": [-0.5, 0.0, -0.7], "ease": "inout"},
+    {"from": 0.55, "to": 0.73, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [], "expect": [{"at": [0.0, 0.73], "on": {"r": "grip", "l": "support"}}]},
+  "run": {"seconds": 0.6, "loop": true,
+   "gun": [
+    {"from": 0.0, "to": 0.15, "pitch": -35.0, "move": [0.0, -18.0, -14.0], "ease": "inout"},
+    {"from": 0.15, "to": 0.3, "pitch": -33.0, "move": [0.0, -18.0, -12.5], "ease": "inout"},
+    {"from": 0.3, "to": 0.45, "pitch": -35.0, "move": [0.0, -18.0, -14.0], "ease": "inout"},
+    {"from": 0.45, "to": 0.6, "pitch": -33.0, "move": [0.0, -18.0, -12.5], "ease": "inout"}],
+   "events": [], "expect": [{"at": [0.0, 0.6], "on": {"r": "grip", "l": "support"}}]},
+  "fire": {"seconds": 0.25,
+   "gun": [
+    {"from": 0.0, "to": 0.025, "pitch": 6.0, "move": [0.0, -1.5, 0.8], "ease": "out"},
+    {"from": 0.025, "to": 0.25, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "spring"}],
+   "events": [], "expect": [{"at": [0.0, 0.25], "on": {"r": "grip", "l": "support"}}]},
+  "equip": {"seconds": 0.6,
+   "gun": [
+    {"from": 0.0, "to": 0.0, "pitch": -80.0, "move": [-14.0, -30.0, -45.0]},
+    {"from": 0.0, "to": 0.6, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "out"}],
+   "events": [
+    {"hand": "l", "from": 0.0, "to": 0.0, "go": {"place": "low_ready"}, "why": "the support hand waits in front of the body"},
+    {"hand": "l", "from": 0.25, "to": 0.5, "go": {"mark": "support"}, "why": "it meets the gun as it comes up and wraps the grip"}],
+   "expect": [{"at": [0.55, 0.6], "on": {"r": "grip", "l": "support"}}]},
+  "holster": {"seconds": 0.5,
+   "gun": [{"from": 0.0, "to": 0.5, "pitch": -80.0, "move": [-14.0, -30.0, -45.0], "ease": "in"}],
+   "events": [{"hand": "l", "from": 0.0, "to": 0.2, "go": {"place": "low_ready"}, "why": "the support hand lets go first"}],
+   "expect": []}
+ }
+}

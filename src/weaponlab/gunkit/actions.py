@@ -21,7 +21,8 @@ EVENT, a hand going somewhere and staying there until its next event:
   TARGET: {"mark": "support"} a mark on the gun; {"part": "handle", "mark": "handle"} a mark riding a moving part;
   {"part": "magazine"} the magazine where it is; {"place": "pouch_l"} a place on the body (PLACES).
   carry: the named free part rides the hand from this event on, until an event puts it back ("seat": "magazine").
-  At 0 the right hand holds "grip" and the left "support", unless the clip's first events say otherwise.
+  At 0 the right hand holds "grip" and the left "support", unless the action's "home" says otherwise
+  ({"home": {"l": {"mark": "grip"}, "r": {"part": "string", "mark": "nock"}}}) or the clip's first events move them.
 
 POSE, the gun's turn and move from its hold, in degrees and cm (absolute, eased from the pose before):
     {"from": 0.2, "to": 0.5, "roll": -35, "pitch": 10, "yaw": 0, "move": [0, -5, 6], "ease": "inout"}
@@ -48,6 +49,9 @@ PLACES = {
     "eye_check": [3.0, 26.0, -8.0],     # held up before the eye to look at
     "belt_r": [-16.0, 0.0, -55.0],      # the right hip: a holster, a speed loader pouch
     "low_ready": [0.0, 30.0, -38.0],    # where a gun points while not aimed
+    "anchor": [-2.0, 1.0, -7.0],        # a drawn bowstring's anchor: the corner of the mouth, under the eye
+    "quiver": [-14.0, -6.0, -50.0],     # arrows or bolts in a quiver on the right hip
+    "ground": [0.0, 35.0, -150.0],      # the ground ahead of the feet: a crossbow's stirrup under the boot
 }
 
 

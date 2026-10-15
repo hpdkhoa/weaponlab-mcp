@@ -1,0 +1,24 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "flamethrower",
+ "name": "a portable flamethrower: tanks on the back, a gun with a rear grip and its fuel valve trigger, a front grip with the igniter (M2)",
+ "extends": "_long_gun",
+ "guns": ["M2 flamethrower"],
+ "manuals": [
+  {"title": "a public-domain manual of the M2-2 portable flamethrower (a US Army field or technical manual of the 1940s or 1950s)", "covers": "the grips, igniting, firing bursts, the fuel valve", "status": "to find"}
+ ],
+ "parts": {
+  "valve": {"kind": "turn", "what": "the fuel valve lever under the rear grip, squeezed"},
+  "igniter": {"kind": "turn", "what": "the igniter trigger at the front grip", "required": false}
+ },
+ "marks": ["grip", "support", "nozzle"],
+ "sources": ["the tanks are refilled, not reloaded in the field: no reload clip; the game's fuel comes from its own rules"],
+ "gun_clips": {
+  "fire": {"seconds": 0.4, "beats": [
+   {"part": "igniter", "from": 0.0, "to": 0.04, "value": 1.0, "ease": "in", "why": "the igniter lit"},
+   {"part": "valve", "from": 0.02, "to": 0.08, "value": 1.0, "ease": "in", "why": "the valve squeezed: fuel flows through the flame"},
+   {"part": "valve", "from": 0.3, "to": 0.36, "value": 0.0, "ease": "out", "why": "a short burst ends"},
+   {"part": "igniter", "from": 0.34, "to": 0.4, "value": 0.0, "ease": "out", "why": "let go"}]}
+ },
+ "hand_clips": {}
+}

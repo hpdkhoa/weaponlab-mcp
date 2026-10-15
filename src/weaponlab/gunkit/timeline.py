@@ -114,19 +114,28 @@ def part_values(action, clip, t, kind="gun"):
 
 
 def point(facts, values, mark, part=None):
-    """A mark's place in gun space with the parts as they are: it rides its part (slide or turn) when it has one."""
-    base = facts["marks"][mark]
-    role = part or facts.get("mark_parts", {}).get(mark)
-    if not role or role not in facts["parts"]:
-        return list(base)
-    p, v = facts["parts"][role], values.get(role, 0.0)
-    if p["kind"] == "slide":
-        return _add(base, _scale(p["axis"], p["travel_cm"] * v))
-    if p["kind"] == "turn":
-        return _rot(base, p["pivot"], p["axis"], p["turn_deg"] * v)
-    if isinstance(v, list):
-        return _add(base, v)
-    return list(base)
+    """A mark's place in gun space with the parts as they are: it rides its part (slide or turn), or its parts in order
+    (a bolt knob: the bolt's lift turns it, then the bolt's draw slides it), when it has them."""
+    roles = facts.get("mark_parts", {}).get(mark) if part is None else part
+    roles = [roles] if isinstance(roles, str) else list(roles or [])
+    if part is not None and isinstance(part, str):
+        # a target that names one part rides the mark's own chain when that part is in it
+        own = facts.get("mark_parts", {}).get(mark)
+        own = [own] if isinstance(own, str) else list(own or [])
+        if part in own:
+            roles = own
+    at = list(facts["marks"][mark])
+    for role in roles:
+        if role not in facts["parts"]:
+            continue
+        p, v = facts["parts"][role], values.get(role, 0.0)
+        if p["kind"] == "slide":
+            at = _add(at, _scale(p["axis"], p["travel_cm"] * v))
+        elif p["kind"] == "turn":
+            at = _rot(at, p["pivot"], p["axis"], p["turn_deg"] * v)
+        elif isinstance(v, list):
+            at = _add(at, v)
+    return at
 
 
 def _resolve(facts, values, go):
@@ -180,7 +189,9 @@ def hand_clip(action, facts, clip_id, fps=FPS):
     gun = action["gun_clips"].get(clip_id, {"seconds": clip["seconds"], "beats": []})
     merged = {"beats": gun.get("beats", []), "events": clip.get("events", [])}
     events = {h: sorted([e for e in clip.get("events", []) if e["hand"] == h], key=lambda e: e["from"]) for h in ("r", "l")}
-    home = {"r": {"mark": "grip"}, "l": {"mark": "support"}}
+    # where each hand rests: the right on the grip, the left on the support, unless the action says (a bow: the left
+    # on its grip, the right on the string)
+    home = {h: dict(v) for h, v in action.get("home", {"r": {"mark": "grip"}, "l": {"mark": "support"}}).items()}
     out = []
     for t in frames_of(clip["seconds"], fps):
         values = part_values(action, merged, t, kind="hand")

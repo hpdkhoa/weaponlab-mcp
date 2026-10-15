@@ -1,0 +1,98 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "bolt_stripper",
+ "name": "a turn-bolt over a fixed box magazine, loaded through the open action from a stripper clip (Mosin-Nagant M91)",
+ "extends": "_long_gun",
+ "guns": ["Mosin-Nagant M91 (scoped)"],
+ "manuals": [
+  {"title": "a public-domain manual for the Mosin-Nagant rifle (a US or Finnish army handbook)", "covers": "the stripper clip, the interrupter, working the bolt", "status": "to find"}
+ ],
+ "parts": {
+  "bolt": {"kind": "slide", "what": "the bolt, drawn back", "travel_cm": 10.0},
+  "bolt_lift": {"kind": "turn", "what": "the bolt turned up by its handle (about 90 degrees)"},
+  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "clip": {"kind": "free", "what": "a stripper clip of five rounds, in the hand during a reload only", "required": false}
+ },
+ "marks": ["grip", "support", "knob", "port", "charger"],
+ "sources": [
+  "five rounds pressed down from the clip into the magazine with the thumb, the clip pulled out (or flipped out by the closing bolt)"
+ ],
+ "gun_clips": {
+  "fire": {"seconds": 0.2, "beats": [
+   {"part": "trigger", "from": 0.0, "to": 0.02, "value": 1.0, "ease": "in", "why": "the shot"},
+   {"part": "trigger", "from": 0.1, "to": 0.18, "value": 0.0, "ease": "inout", "why": "let out"}]},
+  "cycle": {"seconds": 1.1, "beats": [
+   {"part": "bolt_lift", "from": 0.12, "to": 0.25, "value": 1.0, "ease": "out", "why": "the handle lifted a quarter turn; the Mosin's cocking needs a firm lift"},
+   {"part": "bolt", "from": 0.25, "to": 0.45, "value": 1.0, "ease": "out", "why": "drawn back: the case thrown"},
+   {"part": "bolt", "from": 0.5, "to": 0.7, "value": 0.0, "ease": "inout", "why": "pushed home"},
+   {"part": "bolt_lift", "from": 0.7, "to": 0.82, "value": 0.0, "ease": "in", "why": "turned down"}]},
+  "charge": {"seconds": 1.1, "beats": [
+   {"part": "bolt_lift", "from": 0.12, "to": 0.25, "value": 1.0, "ease": "out", "why": "lifted"},
+   {"part": "bolt", "from": 0.25, "to": 0.45, "value": 1.0, "ease": "out", "why": "drawn"},
+   {"part": "bolt", "from": 0.5, "to": 0.7, "value": 0.0, "ease": "inout", "why": "home"},
+   {"part": "bolt_lift", "from": 0.7, "to": 0.82, "value": 0.0, "ease": "in", "why": "down"}]},
+  "check_chamber": {"seconds": 2.0, "beats": [
+   {"part": "bolt_lift", "from": 0.25, "to": 0.4, "value": 1.0, "ease": "out", "why": "lifted"},
+   {"part": "bolt", "from": 0.4, "to": 0.7, "value": 0.4, "ease": "inout", "why": "drawn part way: the round shows"},
+   {"part": "bolt", "from": 1.25, "to": 1.45, "value": 0.0, "ease": "inout", "why": "home"},
+   {"part": "bolt_lift", "from": 1.45, "to": 1.57, "value": 0.0, "ease": "in", "why": "down"}]},
+  "reload": {"seconds": 3.6, "beats": [
+   {"part": "bolt_lift", "from": 0.15, "to": 0.28, "value": 1.0, "ease": "out", "why": "the bolt opened to load"},
+   {"part": "bolt", "from": 0.28, "to": 0.5, "value": 1.0, "ease": "out", "why": "drawn all the way back"},
+   {"part": "clip", "from": 1.7, "to": 2.15, "offset": [0.0, 0.0, 0.0], "ease": "linear", "why": "the clip stays in the charger guide while the thumb strips the rounds down"},
+   {"part": "bolt", "from": 2.75, "to": 2.95, "value": 0.0, "ease": "inout", "why": "pushed home, the top round chambered"},
+   {"part": "bolt_lift", "from": 2.95, "to": 3.07, "value": 0.0, "ease": "in", "why": "turned down"}]},
+  "reload_empty": {"seconds": 3.6, "beats": [
+   {"part": "bolt_lift", "from": 0.15, "to": 0.28, "value": 1.0, "ease": "out", "why": "opened"},
+   {"part": "bolt", "from": 0.28, "to": 0.5, "value": 1.0, "ease": "out", "why": "back"},
+   {"part": "bolt", "from": 2.75, "to": 2.95, "value": 0.0, "ease": "inout", "why": "home"},
+   {"part": "bolt_lift", "from": 2.95, "to": 3.07, "value": 0.0, "ease": "in", "why": "down"}]}
+ },
+ "hand_clips": {
+  "cycle": {"seconds": 1.1,
+   "gun": [{"from": 0.05, "to": 0.2, "roll": 5.0, "ease": "inout"}, {"from": 0.85, "to": 1.05, "roll": 0.0, "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.0, "to": 0.12, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "to the bolt handle"},
+    {"hand": "r", "from": 0.84, "to": 1.05, "go": {"mark": "grip"}, "why": "back to the wrist of the stock"}],
+   "expect": [{"at": [0.3, 0.65], "on": {"r": "knob"}}]},
+  "charge": {"seconds": 1.1,
+   "gun": [{"from": 0.05, "to": 0.2, "roll": 5.0, "ease": "inout"}, {"from": 0.85, "to": 1.05, "roll": 0.0, "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.0, "to": 0.12, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "to the handle"},
+    {"hand": "r", "from": 0.84, "to": 1.05, "go": {"mark": "grip"}, "why": "back"}],
+   "expect": []},
+  "check_chamber": {"seconds": 2.0,
+   "gun": [{"from": 0.1, "to": 0.4, "roll": 30.0, "pitch": 6.0, "move": [0.0, -5.0, 5.0], "ease": "inout"},
+           {"from": 1.6, "to": 2.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.1, "to": 0.25, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "to the handle"},
+    {"hand": "r", "from": 1.6, "to": 1.82, "go": {"mark": "grip"}, "why": "back"}],
+   "expect": [{"at": [0.8, 1.2], "visible": "port"}]},
+  "reload": {"seconds": 3.6,
+   "gun": [{"from": 0.05, "to": 0.35, "roll": 25.0, "pitch": 12.0, "move": [0.0, -6.0, 3.0], "ease": "inout"},
+           {"from": 3.15, "to": 3.6, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.0, "to": 0.15, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "the bolt opened by its handle"},
+    {"hand": "r", "from": 0.6, "to": 1.0, "go": {"place": "chest_l"}, "why": "to the ammunition pouch for a clip"},
+    {"hand": "r", "from": 1.0, "to": 1.15, "go": {"place": "chest_l", "offset": [0.0, 0.0, -2.0]}, "carry": "clip", "why": "a clip of five drawn"},
+    {"hand": "r", "from": 1.15, "to": 1.6, "go": {"mark": "charger", "offset": [0.0, 0.0, 3.0]}, "why": "the clip into the charger guide over the open action"},
+    {"hand": "r", "from": 1.7, "to": 2.15, "go": {"mark": "charger", "offset": [0.0, 0.0, -2.5]}, "grasp": "thumb", "why": "the thumb strips the five rounds down into the magazine"},
+    {"hand": "r", "from": 2.2, "to": 2.45, "go": {"place": "drop"}, "seat": "clip", "why": "the empty clip pulled out and dropped"},
+    {"hand": "r", "from": 2.45, "to": 2.7, "go": {"part": "bolt", "mark": "knob"}, "grasp": "pinch", "why": "back to the handle"},
+    {"hand": "r", "from": 3.1, "to": 3.35, "go": {"mark": "grip"}, "why": "to the wrist of the stock"}],
+   "expect": [{"at": [3.35, 3.6], "on": {"r": "grip", "l": "support"}}]},
+  "reload_empty": {"seconds": 3.6,
+   "gun": [{"from": 0.05, "to": 0.35, "roll": 25.0, "pitch": 12.0, "move": [0.0, -6.0, 3.0], "ease": "inout"},
+           {"from": 3.15, "to": 3.6, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
+   "events": [
+    {"hand": "r", "from": 0.0, "to": 0.15, "go": {"part": "bolt_lift", "mark": "knob"}, "grasp": "pinch", "why": "the bolt opened"},
+    {"hand": "r", "from": 0.6, "to": 1.0, "go": {"place": "chest_l"}, "why": "to the pouch"},
+    {"hand": "r", "from": 1.0, "to": 1.15, "go": {"place": "chest_l", "offset": [0.0, 0.0, -2.0]}, "carry": "clip", "why": "a clip drawn"},
+    {"hand": "r", "from": 1.15, "to": 1.6, "go": {"mark": "charger", "offset": [0.0, 0.0, 3.0]}, "why": "into the guide"},
+    {"hand": "r", "from": 1.7, "to": 2.15, "go": {"mark": "charger", "offset": [0.0, 0.0, -2.5]}, "grasp": "thumb", "why": "rounds stripped down"},
+    {"hand": "r", "from": 2.2, "to": 2.45, "go": {"place": "drop"}, "seat": "clip", "why": "the clip out"},
+    {"hand": "r", "from": 2.45, "to": 2.7, "go": {"part": "bolt", "mark": "knob"}, "grasp": "pinch", "why": "to the handle"},
+    {"hand": "r", "from": 3.1, "to": 3.35, "go": {"mark": "grip"}, "why": "back"}],
+   "expect": []}
+ }
+}
