@@ -64,6 +64,9 @@ def gun_clips(facts_path, clips=None, resolved=None):
     for cid in clips or list(a["gun_clips"]):
         clip = (resolved or {}).get(cid) or T.gun_clip(a, facts, cid)
         tracks.append(R.tracks(facts, clip))
+    # what was keyed, by clip, with which clips the hand step resolved (verify checks those against their keys)
+    (out / "keyed_tracks.json").write_text(json.dumps({"resolved": sorted(resolved or {}), "tracks": {t["clip"]: t for t in tracks}}),
+                                           encoding="utf-8")
     blend = facts["model"]["blend"]
     _blender("gunkit_clips.py", {"blend": blend, "tracks": tracks, "prefix": "A_%s_" % facts["name"], "out": str(out)}, out)
     return json.loads((out / "clips.json").read_text(encoding="utf-8"))
@@ -99,6 +102,32 @@ def expected(facts, clip, t):
     return out
 
 
+def expected_keyed(facts, track, t):
+    """Where each bone's head and its three side points should be at t, from the tracks keyed (a resolved clip): a
+    bone turns round its head, then moves by its loc, then rides its parent (Blender's pose, in gun space)."""
+    fr = min(track["frames"], key=lambda f: abs(f["t"] - t))
+    byname = {b["name"]: b for b in facts["bones"]}
+
+    def move(bone, pt):
+        x = fr["bones"].get(bone)
+        if x:
+            head = byname[bone]["head"]
+            deg, ax, ay, az = x["rot"]
+            n = (ax * ax + ay * ay + az * az) ** 0.5
+            if deg and n:
+                pt = T._rot(pt, head, [ax / n, ay / n, az / n], deg)
+            pt = [pt[i] + x["loc"][i] for i in range(3)]
+        parent = byname[bone].get("parent")
+        return move(parent, pt) if parent and parent != "Root" else pt
+
+    out = {}
+    for b in facts["bones"]:
+        h = b["head"]
+        pts = {"head": h, "x": [h[0] + 3, h[1], h[2]], "y": [h[0], h[1] + 3, h[2]], "z": [h[0], h[1], h[2] + 3]}
+        out[b["name"]] = {k: move(b["name"], v) for k, v in pts.items()}
+    return out
+
+
 def verify(facts_path, times=(0.0, 0.25, 0.5, 0.75, 1.0), tol_cm=0.05):
     """The keyed clips read back from Blender against the timeline's sums: the worst gap a clip, in cm."""
     facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))
@@ -110,18 +139,21 @@ def verify(facts_path, times=(0.0, 0.25, 0.5, 0.75, 1.0), tol_cm=0.05):
         plan["A_%s_%s" % (facts["name"], cid)] = sorted({round(round(secs * x * T.FPS) / T.FPS, 5) for x in times})   # on frames
     _blender("gunkit_readback.py", {"blend": str(out / ("%s_clips.blend" % facts["name"])), "clips": plan, "out": str(out)}, out)
     got = json.loads((out / "readback.json").read_text(encoding="utf-8"))
+    kp = out / "keyed_tracks.json"
+    keyed = json.loads(kp.read_text(encoding="utf-8")) if kp.exists() else {"resolved": [], "tracks": {}}
     report = {}
     for cid in a["gun_clips"]:
         name = "A_%s_%s" % (facts["name"], cid)
         clip = T.gun_clip(a, facts, cid)
+        res = cid in keyed["resolved"] and cid in keyed["tracks"]
         worst = 0.0
         for t in plan[name]:
-            want = expected(facts, clip, t)
+            want = expected_keyed(facts, keyed["tracks"][cid], t) if res else expected(facts, clip, t)
             for bone, pts in want.items():
                 for k, w in pts.items():
                     g = got[name][str(t)][bone][k]
                     worst = max(worst, max(abs(g[i] - w[i]) for i in range(3)))
-        report[cid] = {"worst_cm": round(worst, 4), "ok": worst <= tol_cm}
+        report[cid] = {"worst_cm": round(worst, 4), "ok": worst <= tol_cm, "against": "keyed (hand step)" if res else "timeline"}
     (out / "readback_report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     return report
 

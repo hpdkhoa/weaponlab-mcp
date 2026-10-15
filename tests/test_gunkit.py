@@ -134,3 +134,15 @@ def test_gate_cases_for_every_action_use_known_metrics():
     for aid in A.ids():
         for c in GR.cases("TestGun", aid):
             assert c["metric"] in known and c["rule"]["op"] in G.OPS, (aid, c["id"])
+
+
+def test_a_resolved_clip_is_checked_against_its_keys():
+    """A carried part keyed from the hand step: turned round its head, then moved, then carried by its parent."""
+    from weaponlab.gunkit import run as R
+    facts = {"bones": [{"name": "Root", "head": [0, 0, 0]}, {"name": "Crane", "parent": "Root", "head": [1, 0, 0]},
+                       {"name": "Cylinder", "parent": "Crane", "head": [0, 2, 0]}]}
+    track = {"frames": [{"t": 0.0, "bones": {"Crane": {"loc": [0, 0, 0], "rot": [90, 0, 2, 0]},
+                                             "Cylinder": {"loc": [0, 0, 1], "rot": [0, 0, 1, 0]}}}]}
+    want = R.expected_keyed(facts, track, 0.0)
+    # the cylinder's head (0, 2, 0) goes up 1 cm, then turns 90 degrees round +Y through the crane's head (1, 0, 0)
+    assert want["Cylinder"]["head"] == pytest.approx([2, 2, 1], abs=1e-6)
