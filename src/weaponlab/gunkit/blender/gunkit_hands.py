@@ -151,7 +151,21 @@ def lay_palm(side, at, normal, thickness_cm=1.5):
     return short
 
 
-def grasp(side, mark, part=None, offset=None):
+def settle(side):
+    """The palm onto the surface (Pose Lab's own measure of its gap) and the fingers closed."""
+    hn = L._n("hand", side)
+    for _ in range(4):
+        gr = L.grip(side, hold=False)[side]
+        gap = gr.get("palm_gap_cm")
+        if gap is None or -0.1 <= gap <= 0.4:
+            break
+        P, facing = palm_frame(side)
+        hw = L._bw(hn)
+        L._put_hand(side, Matrix.LocRotScale(hw.translation + facing * ((gap - 0.15) / 100.0), hw.to_quaternion(), L._unit()))
+    L._clear_fingers(side)
+
+
+def grasp(side, mark, part=None, offset=None, start=None):
     """The hand's hold on a mark, solved once with the parts as they are now: (the hand against the mark's bone, the
     fingers' turns, whether a hold passed). The palm is first laid on the surface facing into it (the support hand
     slid back along the bore while the arm cannot reach), then Pose Lab's grip search runs from there; its hold is
@@ -162,23 +176,18 @@ def grasp(side, mark, part=None, offset=None):
     L.snapshot("save", "before_grasp")
     hn = L._n("hand", side)
     at = mark_world(mark, part, offset)
-    n = surface_normal(at, mark)
     back = (RA.matrix_world.to_quaternion() @ g((0.0, -1.0, 0.0))).normalized()
-    short, slid = lay_palm(side, at, n), 0.0
-    while short > 0.3 and mark == "support" and slid < 14.0:      # beyond the arm's reach: slide back along the bore
-        slid += 2.0
-        L.snapshot("load", "before_grasp")
-        short = lay_palm(side, at + back * (slid / 100.0), n)
-    # settle onto the surface (Pose Lab's own measure of the palm's gap) and close the fingers
-    for _ in range(4):
-        gr = L.grip(side, hold=False)[side]
-        gap = gr.get("palm_gap_cm")
-        if gap is None or -0.1 <= gap <= 0.4:
-            break
-        P, facing = palm_frame(side)
-        hw = L._bw(hn)
-        L._put_hand(side, Matrix.LocRotScale(hw.translation + facing * ((gap - 0.15) / 100.0), hw.to_quaternion(), L._unit()))
-    L._clear_fingers(side)
+    slid = 0.0
+    if start:
+        L.snapshot("load", start)                 # the hands as the placement search left them, already settled
+    else:
+        n = surface_normal(at, mark)
+        short = lay_palm(side, at, n)
+        while short > 0.3 and mark == "support" and slid < 14.0:      # beyond the arm's reach: slide back along the bore
+            slid += 2.0
+            L.snapshot("load", "before_grasp")
+            short = lay_palm(side, at + back * (slid / 100.0), n)
+        settle(side)
     L.snapshot("save", "laid")
     found = False
     try:
@@ -200,8 +209,71 @@ def grasp(side, mark, part=None, offset=None):
     return GRASPS[key]
 
 
-home_r = grasp("r", "grip")
-home_l = grasp("l", facts.get("home_l", "support")) if "support" in facts["marks"] else None
+# where the gun sits for both hands: a few places round the first one (along the bore, up and down, a little to the
+# side), both palms laid at each; the place where both arms reach with the least clipping and the fewest broken rules
+# wins (Pose Lab's clearance and anatomy measures)
+def try_place(dv):
+    L.rifle_rest = Matrix.Translation(dv) @ REST0
+    L.pose_idle()
+    rest_parts()
+    sr = lay_palm("r", mark_world("grip"), surface_normal(mark_world("grip"), "grip"))
+    sl = lay_palm("l", mark_world("support"), surface_normal(mark_world("support"), "support")) if "support" in facts["marks"] else 0.0
+    settle("r")
+    settle("l")
+    gr = L.grip("both", hold=True)
+    holding = sum(1 for sd in ("l", "r") if gr.get(sd, {}).get("holding"))
+    cl = L.clearance(parts="both", ignore=["palm*"], top=1)["worst_cm"]
+    an = L.anatomy("both")
+    bad = len(an.get("l", {}).get("bad", [])) + len(an.get("r", {}).get("bad", []))
+    # the view: the muzzle and the bolt face stay about where the arms' own hold puts a gun on the screen (low and to
+    # the right at the hip); a gun dead in the middle of the view would hide the world
+    view = 0.0
+    for m, ref in VIEW_REF.items():
+        w = RA.matrix_world @ g((0.0, 0.0, 0.0)) if m == "bolt_face" else mark_world(m)
+        sc = L.screen(lab_gun(w))
+        view += ((sc.get("x", 2.0) - ref[0]) ** 2 + (sc.get("y", 2.0) - ref[1]) ** 2) ** 0.5
+    return (4.0 * (sr + sl) + cl + 1.5 * bad + 3.0 * (2 - holding) + 6.0 * view,
+            {"short_r": round(sr, 2), "short_l": round(sl, 2), "clearance": cl, "rules": bad, "holding": holding, "view_off": round(view, 3)})
+
+
+REST0 = L.rifle_rest.copy()
+# the screen places of the muzzle and the bolt face with the gun where the arms' idle puts it (the reference the view
+# term keeps the gun near)
+L.pose_idle()
+VIEW_REF = {}
+for m in ("muzzle",):
+    sc = L.screen(lab_gun(mark_world(m)))
+    if sc.get("on_screen") is not None and "x" in sc:
+        VIEW_REF[m] = (sc["x"], sc["y"])
+_bf = L.screen(lab_gun(RA.matrix_world @ g((0.0, 0.0, 0.0))))
+if "x" in _bf:
+    VIEW_REF["bolt_face"] = (_bf["x"], _bf["y"])
+report["view_reference"] = {k: list(v) for k, v in VIEW_REF.items()}
+if job.get("place_search", True) and "support" in facts["marks"]:
+    qg = RA.matrix_world.to_quaternion()
+    fwd, up_, left_ = (qg @ g((0, 1, 0))).normalized(), (qg @ g((0, 0, 1))).normalized(), (qg @ g((1, 0, 0))).normalized()
+    tried = []
+    for dy in (-16.0, -12.0, -8.0, -4.0, 0.0):
+        for dz in (-6.0, -3.0, 0.0, 3.0):
+            for dx in (0.0, 3.0):
+                dv = (fwd * dy + up_ * dz + left_ * dx) / 100.0
+                score, why = try_place(dv)
+                tried.append((score, [dx, dy, dz], why, dv))
+                if score <= min(t[0] for t in tried):
+                    L.snapshot("save", "place_best")      # both hands as they hold the best place so far
+    tried.sort(key=lambda t: t[0])
+    best = tried[0]
+    REST0 = Matrix.Translation(best[3]) @ REST0
+    report["placement_search"] = {"best": {"move_cm": best[1], **best[2]}, "first": next(({"move_cm": t[1], **t[2]} for t in tried if t[1] == [0.0, 0.0, 0.0]), None),
+                                  "tried": len(tried)}
+L.rifle_rest = REST0
+L.pose_idle()
+rest_parts()
+L._place_rifle()
+_BVH.clear()                                       # the gun's surface, in the world, as it now sits
+start = "place_best" if "placement_search" in report else None
+home_r = grasp("r", "grip", start=start)
+home_l = grasp("l", facts.get("home_l", "support"), start=start) if "support" in facts["marks"] else None
 for side, gr in (("r", home_r), ("l", home_l)):
     if gr:
         L._put_hand(side, bone_world("Root") @ gr[0])
