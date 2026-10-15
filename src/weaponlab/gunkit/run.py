@@ -167,3 +167,11 @@ def build_all(facts_path, grip_steps=3):
             resolved[cid] = v["resolved"]
     c = gun_clips(facts_path, resolved=resolved)
     return {"hands": {k: v["checks"] for k, v in h["clips"].items()}, "holds": h.get("holds"), "clips": c, "resolved": list(resolved)}
+
+
+def inspect(model):
+    """What a model holds as Blender shows it after import: its objects, vertex groups, bounds, the longest axis and a
+    units guess, to write its parts map from (and draft_partsmap's starting point)."""
+    out = folder("inspect_" + Path(model).stem.replace(" ", "_"))
+    _blender("gunkit_inspect.py", {"model": str(model), "out": str(out)}, out)
+    return json.loads((out / "inspect.json").read_text(encoding="utf-8"))

@@ -129,6 +129,38 @@ else:
         if (flip @ to_gun).determinant() < 0:
             ob.data.flip_normals()
 
+# a part named by vertex groups (a joined mesh, a Model Lab build): its vertices split off into an object of its own,
+# named after the part, so every later step sees objects
+for role, p in pm["parts"].items():
+    groups = p.get("vertex_groups") or []
+    if not groups:
+        continue
+    made = []
+    for src in list(objects.values()):
+        idx = {vg.index for vg in src.vertex_groups if vg.name in groups}
+        if not idx:
+            continue
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = src
+        src.select_set(True)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode='OBJECT')
+        for v in src.data.vertices:
+            v.select = any(g.group in idx and g.weight > 0.5 for g in v.groups)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.separate(type='SELECTED')
+        bpy.ops.object.mode_set(mode='OBJECT')
+        new = [o for o in bpy.context.selected_objects if o is not src]
+        for o in new:
+            o.name = "%s_%s" % (R.bone_name(role), src.name)
+            objects[o.name] = o
+            made.append(o.name)
+    p["objects"] = list(p.get("objects", [])) + made
+    p.pop("vertex_groups", None)
+for ob in objects.values():                      # the old skin's groups mean nothing on the new rig
+    ob.vertex_groups.clear()
+
 missing = [n for p in pm["parts"].values() for n in p.get("objects", []) if n not in objects]
 if missing:
     raise SystemExit("GUNKIT RIG: the parts map names objects the model does not have: %s; it has: %s"

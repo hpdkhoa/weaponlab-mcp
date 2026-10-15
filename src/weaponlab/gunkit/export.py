@@ -57,6 +57,8 @@ def export(facts_path, game_id, base=None, game_folder="/Game/Guns", staging="/G
     d["_about"] = ("%s, drafted by Gun Kit from %s (action %s); the game's numbers from its dump. A draft: it goes to "
                    "Content/Data/Guns only after the Gate and the user" % (game_id, facts["name"], a["id"]))
     d["Id"] = game_id
+    if facts.get("proxy"):
+        d["DisplayName"] = "TEST MODEL (%s proxy)" % a["id"]      # a proxy never ships: its name says what it is
     d["ArmsRig"] = rig
     d["ArmsGun"] = asset(folder, mesh)
     d["ArmsGunNoIrons"] = ""
