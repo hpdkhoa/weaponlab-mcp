@@ -123,3 +123,47 @@ def verify(facts_path, times=(0.0, 0.25, 0.5, 0.75, 1.0), tol_cm=0.05):
                     worst = max(worst, max(abs(g[i] - w[i]) for i in range(3)))
         report[cid] = {"worst_cm": round(worst, 4), "ok": worst <= tol_cm}
     return report
+
+
+def arms():
+    """The shared arms the hand clips are made on: weaponlab.json "gunkit": {"arms": {"folder", "arms", "idle", "eye"}}
+    (the folder holds the arms' FBX and an idle clip of the same skeleton; the eye in the arms' space, cm)."""
+    a = (project().config.get("gunkit") or {}).get("arms")
+    if not a:
+        raise RuntimeError('weaponlab.json has no "gunkit": {"arms": {"folder", "arms", "idle", "eye"}}: the shared arms')
+    a = dict(a)
+    f = Path(a["folder"])
+    a["folder"] = str(f if f.is_absolute() else Path(project().root) / f)
+    return a
+
+
+def hands(facts_path, clips=None, grip_steps=3, render=False):
+    """The hand clips on the shared arms (Pose Lab's Lab in Blender): each written as FBX and bone data, with Pose
+    Lab's clipping, anatomy and grip checks, the expected sights (a port in view) and the carried parts' tracks."""
+    import poselab_mcp
+    facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))
+    a = A.load(facts["action"])
+    out = Path(facts_path).parent / "hands"
+    out.mkdir(exist_ok=True)
+    want = clips or list(a["hand_clips"])
+    tl = {cid: T.hand_clip(a, facts, cid) for cid in want}
+    tracks = {cid: R.tracks(facts, c) for cid, c in tl.items()}
+    job = {"poselab": str(Path(poselab_mcp.__file__).resolve().parent / "blender"), "arms": arms(),
+           "gun_fbx": facts["model"]["file"], "facts": facts, "clips": tl, "tracks": tracks,
+           "prefix": "A_%s_Hands_" % facts["name"], "out": str(out), "grip_steps": grip_steps, "render": render}
+    _blender("gunkit_hands.py", job, out, timeout=7200)
+    return json.loads((out / "hands.json").read_text(encoding="utf-8"))
+
+
+def build_all(facts_path, grip_steps=3):
+    """Every clip of one gun: the hand clips first (they settle where a carried part goes), then the gun's own clips
+    with those parts' tracks. Returns both reports."""
+    facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))
+    a = A.load(facts["action"])
+    h = hands(facts_path, grip_steps=grip_steps)
+    resolved = {}
+    for cid, v in h["clips"].items():
+        if cid in a["gun_clips"] and any(isinstance(x, dict) and "at" in x for fr in v["resolved"]["frames"] for x in fr["parts"].values()):
+            resolved[cid] = v["resolved"]
+    c = gun_clips(facts_path, resolved=resolved)
+    return {"hands": {k: v["checks"] for k, v in h["clips"].items()}, "holds": h.get("holds"), "clips": c, "resolved": list(resolved)}

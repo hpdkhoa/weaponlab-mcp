@@ -35,22 +35,25 @@ def _long_gun(barrel=40.0, mag=True):
     shapes = [_box("Receiver", (4.0, 24.0, 7.0), (0.0, -4.0, 0.5)),
               _cyl("Barrel", 2.0, barrel, (0.0, barrel / 2.0, 0.0)),
               _box("Handguard", (5.0, 22.0, 6.0), (0.0, 16.0, -0.5)),
-              _box("Stock", (4.0, 26.0, 10.0), (0.0, -29.0, -3.0)),
+              _cyl("BufferTube", 3.0, 18.0, (0.0, -25.0, 1.0)),
+              _box("Butt", (4.0, 8.0, 13.0), (0.0, -37.0, -2.0)),
               _box("Grip", (3.0, 4.0, 10.0), (0.0, -10.0, -8.0))]
-    marks = {"grip": [0.0, -10.0, -8.0], "support": [0.0, 16.0, -3.5], "muzzle": [0.0, barrel, 0.0],
+    # a hand's mark is where its palm (or a pinch's fingertips) meets the surface: the right palm on the grip's right
+    # side, the left palm under the handguard
+    marks = {"grip": [-1.5, -10.0, -7.0], "support": [0.0, 16.0, -3.5], "muzzle": [0.0, barrel, 0.0],
              "trigger": [0.0, -6.5, -5.5], "port": [-2.2, 1.0, 1.5]}
     if mag:
         shapes.append(_box("Magazine", (2.5, 6.0, 18.0), (0.0, 3.0, -11.0), "magazine"))
-        marks.update({"mag_well": [0.0, 3.0, -2.0], "mag_grab": [0.0, 3.5, -17.0], "mag_lips": [0.0, 3.0, -2.2]})
+        marks.update({"mag_well": [0.0, 3.0, -2.0], "mag_grab": [1.25, 3.0, -15.0], "mag_lips": [0.0, 3.0, -2.2]})
     return shapes, marks
 
 
 def _pistol():
     shapes = [_box("Frame", (3.0, 18.0, 3.5), (0.0, 2.0, -1.5)),
               _box("Grip", (3.0, 5.0, 11.0), (0.0, -5.0, -8.0))]
-    marks = {"grip": [0.0, -5.0, -7.0], "support": [1.8, -4.5, -8.0], "muzzle": [0.0, 12.0, 0.0],
+    marks = {"grip": [-1.5, -5.0, -7.0], "support": [1.5, -4.5, -8.0], "muzzle": [0.0, 12.0, 0.0],
              "trigger": [0.0, -1.0, -4.0], "port": [-1.6, 1.0, 1.2],
-             "mag_well": [0.0, -5.0, -2.5], "mag_grab": [0.0, -5.5, -13.5], "mag_lips": [0.0, -5.0, -2.6]}
+             "mag_well": [0.0, -5.0, -2.5], "mag_grab": [0.0, -5.0, -13.6], "mag_lips": [0.0, -5.0, -2.6]}
     return shapes, marks
 
 
@@ -92,7 +95,7 @@ def proxy(action_id):
         part("release", "MagRelease", S((0.6, 1.0, 1.0), (-2.2, -1.0, -2.5)), axis=[1, 0, 0], travel_cm=0.3)
         part("assist", "ForwardAssist", S((1.0, 2.0, 1.0), (-2.4, -9.0, 1.5)), axis=[0, 1, 0], travel_cm=0.5)
         part("trigger", "Trigger", S((0.6, 0.8, 2.0), (0.0, -6.5, -5.5)), axis=[1, 0, 0], turn_deg=12.0, pivot=[0.0, -6.5, -4.5])
-        marks.update({"handle": [0.0, -15.0, 3.2], "catch": [2.2, -4.0, -2.5], "release": [-2.2, -1.0, -2.5], "assist": [-2.4, -9.0, 1.5]})
+        marks.update({"handle": [1.8, -15.5, 3.2], "catch": [2.45, -4.0, -2.5], "release": [-2.5, -1.0, -2.5], "assist": [-2.9, -9.0, 1.5]})
         mark_parts.update({"handle": "handle"})
     elif action_id == "ak_handle":
         part("carrier", "Carrier", S((2.0, 14.0, 2.5), (0.0, -2.0, 2.5)), axis=[0, -1, 0], travel_cm=12.0)
