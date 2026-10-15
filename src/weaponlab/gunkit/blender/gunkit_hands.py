@@ -107,47 +107,94 @@ FINGER_BONES = {s: [pb.name for pb in L.arm.pose.bones if any(pb.name.startswith
 GRASPS = {}
 
 
+_BVH = {}
+
+
+def surface_normal(world_point, mark=None):
+    """The gun's surface normal at a mark: the facts' own (gun space) when given, else the nearest face's, outward."""
+    q = RA.matrix_world.to_quaternion()
+    n = (facts.get("normals") or {}).get(mark) if mark else None
+    if n:
+        return (q @ g(n)).normalized()
+    if "tree" not in _BVH:
+        from mathutils.bvhtree import BVHTree
+        dg = bpy.context.evaluated_depsgraph_get()
+        ev = L.rifle_mesh.evaluated_get(dg)
+        me = ev.to_mesh()
+        M = L.rifle_mesh.matrix_world
+        _BVH["tree"] = BVHTree.FromPolygons([M @ v.co for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+        ev.to_mesh_clear()
+    loc, nrm, idx, dist = _BVH["tree"].find_nearest(world_point)
+    return nrm.normalized() if nrm is not None else Vector((0.0, 0.0, 1.0))
+
+
+def palm_frame(side):
+    """The palm's middle and the way it faces (toward what the fingers close on)."""
+    hn = L._n("hand", side)
+    w = L._bw(hn).translation
+    mid = L._bw(L._n("finger", side, "middle", "01")).translation
+    across, k = L._hand_frame(side)
+    return w.lerp(mid, 0.5), (across.cross((mid - w).normalized()) * k).normalized()
+
+
+def lay_palm(side, at, normal, thickness_cm=1.5):
+    """The palm turned to face into the surface (the least turn) and its middle set a palm's thickness off it."""
+    hn = L._n("hand", side)
+    H = L._bw(hn).copy()
+    P, facing = palm_frame(side)
+    q = facing.rotation_difference(-normal)
+    R = Matrix.Translation(P) @ q.to_matrix().to_4x4() @ Matrix.Translation(-P) @ H
+    goal = at + normal * (thickness_cm / 100.0)
+    R = Matrix.Translation(goal - P) @ R
+    short = L._put_hand(side, Matrix.LocRotScale(R.translation, R.to_quaternion(), L._unit()))
+    L._mend_hand(side)
+    return short
+
+
 def grasp(side, mark, part=None, offset=None):
     """The hand's hold on a mark, solved once with the parts as they are now: (the hand against the mark's bone, the
-    fingers' turns). Pose Lab's grip search; without a hold that passes, the hand turned as it is, laid on the mark."""
+    fingers' turns, whether a hold passed). The palm is first laid on the surface facing into it (the support hand
+    slid back along the bore while the arm cannot reach), then Pose Lab's grip search runs from there; its hold is
+    kept when one passes, else the laid palm, settled and with its fingers closed."""
     key = (side, mark, part, tuple(offset or ()))
     if key in GRASPS:
         return GRASPS[key]
     L.snapshot("save", "before_grasp")
-    target = lab_gun(mark_world(mark, part, offset))
+    hn = L._n("hand", side)
+    at = mark_world(mark, part, offset)
+    n = surface_normal(at, mark)
+    back = (RA.matrix_world.to_quaternion() @ g((0.0, -1.0, 0.0))).normalized()
+    short, slid = lay_palm(side, at, n), 0.0
+    while short > 0.3 and mark == "support" and slid < 14.0:      # beyond the arm's reach: slide back along the bore
+        slid += 2.0
+        L.snapshot("load", "before_grasp")
+        short = lay_palm(side, at + back * (slid / 100.0), n)
+    # settle onto the surface (Pose Lab's own measure of the palm's gap) and close the fingers
+    for _ in range(4):
+        gr = L.grip(side, hold=False)[side]
+        gap = gr.get("palm_gap_cm")
+        if gap is None or -0.1 <= gap <= 0.4:
+            break
+        P, facing = palm_frame(side)
+        hw = L._bw(hn)
+        L._put_hand(side, Matrix.LocRotScale(hw.translation + facing * ((gap - 0.15) / 100.0), hw.to_quaternion(), L._unit()))
+    L._clear_fingers(side)
+    L.snapshot("save", "laid")
+    found = False
     try:
-        r = L.solve_grip(side, target, along=(-2.0, 2.0), steps=int(job.get("grip_steps", 3)), rolls=(0.0, -20.0, 20.0, -40.0, 40.0))
+        target = lab_gun(at + back * (slid / 100.0))
+        span = (-8.0, 2.0) if mark == "support" else (-2.0, 2.0)
+        r = L.solve_grip(side, target, along=span, steps=int(job.get("grip_steps", 3)), rolls=(0.0, -20.0, 20.0))
         found = r["found"]
     except Exception as e:                          # a part too small or too odd for the grip search
-        found = False
         report["notes"].append("grip %s on %s: %s" % (side, mark, str(e)[:160]))
-    hn = L._n("hand", side)
     if not found:
-        # no hold passed: the palm's middle laid on the mark, the hand's turn kept, settled onto the surface and the
-        # fingers closed round what they meet (Pose Lab's own mending), as solve_grip settles each of its tries
-        H0 = L._bw(hn).copy()
-        mid = L._bw(L._n("finger", side, "middle", "01")).translation
-        palm_off = H0.to_quaternion().inverted() @ (H0.translation.lerp(mid, 0.5) - H0.translation)
-        goal = mark_world(mark, part, offset)
-        L._put_hand(side, Matrix.LocRotScale(goal - (H0.to_quaternion() @ palm_off), H0.to_quaternion(), L._unit()))
-        L._mend_hand(side)
-        for _ in range(3):
-            gr = L.grip(side, hold=False)[side]
-            gap = gr.get("palm_gap_cm")
-            if gap is None or -0.1 <= gap <= 0.4:
-                break
-            across, k = L._hand_frame(side)
-            hw = L._bw(hn)
-            mid_now = L._bw(L._n("finger", side, "middle", "01")).translation
-            palm_dir = (across.cross((mid_now - hw.translation).normalized()) * k).normalized()
-            L._put_hand(side, Matrix.LocRotScale(hw.translation + palm_dir * ((gap - 0.15) / 100.0), hw.to_quaternion(), L._unit()))
-        L._clear_fingers(side)
-        H = L._bw(hn).copy()
-        report["notes"].append("no hold passed for the %s hand on %s: the palm laid on the mark and settled" % (side, mark))
-    else:
-        H = L._bw(hn).copy()
+        L.snapshot("load", "laid")
+        report["notes"].append("no hold passed for the %s hand on %s: the palm laid on the surface%s"
+                               % (side, mark, (", slid back %.0f cm" % slid) if slid else ""))
+    H = L._bw(hn).copy()
     rel = bone_world(mark_bone(mark, part)).inverted() @ H
-    fingers = {n: L.arm.pose.bones[n].rotation_quaternion.copy() for n in FINGER_BONES[side]}
+    fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
     L.snapshot("load", "before_grasp")
     GRASPS[key] = (rel, fingers, found)
     return GRASPS[key]

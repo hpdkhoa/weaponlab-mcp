@@ -125,3 +125,12 @@ def test_every_proxy_rigs_into_facts_its_action_takes(action_id):
         assert tr["frames"] and all(b in {x["name"] for x in facts["bones"]} for b in tr["frames"][0]["bones"])
     for cid in a["hand_clips"]:
         assert R.tracks(facts, T.hand_clip(a, facts, cid))["frames"]
+
+
+def test_gate_cases_for_every_action_use_known_metrics():
+    from weaponlab import gate as G
+    from weaponlab.gunkit import gaterows as GR
+    known = G.metrics()
+    for aid in A.ids():
+        for c in GR.cases("TestGun", aid):
+            assert c["metric"] in known and c["rule"]["op"] in G.OPS, (aid, c["id"])

@@ -60,7 +60,9 @@ def _pistol():
 def proxy(action_id):
     """The proxy gun of an action: its parts map (model left empty: the build writes it) and its shapes."""
     a = A.load(action_id)
-    parts, mark_parts, normals = {}, {}, {"port": [-1.0, 0.0, 0.0]}
+    # which way each hand mark's surface faces (a palm is laid facing into it); the rest from the nearest face
+    parts, mark_parts = {}, {}
+    normals = {"port": [-1.0, 0.0, 0.0], "grip": [-1.0, 0.0, 0.0], "support": [0.0, 0.0, -1.0], "mag_grab": [1.0, 0.0, 0.0]}
     lips = None
     if action_id in ("pistol_slide", "revolver_swing", "energy_cell_pistol"):
         shapes, marks = _pistol()

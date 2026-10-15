@@ -118,7 +118,9 @@ else:
     axes = {"+X": Vector((1, 0, 0)), "-X": Vector((-1, 0, 0)), "+Y": Vector((0, 1, 0)), "-Y": Vector((0, -1, 0)),
             "+Z": Vector((0, 0, 1)), "-Z": Vector((0, 0, -1))}
     f, u = axes[pm.get("forward", "+Y")], axes[pm.get("up", "+Z")]
-    left = f.cross(u)
+    # Blender's world is right-handed, gun space left-handed (+X the gun's left, as Unreal's): the gun's left is up x
+    # forward here (forward x up is its right)
+    left = u.cross(f)
     unit_cm = {"m": 100.0, "cm": 1.0, "mm": 0.1}[pm.get("units", "m")]
     o = Vector(pm.get("origin", [0, 0, 0]))
     to_gun = Matrix(((*left, 0.0), (*f, 0.0), (*u, 0.0), (0.0, 0.0, 0.0, 1.0)))   # rows: gun x, y, z of a model vector
@@ -143,12 +145,18 @@ for role, p in pm["parts"].items():
         bpy.ops.object.select_all(action='DESELECT')
         bpy.context.view_layer.objects.active = src
         src.select_set(True)
+        bpy.context.tool_settings.mesh_select_mode = (True, False, False)     # vertices: their faces follow
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='DESELECT')
         bpy.ops.object.mode_set(mode='OBJECT')
+        picked = 0
         for v in src.data.vertices:
             v.select = any(g.group in idx and g.weight > 0.5 for g in v.groups)
+            picked += v.select
+        if not picked:
+            continue
         bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_mode(type='VERT')
         bpy.ops.mesh.separate(type='SELECTED')
         bpy.ops.object.mode_set(mode='OBJECT')
         new = [o for o in bpy.context.selected_objects if o is not src]

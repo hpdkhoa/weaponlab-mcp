@@ -122,6 +122,7 @@ def verify(facts_path, times=(0.0, 0.25, 0.5, 0.75, 1.0), tol_cm=0.05):
                     g = got[name][str(t)][bone][k]
                     worst = max(worst, max(abs(g[i] - w[i]) for i in range(3)))
         report[cid] = {"worst_cm": round(worst, 4), "ok": worst <= tol_cm}
+    (out / "readback_report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     return report
 
 

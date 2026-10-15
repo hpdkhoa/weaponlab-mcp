@@ -92,6 +92,8 @@ def export(facts_path, game_id, base=None, game_folder="/Game/Guns", staging="/G
               "ArmsMagHandBone", "ArmsGunChargeLocked", "ArmsGunLoad", "ArmsGunLoadStart", "ArmsGunLoadEnd"):
         d.pop(k, None)
     (out / ("%s.json" % game_id)).write_text(json.dumps(d, indent=1), encoding="utf-8")
+    from .gaterows import register
+    register(game_id, build)                          # the Gate's gunkit provider finds the build by the game id
     # the same file for a trial before the import is approved: every asset in the staging folder (the game reads it
     # with -GunData=<folder>, Game Probe's trial)
     trial = json.loads(json.dumps(d).replace('"%s/' % folder, '"%s/%s/' % (staging, game_id)))

@@ -60,6 +60,8 @@ def metrics():
     (provider rig), tolerance 0 unless the project says otherwise."""
     std = {k: {"provider": "probe", "unit": u, "better": b, "tolerance": 0.0, "about": a} for k, (u, b, a) in C.STANDARD_METRICS.items()}
     std.update({k: {"provider": "rig", "unit": u, "better": b, "tolerance": t, "about": a} for k, (u, b, t, a) in RIG_METRICS.items()})
+    from .gunkit.gaterows import METRICS as GK
+    std.update({k: {"provider": "gunkit", "unit": u, "better": b, "tolerance": t, "about": a} for k, (u, b, t, rule, a) in GK.items()})
     std.update(_load(project().data / "metrics.json", {}))
     return std
 
@@ -124,13 +126,18 @@ def key(row):
 
 
 def _builtin(name):
-    """The providers inside Weapon Lab: probe (the game's probe) and rig (parts dumps against the specs)."""
+    """The providers inside Weapon Lab: probe (the game's probe), rig (parts dumps against the specs) and gunkit (a Gun
+    Kit build's own checks: its facts, its clips read back, its hand clips' Pose Lab checks)."""
     if name == "probe":
         from . import probe
         return lambda ws, acts, staging: probe.measure(ws, acts, staging)
     if name == "rig":
         from . import rig
         return lambda ws, acts, staging: rig.measure(ws, acts, staging)
+    if name == "gunkit":
+        from .gunkit import gaterows
+        return lambda ws, acts, staging: [r for w in (ws or list(gaterows.registry())) for r in gaterows.rows(w)
+                                          if not acts or r["action"] in acts]
     return None
 
 
