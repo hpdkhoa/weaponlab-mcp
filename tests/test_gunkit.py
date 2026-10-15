@@ -82,7 +82,7 @@ def test_a_hand_rides_the_handle_it_holds():
 def test_the_check_rolls_the_port_up_and_back():
     clip = T.hand_clip(A.load("ar_gas"), ar_facts(), "check_chamber")
     by_t = {fr["t"]: fr for fr in clip["frames"]}
-    assert by_t[1.0]["gun"]["roll"] == pytest.approx(35.0) and by_t[2.0]["gun"]["roll"] == pytest.approx(0.0)
+    assert by_t[1.0]["gun"]["roll"] == pytest.approx(60.0) and by_t[2.0]["gun"]["roll"] == pytest.approx(0.0)
     assert by_t[1.0]["parts"]["handle"] == pytest.approx(0.238)
 
 
