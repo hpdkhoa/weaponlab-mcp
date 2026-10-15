@@ -1,6 +1,18 @@
-# Weapon Lab
+<h1 align="center">Weapon Lab</h1>
 
 <!-- mcp-name: io.github.hpdkhoa/weaponlab-mcp -->
+
+<p align="center"><strong>First-person weapon bugs fixed once per kind, then for every weapon, behind a gate.</strong></p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <a href="pyproject.toml"><img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python&logoColor=white"></a>
+  <a href="https://pypi.org/project/weaponlab-mcp/"><img alt="PyPI: weaponlab-mcp" src="https://img.shields.io/pypi/v/weaponlab-mcp?label=PyPI&logo=pypi&logoColor=white&color=3775a9"></a>
+  <a href="https://registry.modelcontextprotocol.io/v0/servers?search=weaponlab-mcp"><img alt="MCP Registry: weaponlab-mcp" src="https://img.shields.io/badge/MCP%20Registry-weaponlab--mcp-6f42c1"></a>
+  <a href="https://www.blender.org/download/"><img alt="Blender: 4.4+ (Motion Lab)" src="https://img.shields.io/badge/Blender-4.4%2B%20(Motion%20Lab)-e87d0d?logo=blender&logoColor=white"></a>
+  <a href="#what-it-does"><img alt="tools: 30" src="https://img.shields.io/badge/tools-30-orange"></a>
+  <a href="docs/PROBE_CONTRACT.md"><img alt="probe contract: v1" src="https://img.shields.io/badge/probe%20contract-v1-orange"></a>
+</p>
 
 An MCP server that finds and fixes first-person weapon bugs behind a gate: hands off the gun, a magazine crooked in
 its well, a blade held wrong, arms covering the screen.
