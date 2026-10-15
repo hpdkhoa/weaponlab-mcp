@@ -10,7 +10,7 @@
   <a href="https://pypi.org/project/weaponlab-mcp/"><img alt="PyPI: weaponlab-mcp" src="https://img.shields.io/pypi/v/weaponlab-mcp?label=PyPI&logo=pypi&logoColor=white&color=3775a9"></a>
   <a href="https://registry.modelcontextprotocol.io/v0/servers?search=weaponlab-mcp"><img alt="MCP Registry: weaponlab-mcp" src="https://img.shields.io/badge/MCP%20Registry-weaponlab--mcp-6f42c1"></a>
   <a href="https://www.blender.org/download/"><img alt="Blender: 4.4+ (Motion Lab)" src="https://img.shields.io/badge/Blender-4.4%2B%20(Motion%20Lab)-e87d0d?logo=blender&logoColor=white"></a>
-  <a href="#what-it-does"><img alt="tools: 30" src="https://img.shields.io/badge/tools-30-orange"></a>
+  <a href="#what-it-does"><img alt="tools: 41" src="https://img.shields.io/badge/tools-41-orange"></a>
   <a href="docs/PROBE_CONTRACT.md"><img alt="probe contract: v1" src="https://img.shields.io/badge/probe%20contract-v1-orange"></a>
 </p>
 
@@ -35,6 +35,7 @@ writes back.
 | Motion Lab | `motion_roll`, `motion_roll_profile`, `motion_roll_set`, `motion_track`, `motion_render` | Rebuilds clips in Blender: turns a hand about its forearm inside the forearm's range, puts a sliding part back on its axis. |
 | Specs | `spec_list`, `spec_read`, `spec_validate`, `spec_write` | One file a weapon: marks (grip, support), anchors (pieces to find), facts, limits. |
 | Contract | `contract_check` | Checks a probe's job, rows or parts dump. |
+| Gun Kit | `gunkit_inspect`, `gunkit_draft`, `gunkit_from_modellab`, `gunkit_proxy`, `gunkit_rig`, `gunkit_build`, `gunkit_verify`, `gunkit_export`, `gunkit_cases`, `gunkit_actions`, `gunkit_action` | Takes any gun model to the game: rigs it for one of 18 actions, makes its own clips and the hand clips on one shared pair of arms, checks them, stages the files. See [docs/GUNKIT.md](docs/GUNKIT.md). |
 
 ## Try it on the demo
 

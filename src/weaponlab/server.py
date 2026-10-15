@@ -1,4 +1,4 @@
-"""Weapon Lab over MCP: one server, five groups of tools (spec_, gate_, probe_, rig_, motion_) and the contract checks.
+"""Weapon Lab over MCP: one server, six groups of tools (spec_, gate_, probe_, rig_, motion_, gunkit_) and the contract checks.
 Run: weaponlab-mcp (or python -m weaponlab serve)."""
 from typing import Annotated
 
@@ -227,6 +227,97 @@ def motion_track(src_fbx: str, out_fbx: str, bone: str, root: str, axis: list[fl
 def motion_render(objs: list[str], out_folder: str) -> dict:
     """Dev views of parts dumps (not the game's view)."""
     return _err(M.render, objs, out_folder)
+
+
+# ------------------------------------------------------------------ Gun Kit: any gun, from its model to the game
+@mcp.tool()
+def gunkit_actions() -> dict:
+    """The kinds of gun action Gun Kit knows (AR gas, AK handle, bolt, lever, pump, pistol slide, open bolt, revolver,
+    belt fed, launchers, bow, crossbow, flamethrower, fictional energy guns): each one's guns, parts and clips."""
+    from .gunkit import actions as GA
+    return GA.summary()
+
+
+@mcp.tool()
+def gunkit_action(action: str) -> dict:
+    """One action in full: its parts, marks, the beats of its gun clips and the hand events of its hand clips, with
+    the reason or source of each, and the manuals to read or find."""
+    from .gunkit import actions as GA
+    return _err(GA.load, action)
+
+
+@mcp.tool()
+def gunkit_inspect(model: str) -> dict:
+    """What a model holds as Blender shows it after import (objects, vertex groups, bounds, the longest axis, a units
+    guess): the starting point of its parts map."""
+    from .gunkit import run as GR
+    return _err(GR.inspect, model)
+
+
+@mcp.tool()
+def gunkit_draft(model: str, action: str, name: str | None = None) -> dict:
+    """A first parts map for a model of the user's own and the list of every guess in it to confirm (forward, units,
+    the bolt face, each part, each mark). Write the confirmed map to a file for gunkit_rig."""
+    from .gunkit import draft as GD, run as GR
+    return _err(lambda: GD.draft(GR.inspect(model), action, model, name))
+
+
+@mcp.tool()
+def gunkit_from_modellab(build_folder: str) -> dict:
+    """A Model Lab build's parts map (its moving parts, travel, hinges and hand marks), ready for gunkit_rig."""
+    from .gunkit import modellab as GM
+    return _err(GM.partsmap, build_folder)
+
+
+@mcp.tool()
+def gunkit_proxy(action: str) -> dict:
+    """An action's proxy gun (simple shapes with its real moving parts) built and rigged: the whole chain runs on it
+    before a real model exists. A test model: label every picture of it."""
+    from .gunkit import run as GR
+    return _err(GR.build_proxy, action)
+
+
+@mcp.tool()
+def gunkit_rig(partsmap: Annotated[str, Field(description="a parts map file (weaponlab-partsmap/1)")]) -> dict:
+    """A gun rigged for its action from its parts map: one bone a moving part, the gun facts checked against the action."""
+    from .gunkit import run as GR
+    return _err(GR.rig, partsmap)
+
+
+@mcp.tool()
+def gunkit_build(facts: Annotated[str, Field(description="the rigged gun's gunfacts.json")], grip_steps: int = 3) -> dict:
+    """Every clip of one gun: the hand clips on the shared arms (Pose Lab: the hold searched for both hands and the
+    view, each clip's clearance, anatomy and grip checks, the expected sights), then the gun's own clips with the
+    carried parts' tracks. Minutes per gun."""
+    from .gunkit import run as GR
+    return _err(GR.build_all, facts, grip_steps)
+
+
+@mcp.tool()
+def gunkit_verify(facts: str) -> dict:
+    """The gun's own clips read back from Blender against the timeline's sums: the worst gap a clip, cm."""
+    from .gunkit import run as GR
+    return _err(GR.verify, facts)
+
+
+@mcp.tool()
+def gunkit_export(facts: str, game_id: str, base: Annotated[str | None, Field(description="the game's current definition of the gun (a data file), for its numbers")] = None) -> dict:
+    """The gun's files staged for a game: its FBX with its clips, the hand clips, an import plan, a draft data file and
+    a trial copy pointing at staging. Registers the build for the Gate's gunkit provider."""
+    from .gunkit import export as GX
+    return _err(GX.export, facts, game_id, base)
+
+
+@mcp.tool()
+def gunkit_cases(weapon: str, action: str, add: bool = False) -> list:
+    """The Gate cases every gun of an action gets (its facts, each clip's read-back, each hand clip's checks and
+    sights); add writes them into the Gate."""
+    from .gunkit import gaterows as GG
+    cs = GG.cases(weapon, action)
+    if add:
+        for c in cs:
+            _err(G.add_case, c)
+    return cs
 
 
 def main():
