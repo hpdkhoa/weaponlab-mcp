@@ -228,5 +228,22 @@ P.lathe(G, "plug", "slide", "blued", [[BARREL - 0.6, 0.42], [BARREL - 0.05, 0.42
 P.numbers(G, "bushing", ["B8596"])
 P.numbers(G, "plug", ["A13201"])
 P.numbers(G, "barrel", ["C3838"])
-P.numbers(G, "magazine", ["C6695", "B8606"])
+# the magazine: a single-stack tube, rounded at its front (the cartridges' noses), and its base plate
+mo = store.load(G, "blueprint")["parts"]["magazine"]["shape"]["outline"]
+mzb = min(q[1] for q in mo)
+P.views(G, "magazine", front=[{"y": [-20.0, 5.0], "outline": P.rounded(-0.75, 0.75, mzb - 1.0, max(q[1] for q in mo) + 1.0, 0.0)}],
+        front_source={"guess": "a single-stack tube, its sides flat and square across (no plan view shows the magazine)"},
+        top=[[max(q[0] for q in mo) + 0.2, -0.55], [max(q[0] for q in mo) + 0.2, 0.55], [max(q[0] for q in mo) - 0.35, 0.75],
+             [min(q[0] for q in mo) - 0.2, 0.75], [min(q[0] for q in mo) - 0.2, -0.75], [max(q[0] for q in mo) - 0.35, -0.75]],
+        top_source={"guess": "the tube's front rounds in where the cartridges' noses sit (a .45 ACP magazine's shape)"})
+P.extrude(G, "mag_base", "magazine", "blued", None, [-0.85, 0.85], {"guess": "the base plate stands 0.1 cm proud of the tube on each side"},
+          clips=[("z", mzb + 0.35, "below", "the bottom 0.35 cm of the magazine")],
+          outline=mo, outline_source={"derived": "the magazine's outline, its bottom: the base plate B8606 (labelled on the section)"},
+          motion={"kind": "free"}, name="Base B8606")
+bp = store.load(G, "blueprint")
+bp["parts"]["magazine"]["shape"]["side"] = P.clip(bp["parts"]["magazine"]["shape"]["side"], "z", mzb + 0.35, "above")
+bp["parts"]["magazine"]["sources"]["side"]["derived"] = bp["parts"]["magazine"]["sources"]["side"].get("derived", "") + "; over its base plate"
+store.save(G, "blueprint", bp, strict=False)
+P.numbers(G, "magazine", ["C6695"])
+P.numbers(G, "mag_base", ["B8606"])
 print("parts:", ", ".join(store.load(G, "blueprint")["parts"]))
