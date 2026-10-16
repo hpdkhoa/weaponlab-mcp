@@ -34,6 +34,9 @@ for fid, v, u, page, q in [
     X.add(G, fid, v, u, SRC, page, q)
 fx = X.facts(G)
 
+# the traces lose their edge noise (the photo's halftone dots): runs between corners averaged over 13 px, corners
+# that turn 40 degrees or more kept, then simplified to 2.5 px
+T.smoothing(13, 40)
 # step 3a: the photo (Figure 2, page 7, left side), scaled by the overall length, framed by the front sight's height
 F.add(G, "photo-a1-left", SRC, 7, "photo", shows="left", crop=[0.08, 0.2, 0.88, 0.97], rotate_deg=90, dpi=200,
       caption="Figure 2. Automatic pistol, caliber .45, M1911A1")
@@ -44,7 +47,7 @@ xmin, xmax = min(p[0] for p in px), max(p[0] for p in px)
 sight = min((p for p in px if p[0] < xmin + 0.1 * (xmax - xmin)), key=lambda p: p[1])     # the front sight's top
 yb = sight[1] + fx["sight_height"]["value"] / c["cm_per_px"]
 F.frame(G, "photo-a1-left", [xmax, yb], [xmin, yb], [xmin + fx["barrel_length"]["value"] / c["cm_per_px"], yb])
-T.save(G, "photo_outline", T.silhouette(G, "photo-a1-left", region=[235, 70, 1008, 545], close_px=7, eps_px=1.5))
+T.save(G, "photo_outline", T.silhouette(G, "photo-a1-left", region=[235, 70, 1008, 545], close_px=7, eps_px=2.5))
 T.save(G, "photo_guard", T.region(G, "photo-a1-left", [640, 265], gap_px=2, name="guard"))
 
 # step 3b: the sectional side view (Figure 3, page 12) and the plan section (its top, page 11)
@@ -61,4 +64,6 @@ F.align(G, "section-side", "photo-a1-left", g["outline_px"], P.trace(G, "photo_g
         note="the slide is drawn locked back; its y readings here are of the open slide; the printed inches bar reads about 5 to 10 percent off the photo")
 T.save(G, "section_magazine", T.snap(G, "section-side", [[1090, 310], [1265, 300], [1400, 805], [1205, 815]],
                                      radius_px=10, step_px=6, eps_px=2.0, name="magazine"))
+# section A-A (the slide's front, at the barrel bushing): its outer outline, for the slide's front section
+T.save(G, "section_aa_px", T.silhouette(G, "section-side", region=[153, 172, 268, 370], close_px=5, eps_px=1.0))
 print("sources done; next: examples/m1911a1/blueprint.py")

@@ -20,7 +20,7 @@ outline = P.trace(G, "photo_outline")["outline_cm"]
 BARREL = fx["barrel_length"]["value"]
 
 # --- readings ------------------------------------------------------------------------------------------------------
-top = sorted(p[1] for p in outline if 2 < p[0] < 10 and p[1] > 0.5)
+top = sorted(p[1] for p in P.dense(outline) if 2 < p[0] < 10 and p[1] > 0.5)
 slide_top = top[len(top) // 2]                                     # the slide's flat top above the bore (photo)
 # the section, as px rows at the slide's middle (x 760 to 900): slide top 168, barrel 201 to 259, lower wall to 296.5
 SEC = {"slide_top": 168.0, "barrel_top": 201.0, "barrel_bottom": 259.0, "slide_bottom": 296.5}
@@ -108,7 +108,7 @@ MAGSRC = {"derived": "the magazine part's outline (the section's tube set along 
 P.lips(G, [0.0, lips[0], lips[1]], MAGSRC)
 
 # --- marks -----------------------------------------------------------------------------------------------------------
-gy = [p[0] for p in outline if -10.5 < p[1] < -4.0]
+gy = [p[0] for p in P.dense(outline) if -10.5 < p[1] < -4.0]
 grip_mid_y = round(sum(gy) / len(gy), 3) if gy else -5.0
 P.mark(G, "muzzle", [0.0, BARREL, 0.0], {"fact": "barrel_length", "note": "the muzzle a barrel's length ahead of the breech face, on the bore"})
 P.mark(G, "grip", [-grip_w / 2.0, grip_mid_y, -6.5], {"derived": "the right stock's face (half the grip's width) at the middle of the grip's outline in the photo"}, normal=[-1.0, 0.0, 0.0])

@@ -9,6 +9,7 @@ from weaponlab.blueprint import store
 from weaponlab.blueprint import trace as T
 
 G, SRC = "M1911A1", "fm23-35-1940"
+T.smoothing(13, 40)                     # the detail traces (the magazine catch) lose their edge noise too
 photo, side, top = F.figure(G, "photo-a1-left"), F.figure(G, "section-side"), F.figure(G, "section-top")
 bp = store.load(G, "blueprint")
 outline = P.trace(G, "photo_outline")["outline_cm"]
@@ -62,14 +63,16 @@ front = [[round((x - cx) * k, 4), round(slide_top - (y - min(ys)) * k, 4)] for x
 P.views(G, "slide", front=[{"y": [-7.0, BARREL + 0.5], "outline": front}],
         front_source={"figure": "section-side", "method": "traced", "note": "section A-A (the slide at the barrel bushing), scaled to the slide's width, its top on the slide's top"})
 # the sights: the outline above the slide's flat top, at the front and the rear
-SIGHT = {"derived": "the photo's outline above the slide's flat top (photo_outline)"}
-P.extrude(G, "sight_front", "body", "parkerized", "photo_outline", [-0.16, 0.16],
+RIDE = {"kind": "slide", "axis": [0.0, -1.0, 0.0], "travel_cm": bp["parts"]["slide"]["motion"]["travel_cm"]}
+RIDE_SRC = {"axis": {"derived": "the sights are fixed to the slide and move with it"}, "travel_cm": {"derived": "the slide's travel"}}
+P.extrude(G, "sight_front", "slide", "parkerized", "photo_outline", [-0.16, 0.16],
           {"derived": "section A-A's front sight stub, 20 px across at its root less the drawing's two 3 px lines, scaled as the section"},
-          clips=[("z", slide_top - 0.05, "above", "above the slide's top"), ("y", 7.0, "above", "the front sight, near the muzzle")], name="Sight A13197")
-P.extrude(G, "sight_rear", "body", "parkerized", "photo_outline", [-0.5, 0.5],
+          clips=[("z", slide_top - 0.05, "above", "above the slide's top"), ("y", 7.0, "above", "the front sight, near the muzzle")], name="Sight A13197",
+          motion=RIDE, motion_sources=RIDE_SRC)
+P.extrude(G, "sight_rear", "slide", "parkerized", "photo_outline", [-0.5, 0.5],
           {"guess": "the rear sight's width: about 1 cm, the same as its notch and its two shoulders (no plan view shows it)"},
           clips=[("z", slide_top - 0.05, "above", "above the slide's top"), ("y", -3.0, "below", "the rear sight, over the slide's rear"),
-                 ("y", -6.45, "above", "ahead of the slide's rear face")], name="Sight A13196")
+                 ("y", -6.45, "above", "ahead of the slide's rear face")], name="Sight A13196", motion=RIDE, motion_sources=RIDE_SRC)
 bp = store.load(G, "blueprint")
 sv = bp["parts"]["slide"]
 sv["shape"]["side"] = P.clip(sv["shape"]["side"], "z", slide_top + 0.02, "below")
@@ -125,6 +128,8 @@ zmin = min(p[1] for p in outline)
 back, miss = P.edge_line(outline, zmin + 1.0, -3.0, front=False)
 inner = [[back[0][0] + 0.9, back[0][1]], [back[1][0] + 0.9, back[1][1]]]
 z_joint = -6.2
+side_of = lambda q: (inner[1][0] - inner[0][0]) * (q[1] - inner[0][1]) - (inner[1][1] - inner[0][1]) * (q[0] - inner[0][0])   # noqa: E731
+zb = min(q[1] for q in P.dense(outline) if side_of(q) > 0)       # the lowest point behind the line: the loop's bottom
 WHY_IN = "0.9 cm inside the grip's back strap (a straight fit to the photo's rear outline, worst miss %.2f cm; the depth is a guess at the parts' thickness)" % miss
 P.extrude(G, "grip_safety", "body", "parkerized", "photo_outline", [-hs * 0.85, hs * 0.85],
           {"guess": "the grip safety is a little narrower than the frame (0.85 of it), as it sits between the stocks"},
@@ -134,10 +139,10 @@ P.extrude(G, "grip_safety", "body", "parkerized", "photo_outline", [-hs * 0.85, 
 P.extrude(G, "housing", "body", "parkerized", "photo_outline", [-hs * 0.85, hs * 0.85],
           {"guess": "the mainspring housing as wide as the grip safety"},
           clips=[("line", inner, "left", "behind the line " + WHY_IN), ("z", z_joint, "below", "under its joint with the grip safety"),
-                 ("z", zmin + 0.25, "above", "over the lanyard loop")], name="Housing C3841")
+                 ("z", zb + 0.35, "above", "over the lanyard loop")], name="Housing C3841")
 P.feature(G, "housing", {"kind": "texture", "pattern": "knurling", "face": "rear", "source": TEXT(6, "curve to fit the palm of the hand and is knurled")})
 P.extrude(G, "loop", "body", "parkerized", "photo_outline", [-0.25, 0.25], {"guess": "the lanyard loop is a ring of 0.5 cm wire"},
-          clips=[("line", inner, "left", "under the housing"), ("z", zmin + 0.25, "below", "the bottom 0.25 cm of the outline behind the back strap line")], name="Loop A13214")
+          clips=[("line", inner, "left", "under the housing"), ("z", zb + 0.35, "below", "the bottom 0.35 cm of the outline behind the back strap line")], name="Loop A13214")
 P.numbers(G, "grip_safety", ["D1828"])
 P.numbers(G, "housing", ["C3841"])
 P.numbers(G, "loop", ["A13214"])
@@ -210,13 +215,16 @@ P.part(G, "thumb_safety", "body", "parkerized", {"kind": "extrude", "outline": s
 
 # --- the bushing and the recoil spring plug at the muzzle --------------------------------------------------------
 od = store.load(G, "blueprint")["parts"]["barrel"]["shape"]["profile"][0][1]
-P.lathe(G, "bushing", "body", "blued", [[BARREL - 1.0, od + 0.18], [BARREL + 0.02, od + 0.18]], [0.0, 0.0],
+travel = store.load(G, "blueprint")["parts"]["slide"]["motion"]["travel_cm"]
+RIDES = {"kind": "slide", "axis": [0.0, -1.0, 0.0], "travel_cm": travel}
+RIDES_SRC = {"axis": {"derived": "it sits in the slide's front and moves with it"}, "travel_cm": {"derived": "the slide's travel"}}
+P.lathe(G, "bushing", "slide", "blued", [[BARREL - 1.0, od + 0.18], [BARREL + 0.02, od + 0.18]], [0.0, 0.0],
         {"derived": "section A-A's bushing ring round the barrel: about 0.18 cm thick in the section; its front flush with the muzzle"},
-        {"derived": "on the bore"}, bore_r=od + 0.01, name="Bushing B8596")
+        {"derived": "on the bore"}, bore_r=od + 0.01, name="Bushing B8596", motion=RIDES, motion_sources=RIDES_SRC)
 plug_z = round(-(330 - 245) * k, 3)
-P.lathe(G, "plug", "body", "blued", [[BARREL - 0.6, 0.42], [BARREL - 0.05, 0.42]], [0.0, plug_z],
+P.lathe(G, "plug", "slide", "blued", [[BARREL - 0.6, 0.42], [BARREL - 0.05, 0.42]], [0.0, plug_z],
         {"derived": "section A-A's lower circle (the recoil spring plug), about 0.84 cm across at the section's scale"},
-        {"derived": "section A-A: its centre 85 px under the barrel's, at the section's scale"}, name="Plug A13201")
+        {"derived": "section A-A: its centre 85 px under the barrel's, at the section's scale"}, name="Plug A13201", motion=RIDES, motion_sources=RIDES_SRC)
 P.numbers(G, "bushing", ["B8596"])
 P.numbers(G, "plug", ["A13201"])
 P.numbers(G, "barrel", ["C3838"])

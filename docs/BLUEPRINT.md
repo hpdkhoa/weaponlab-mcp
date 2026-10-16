@@ -17,7 +17,7 @@ blueprint names its source.
 | 4. Blueprint | `blueprint_new`, `blueprint_part`, `blueprint_hole`, `blueprint_mark`, `blueprint_read` | writes the parts (extrude or lathe, clipped where neighbours meet), cuts, marks |
 | Detail | `blueprint_views`, `blueprint_feature`, `blueprint_parts_list`, `blueprint_numbers` | shapes parts by three views, adds grooves, screws and textures, holds every visible listed part to a blueprint part |
 | 5. Check | `blueprint_check` | contract, outline overlap with the reference, length and weight sums, overlay pictures |
-| 6. Model | `blueprint_build` | the model in Blender, one object a part, its parts map, labelled pictures |
+| 6. Model | `blueprint_build`, `blueprint_showcase` | the model in Blender, one object a part, its parts map, labelled pictures; a GIF and MP4 showcase |
 | 7. Motion | `blueprint_to_gunkit` | Gun Kit: rig, hand clips, gun clips, read-back |
 
 A gun's files are in `<work>/digitize/<gun>/` (or under `WEAPONLAB_DIGITIZE`): `sources.json`, `blueprint.json`,
@@ -70,6 +70,25 @@ like the gun.
 The check's `detail` result gives the listed and visible parts, the missing ones, how many parts are shaped, slabs
 or round, and the features by kind.
 
+## Edge noise
+
+A photo printed as a halftone, or a grainy scan, gives a traced outline a chipped edge: the tracer follows the dots.
+`blueprint_trace` with `smooth_px` takes it out. It finds the outline's corners (turns of `corner_deg` or more, judged
+over twice the window), averages each run between two corners over the window with its corner ends held, then
+simplifies. Straight edges come out straight, curves even, corners sharp. The trace records the smoothing, and every
+part cut from it says so in its source. The M1911A1 uses 13 px and 40 degrees (0.38 cm and its corners).
+
+## Showcase
+
+`blueprint_showcase` makes a labelled GIF and MP4 of a gun that has been through Gun Kit:
+
+- a title card
+- the source figure beside the copy
+- one turn round the gun
+- its own clips: firing slowed down, the empty reload, the chamber check, the magazine check
+
+The MP4 is H.264 from Blender's encoder, so no ffmpeg is needed. The files are in `<gun>/showcase/`.
+
 ## Checks
 
 | Check | Pass |
@@ -117,8 +136,8 @@ After the detail pass (`detail.py`):
   - knurling on the trigger and the mainspring housing (from the text)
 - **Outline:** IoU 0.991 against the photo.
 
-Still slabs: the frame, the magazine and the small parts (no front or top view shows them). The traced edges carry
-about 0.1 cm of the photo's halftone noise.
+Still slabs: the frame, the magazine and the small parts (no front or top view shows them). The traced edges are
+smoothed (edge noise, above).
 
 What the example found about its sources:
 
