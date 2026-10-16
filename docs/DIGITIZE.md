@@ -62,6 +62,67 @@ pass makes the copy look like the gun, from the same sources. It runs between th
 4. **The detail check.** Every visible part in the parts list has a blueprint part, and each feature names its
    source. A missing visible part fails the check.
 
+## The hands: grip styles and the character
+
+The hand clips fail their checks today because every gun uses one universal hand: the same rest pose, the same
+thumb, the same holds. A pistol, a rifle and a shotgun are held in different ways, so the hands follow the gun's
+grip style. And the hands belong to a character, whose gloves and size change the hands' shape, so the character is
+set before any hand clip is made.
+
+### One skeleton, a hand setup per grip style
+
+The arms keep one skeleton (the Unreal 5 Manny's), so every clip plays on every character. What changes per grip
+style is the hand setup on it:
+
+- **Firing hand:** where the web of the hand meets the gun, where the thumb rests, the trigger finger off or on the
+  trigger, how the other fingers wrap.
+- **Support hand:** where it holds and how (it wraps the firing hand, cups a handguard, works a pump).
+- **Stance:** the wrist and elbow targets for the hold (a pistol's two arms forward, a rifle's support elbow under).
+- **Reload roles:** which hand does what (it takes the magazine, thumbs shells in, loads a speed loader).
+- **Rules:** each style's own checks on top of the shared anatomy limits, such as a thumb clear of a pistol's slide
+  path or the hands clear of the ejection path.
+- **Sources:** each style cites the manual it comes from, with pages.
+
+| Grip style | Action families | Firing hand | Support hand | Source |
+|---|---|---|---|---|
+| Pistol, two hands | pistol slide, energy cell pistol | high under the tang, thumb forward along the frame | wraps the firing fingers, thumb forward under the slide's path | FM 3-23.35 (2003), paragraph 2-3 |
+| Revolver, two hands | swing-out revolver | high on the back strap, thumb clear of the cylinder gap | wraps the firing fingers, thumb clear of the cylinder | FM 23-35 (1988), to read |
+| Rifle, pistol grip | AR gas, reciprocating handle, open bolt, energy cell | the pistol grip, thumb over or beside it | under the handguard, or a C-clamp | TC 3-22.9 (2016), chapter 6, page 6-2 |
+| Rifle, straight stock | bolt (box and stripper clip), lever | the stock's wrist, thumb over it | under the fore-end | FM 23-10 (1994), chapter 3 |
+| Shotgun, pump | pump tube | the stock's wrist | wraps the fore-end and works it | TM 9-285 (1942), operation, to read |
+| Shotgun, semi-automatic | semi tube | the stock's wrist | under the fore-end | TM 9-285 (1942), to read |
+| Machine gun, belt | belt-fed open bolt | the pistol grip | on the stock or the feed cover for loading | FM 3-22.68 (2003), to read |
+| Launcher on the shoulder | muzzle loaded | the pistol grip | the front grip | to find |
+| Break-open launcher | break-open | the stock's wrist | under the barrel | FM 23-31 (1972), to read |
+| Bow, crossbow, flamethrower | their own | their own | their own | the action's sources |
+
+A grip style is data (`gunkit/gripstyles/<id>.json`), as an action is. An action family names its default style,
+and a gun may name another (a bullpup).
+
+### The character, set before creation
+
+A character profile (`weaponlab-character/1`) is the hand step's first input:
+
+- **Arms:** the arms mesh on the shared skeleton, and its handedness.
+- **Hand size:** palm width and finger length, which set how far a hand reaches round a grip.
+- **Hand covering:** bare skin (its tone), fingerless gloves or full gloves (their material and thickness), and the
+  sleeves.
+- **Finish:** the skin, glove and sleeve finishes, from Coating Lab.
+
+It comes first because it changes what the hand step checks. A glove adds 2 to 3 mm to every finger and the palm,
+so the clearance and the finger closure change; a small hand cannot wrap a large grip the same way. The finish goes
+on the arms, so every picture of the hands shows the character who holds the gun.
+
+### The order inside the hand step
+
+1. Load the character's arms and hand covering.
+2. Pick the grip style from the action family (or the gun's own).
+3. Lay the firing hand, then the support hand, by the style's contacts.
+4. Solve the stance within the style's wrist and elbow targets and the anatomy limits.
+5. Make each hand clip: the action's events with the style's reload roles.
+6. Check every frame: anatomy, the style's grip rules, clearance against the gun with the glove's thickness, and the
+   sights each clip expects.
+
 ## The action families
 
 A gun's action family decides its moving parts and its clips. There are 18 families in `gunkit/actions/`:
@@ -130,8 +191,8 @@ schema and against what a schema cannot say: ids that must exist, the source of 
 Not done yet:
 
 1. **The detail pass** (above), on the M1911A1 first.
-2. **The hand clips fail their anatomy and grip checks** on every gun, the M1911A1 as well. This is limit 9 above,
-   and it comes after the detail pass: the hands grip the real shapes.
+2. **The hand clips fail their anatomy and grip checks** on every gun, the M1911A1 as well (limit 9 above). The fix
+   is the grip styles and the character profile (above), set before the hands are made.
 3. **The AR-15 from its blueprint**, checked against Model Lab's AR-15 (order step 4).
 4. **One gun for each action family** (order step 5). Each needs its manual's figures read the way the M1911A1's
    were.
