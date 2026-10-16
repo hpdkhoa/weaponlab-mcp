@@ -885,6 +885,42 @@ def _face_world(tgt):
     return (RA.matrix_world.to_quaternion() @ g(n)).normalized()
 
 
+def arc_dir(a, b):
+    """The way a hand lifts off between two targets: both holds' facings, or the one hold's."""
+    na, nb = _face_world(a), _face_world(b)
+    if na is None and nb is None:
+        return None
+    if na is None or nb is None:
+        return (na or nb).normalized()
+    d = na + nb
+    return (d if d.length > 1e-6 else na).normalized()
+
+
+def clear_lift(side, d, step_cm=0.5, most_cm=8.0):
+    """A hand on its way that still presses into the gun (or the other hand) is lifted further along d, half a
+    centimetre at a time, until nothing presses past what is allowed. Returns the extra lift, cm."""
+    tree = L._tree()
+    pen = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
+    if pen <= 0.0 or d is None:
+        return 0.0
+    hn = L._n("hand", side)
+    H0 = L._bw(hn).copy()
+    best = (pen, 0.0)
+    k = step_cm
+    while k <= most_cm + 1e-6:
+        L._put_hand(side, Matrix.Translation(d * (k / 100.0)) @ H0)
+        bpy.context.view_layer.update()
+        pen = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
+        if pen < best[0]:
+            best = (pen, k)
+        if pen <= 0.0:
+            return k
+        k += step_cm
+    L._put_hand(side, Matrix.Translation(d * (best[1] / 100.0)) @ H0)
+    bpy.context.view_layer.update()
+    return best[1]
+
+
 def arc(a, b, w):
     """A hand going from one hold on the gun to another goes round the gun, not through it: lifted off along both
     surfaces' facing, most at the middle of the way. A hand coming to a hold from off the gun (a pouch, the chest), or
@@ -1123,6 +1159,8 @@ for cid, clip in job["clips"].items():
                     L.arm.pose.bones[n].rotation_quaternion = qb
                 elif qa is not None:
                     L.arm.pose.bones[n].rotation_quaternion = qa
+            if STYLE and job.get("clear_lift", True) and 0.0 < h["w"] < 1.0 and (mark_of(h["a"]) or mark_of(h["b"])):
+                clear_lift(side, arc_dir(h["a"], h["b"]))  # a hand on its way still in the gun: lifted further off
             if STYLE and job.get("elbow_ease", True):
                 elbow_ease(side)                          # a wrist past its range: the elbow swings, the hand stays
             if TRIGGER and side == "r" and cid in STYLE.get("trigger_clips", []):
