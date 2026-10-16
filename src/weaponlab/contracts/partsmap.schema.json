@@ -24,7 +24,9 @@
     "normals": {"type": "object", "additionalProperties": {"$ref": "#/$defs/vec3"}, "description": "mark -> the way its surface faces"},
     "magazine": {
       "type": ["object", "null"],
-      "properties": {"lips": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]}}
+      "properties": {"lips": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]},
+                     "axis": {"$ref": "#/$defs/vec3", "description": "the magazine's own line out of the well (a unit vector, gun space)"},
+                     "length_cm": {"type": "number", "exclusiveMinimum": 0, "description": "its length along that line"}}
     },
     "proxy": {"type": "boolean", "description": "a test model: every picture of it says so"},
     "blueprint": {"type": "string", "description": "the blueprint this parts map was written from, when there is one"},

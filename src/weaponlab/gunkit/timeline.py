@@ -60,6 +60,28 @@ def _value_track(beats, t, start=0.0):
     return v
 
 
+def well(facts, d):
+    """d cm out of the well along the magazine's own line (its axis, out of the gun), or "clear": its length and
+    half a cm, so it is out of the grip. A magazine that sits tilted (a pistol's, along its grip) leaves along that
+    line, not straight down."""
+    m = facts.get("magazine") or {}
+    axis = m.get("axis") or [0.0, 0.0, -1.0]
+    if d == "clear":
+        d = float(m.get("length_cm", 10.0)) + 0.5
+    return _scale(axis, float(d))
+
+
+def _beats(beats, facts):
+    """Beats with any well move turned into a plain offset in gun space."""
+    out = []
+    for b in beats:
+        if "well" in b:
+            b = dict(b)
+            b["offset"] = _add(well(facts, b.pop("well")), b.get("offset", [0.0, 0.0, 0.0]))
+        out.append(b)
+    return out
+
+
 def _offset_track(beats, t):
     o = [0.0, 0.0, 0.0]
     for b in sorted(beats, key=lambda b: b["from"]):
@@ -144,6 +166,8 @@ def _resolve(facts, values, go):
     r = _resolve_base(facts, dict(values, **({go["part"]: go["value"]} if "value" in go and "part" in go else {})), go)
     if go.get("offset") and r["point"] is not None:
         r["point"] = _add(r["point"], go["offset"])
+    if "well" in go and r["point"] is not None:                    # cm out along the magazine's line, in gun space
+        r["point"] = _add(r["point"], well(facts, go["well"]))
     return r
 
 
@@ -177,7 +201,8 @@ def _pose(clip, t):
 
 
 def gun_clip(action, facts, clip_id, fps=FPS):
-    clip = action["gun_clips"][clip_id]
+    clip = dict(action["gun_clips"][clip_id])
+    clip["beats"] = _beats(clip.get("beats", []), facts)
     return {"clip": clip_id, "seconds": clip["seconds"], "fps": fps,
             "frames": [{"t": t, "parts": part_values(action, clip, t)} for t in frames_of(clip["seconds"], fps)]}
 
@@ -187,7 +212,7 @@ def hand_clip(action, facts, clip_id, fps=FPS):
     each hand's way from one target to the next."""
     clip = action["hand_clips"][clip_id]
     gun = action["gun_clips"].get(clip_id, {"seconds": clip["seconds"], "beats": []})
-    merged = {"beats": gun.get("beats", []), "events": clip.get("events", [])}
+    merged = {"beats": _beats(gun.get("beats", []), facts), "events": clip.get("events", [])}
     events = {h: sorted([e for e in clip.get("events", []) if e["hand"] == h], key=lambda e: e["from"]) for h in ("r", "l")}
     # where each hand rests: the right on the grip, the left on the support, unless the action says (a bow: the left
     # on its grip, the right on the string)

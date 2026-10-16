@@ -49,7 +49,8 @@ def plan(partsmap, centres, model=None):
              "model": model or {"source": "proxy" if partsmap.get("proxy") else "import"},
              "bones": bones, "parts": parts, "marks": {k: list(v) for k, v in partsmap["marks"].items()},
              "mark_parts": dict(partsmap.get("mark_parts", {})), "normals": dict(partsmap.get("normals", {})),
-             "magazine": ({"bone": parts[free]["bone"], "lips": list(partsmap["magazine"]["lips"])}
+             "magazine": (dict({"bone": parts[free]["bone"], "lips": list(partsmap["magazine"]["lips"])},
+                               **{k: partsmap["magazine"][k] for k in ("axis", "length_cm") if k in partsmap["magazine"]})
                           if free and (partsmap.get("magazine") or {}).get("lips") else None),
              "proxy": bool(partsmap.get("proxy")),
              "sources": list(partsmap.get("sources", []))}

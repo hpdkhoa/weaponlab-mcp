@@ -14,6 +14,21 @@ from . import store
 SCRIPT = Path(__file__).resolve().parent / "blender" / "blueprint_build.py"
 
 
+def magazine_line(outline):
+    """A magazine's own line from its side outline: the direction of its longest straight side (a magazine's front
+    and back run along its well; the points' spread would lean toward a slanted outline's diagonal), pointing down,
+    out of the well; and its length along it."""
+    import numpy as np
+    P = np.array(outline, dtype=float)
+    segs = [(np.linalg.norm(b - a), b - a) for a, b in zip(P, np.roll(P, -1, axis=0))]
+    d = max(segs, key=lambda s: s[0])[1]
+    d = d / np.linalg.norm(d)
+    if d[1] > 0:
+        d = -d
+    proj = (P - P.mean(axis=0)) @ d
+    return {"axis": [0.0, round(float(d[0]), 5), round(float(d[1]), 5)], "length_cm": round(float(proj.max() - proj.min()), 3)}
+
+
 def partsmap(bp, blend):
     """The parts map for a built blueprint: Blender's world (metres, Y flipped), forward -Y, up +Z, origin 0."""
     parts = {}
@@ -46,6 +61,9 @@ def partsmap(bp, blend):
           "blueprint": str(Path(store.root() / bp["name"] / "blueprint.json").resolve())}
     if bp.get("magazine_lips"):
         pm["magazine"] = {"lips": bp["magazine_lips"]["at"]}
+        mag = next((p for p in bp["parts"].values() if p["role"] in ("magazine", "cell")), None)
+        if mag and mag["shape"]["kind"] in ("extrude", "views"):
+            pm["magazine"].update(magazine_line(mag["shape"]["outline"] if mag["shape"]["kind"] == "extrude" else mag["shape"]["side"]))
     src = json.loads(Path(bp["sources"]).read_text(encoding="utf-8")) if Path(bp["sources"]).exists() else {"sources": []}
     pm["sources"] = ["%s (%s)" % (s["title"], s.get("year", "")) for s in src["sources"]]
     return pm

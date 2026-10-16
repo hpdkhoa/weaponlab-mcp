@@ -127,8 +127,10 @@ def check(action):
             if b.get("ease", "inout") not in EASES:
                 bad.append("%s: ease %r" % (where, b.get("ease")))
             free = parts[b["part"]]["kind"] == "free"
-            if free and not ("offset" in b or "follow" in b):
-                bad.append("%s: a free part takes offset or follow" % where)
+            if free and not ("offset" in b or "follow" in b or "well" in b):
+                bad.append("%s: a free part takes offset, well or follow" % where)
+            if "well" in b and not (b["well"] == "clear" or isinstance(b["well"], (int, float))):
+                bad.append("%s: well is cm along the magazine's own line, or clear" % where)
             if not free and not isinstance(b.get("value"), (int, float)):
                 bad.append("%s: value (a share of the travel)" % where)
             if not b.get("why"):

@@ -146,3 +146,17 @@ def test_a_resolved_clip_is_checked_against_its_keys():
     want = R.expected_keyed(facts, track, 0.0)
     # the cylinder's head (0, 2, 0) goes up 1 cm, then turns 90 degrees round +Y through the crane's head (1, 0, 0)
     assert want["Cylinder"]["head"] == pytest.approx([2, 2, 1], abs=1e-6)
+
+
+def test_a_magazine_leaves_along_its_well():
+    """A tilted magazine (a pistol's, along its grip) slides out along its own line, not straight down."""
+    from weaponlab.blueprint.build import magazine_line
+    tilted = [[0.0, 0.0], [3.0, 0.0], [0.0, -10.0], [-3.0, -10.0]]          # leans back as it goes down
+    line = magazine_line(tilted)
+    assert line["axis"][2] < -0.9 and line["axis"][1] < 0                   # down, and back
+    facts = {"magazine": {"axis": line["axis"], "length_cm": line["length_cm"]}}
+    out = T.well(facts, "clear")
+    assert out[2] < -10.0 and out[1] < -2.5
+    beats = T._beats([{"part": "magazine", "from": 0, "to": 1, "well": 4.0, "offset": [0, 0, -1.0], "why": "x"}], facts)
+    assert beats[0]["offset"][2] == pytest.approx(4.0 * line["axis"][2] - 1.0)
+    assert T.well({}, 2.0) == [0.0, 0.0, -2.0]                               # no axis known: straight down
