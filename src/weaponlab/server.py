@@ -39,10 +39,15 @@ def project_info() -> dict:
 
 
 @mcp.tool()
-def contract_check(kind: Annotated[str, Field(description="job, rows or parts")], path: str,
+def contract_check(kind: Annotated[str, Field(description="job, rows or parts (the probe contract); sources, blueprint or partsmap (the digitizer's)")], path: str,
                    job_path: Annotated[str | None, Field(description="for rows: the job they answer")] = None) -> dict:
-    """Checks a file a probe reads or writes against the probe contract."""
-    bad = _err(C.check_file, kind, path, job_path)
+    """Checks a file against its contract: a probe's job, rows or parts dump, or a digitizer file (sources,
+    blueprint, partsmap)."""
+    if kind in ("sources", "blueprint", "partsmap"):
+        from . import contracts as DC
+        bad = _err(DC.check_file, path)
+    else:
+        bad = _err(C.check_file, kind, path, job_path)
     return {"ok": not bad, "problems": bad}
 
 

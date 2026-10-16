@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "weaponlab-partsmap/1",
+  "title": "weaponlab-partsmap/1",
+  "description": "How a 3D model maps onto a gun's action: its file, units and axes, where the bolt face is, which objects or vertex groups make each moving part, and the marks a hand or a check needs. Marks, pivots and lips are in gun space (cm, +Y to the muzzle, +Z up, +X the gun's left, origin the bolt face); axes are unit vectors in gun space. Objects in no part are the body.",
+  "type": "object",
+  "required": ["contract", "name", "action", "model", "units", "forward", "up", "origin", "parts", "marks"],
+  "properties": {
+    "contract": {"const": "weaponlab-partsmap/1"},
+    "name": {"type": "string", "pattern": "^[A-Za-z0-9_]+$", "description": "the gun's name in file and asset names"},
+    "action": {"type": "string", "description": "the action family's id (gunkit/actions)"},
+    "model": {"type": ["string", "null"], "description": "the model file: .blend, .fbx, .obj or .glb (null only for a proxy, built from its shapes)"},
+    "units": {"enum": ["m", "cm", "mm"]},
+    "forward": {"enum": ["+X", "-X", "+Y", "-Y", "+Z", "-Z"], "description": "the model's axis toward the muzzle"},
+    "up": {"enum": ["+X", "-X", "+Y", "-Y", "+Z", "-Z"]},
+    "origin": {"$ref": "#/$defs/vec3", "description": "the bolt face, in the model's own units and axes"},
+    "parts": {
+      "type": "object",
+      "description": "role -> the objects or vertex groups that move as that part",
+      "additionalProperties": {"$ref": "#/$defs/part"}
+    },
+    "marks": {"type": "object", "additionalProperties": {"$ref": "#/$defs/vec3"}},
+    "mark_parts": {"type": "object", "additionalProperties": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}, "minItems": 1}]}, "description": "mark -> the part it rides, or the chain of parts from the nearest outward"},
+    "normals": {"type": "object", "additionalProperties": {"$ref": "#/$defs/vec3"}, "description": "mark -> the way its surface faces"},
+    "magazine": {
+      "type": ["object", "null"],
+      "properties": {"lips": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]}}
+    },
+    "proxy": {"type": "boolean", "description": "a test model: every picture of it says so"},
+    "blueprint": {"type": "string", "description": "the blueprint this parts map was written from, when there is one"},
+    "sources": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vec3": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "part": {
+      "type": "object",
+      "properties": {
+        "objects": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "vertex_groups": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "axis": {"$ref": "#/$defs/vec3"},
+        "travel_cm": {"type": "number"},
+        "turn_deg": {"type": "number"},
+        "pivot": {"$ref": "#/$defs/vec3"},
+        "parent": {"type": "string", "description": "the part this one rides (a cylinder on its crane)"}
+      },
+      "anyOf": [{"required": ["objects"]}, {"required": ["vertex_groups"]}],
+      "additionalProperties": false
+    }
+  }
+}

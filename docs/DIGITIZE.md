@@ -66,6 +66,10 @@ A new family is a new action file. No code changes.
 
 ## Contracts
 
+The schemas are in `src/weaponlab/contracts/` (`<name>.schema.json`). `contracts.check()` checks a file against its
+schema and against what a schema cannot say: ids that must exist, the source of every number, the scale's sum. The
+`contract_check` tool takes `sources`, `blueprint` or `partsmap`.
+
 | Contract | Holds |
 |---|---|
 | `weaponlab-sources/1` | a gun's sources: files, pages, figures, licenses |
