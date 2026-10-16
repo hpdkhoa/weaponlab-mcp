@@ -315,10 +315,10 @@
  "stance": {
   "view_cm": [
    7.0,
-   42.0,
+   38.0,
    -13.0
   ],
-  "why": "both arms out in front, the pistol below the line of sight and a little right of it (a two-handed ready hold; aimed, it rises to the eye); a guess at the first-person view"
+  "why": "both arms out in front with the elbows a little bent, the pistol below the line of sight and a little right of it (a two-handed ready hold; aimed, it rises to the eye); a guess at the first-person view"
  },
  "trigger_clips": [
   "fire"

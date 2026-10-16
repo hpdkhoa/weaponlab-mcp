@@ -618,6 +618,15 @@ def contact_search(side, mark, at, n, tw):
     return short
 
 
+def style_plan(side, mark):
+    """The style's finger plan for a hand on a mark: its contact's fingers, or a working hold's."""
+    h = (STYLE or {}).get("hands", {}).get(side) or {}
+    if h.get("contact", {}).get("mark") == mark:
+        return h["fingers"]
+    x = (h.get("holds") or {}).get(mark)
+    return x["fingers"] if x else None
+
+
 def grasp(side, mark, part=None, offset=None, start=None):
     """The hand's hold on a mark, solved once with the parts as they are now: (the hand against the mark's bone, the
     fingers' turns, whether a hold passed). The palm is first laid on the surface facing into it (the support hand
@@ -629,6 +638,26 @@ def grasp(side, mark, part=None, offset=None, start=None):
     L.snapshot("save", "before_grasp")
     hn = L._n("hand", side)
     at = mark_world(mark, part, offset)
+    plan = style_plan(side, mark) if STYLE and job.get("solver", True) else None
+    if plan is not None:
+        # the grasp solver (Pose Lab): the whole hand placed on the hold, its digits closed by the style's plan,
+        # nothing pressing into the gun or the other hand past what is allowed, the glove counted
+        if start:
+            L.snapshot("load", start)
+        tw = TOWARD.get(mark)
+        tw = (RA.matrix_world.to_quaternion() @ g(tw)).normalized() if tw else None
+        r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=tw, glove_cm=GLOVE, frame="world",
+                         soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 24)),
+                         span_cm=float(job.get("solver_span_cm", 2.0)),
+                         turn_deg=float(job.get("solver_turn_deg", 25.0)) * (1.0 if (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark else 3.0),
+                         other=job.get("solver_other", True))
+        report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
+        H = L._bw(hn).copy()
+        rel = bone_world(mark_bone(mark, part)).inverted() @ H
+        fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
+        L.snapshot("load", "before_grasp")
+        GRASPS[key] = (rel, fingers, r["press"] <= 0.01 and r["rules"] == 0)
+        return GRASPS[key]
     back = (RA.matrix_world.to_quaternion() @ g((0.0, -1.0, 0.0))).normalized()
     slid = 0.0
     if start:
@@ -745,6 +774,23 @@ _BVH.clear()                                       # the gun's surface, in the w
 start = "place_best" if "placement_search" in report else None
 home_r = grasp("r", "grip", start=start)
 home_l = grasp("l", facts.get("home_l", "support"), start=start) if "support" in facts["marks"] else None
+if STYLE and home_l and style_plan("r", "grip") is not None and job.get("solver", True):
+    # the firing hand solved again with the support hand on: the two hands meet (thumbs stacked, fingers wrapped)
+    L._put_hand("l", bone_world("Root") @ home_l[0])
+    for _n, _q in home_l[1].items():
+        L.arm.pose.bones[_n].rotation_quaternion = _q
+    bpy.context.view_layer.update()
+    L.snapshot("save", "with_support")
+    GRASPS.pop(("r", "grip", None, ()), None)
+    home_r = grasp("r", "grip", start="with_support")
+    # and the support hand once more on the firing hand where it now is
+    L._put_hand("r", bone_world("Root") @ home_r[0])
+    for _n, _q in home_r[1].items():
+        L.arm.pose.bones[_n].rotation_quaternion = _q
+    bpy.context.view_layer.update()
+    L.snapshot("save", "with_firing")
+    GRASPS.pop(("l", facts.get("home_l", "support"), None, ()), None)
+    home_l = grasp("l", facts.get("home_l", "support"), start="with_firing")
 for side, gr in (("r", home_r), ("l", home_l)):
     if gr:
         L._put_hand(side, bone_world("Root") @ gr[0])
@@ -839,16 +885,83 @@ def _face_world(tgt):
 
 def arc(a, b, w):
     """A hand going from one hold on the gun to another goes round the gun, not through it: lifted off along both
-    surfaces' facing, most at the middle of the way."""
+    surfaces' facing, most at the middle of the way. A hand coming to a hold from off the gun (a pouch, the chest), or
+    leaving for one, comes in and goes out along that hold's facing the same way."""
     if not (0.0 < w < 1.0) or a == b:
         return None
     na, nb = _face_world(a), _face_world(b)
-    if na is None or nb is None or (a.get("name") == b.get("name")):
+    if na is None and nb is None or (a.get("name") == b.get("name")):
         return None
+    if na is None or nb is None:
+        return (na or nb).normalized() * (ARC_CM / 100.0) * math.sin(math.pi * w)
     d = na + nb
     if d.length < 1e-6:
         d = na
     return d.normalized() * (ARC_CM / 100.0) * math.sin(math.pi * w)
+
+
+def elbow_ease(side):
+    """A wrist past its range relieved at the elbow: the elbow swung about the shoulder-to-wrist line, 10 degrees at
+    a time up to 40 each way, the hand kept where it is; the swing that leaves the arm least past its limits stays."""
+    base = arm_over(side)
+    if base <= 0.0:
+        return 0.0
+    L.snapshot("save", "_elbow")
+    best = (base, 0.0)
+    for deg in (-10.0, 10.0, -20.0, 20.0, -30.0, 30.0, -40.0, 40.0):
+        L.snapshot("load", "_elbow")
+        L._swing_elbow(side, deg)
+        bpy.context.view_layer.update()
+        o = arm_over(side)
+        if o < best[0] - 0.5:
+            best = (o, deg)
+    L.snapshot("load", "_elbow")
+    if best[1]:
+        L._swing_elbow(side, best[1])
+        bpy.context.view_layer.update()
+    return best[1]
+
+
+CLAV = {}                    # the clavicles' turns in the hold: each frame starts from them
+
+
+def elbow_bend(side):
+    return L._arm_report(side, L._limits()[0])[0].get("elbow_bend_deg", 90.0)
+
+
+def shoulder_reach(side, H):
+    """An arm at full stretch reaches with the shoulder too, as a shooter's does: the clavicle turned toward the hand,
+    2 degrees at a time up to 16 (about 4 cm at the shoulder), until the elbow keeps 5 degrees past its locked limit.
+    Each frame starts from the hold's clavicle, so a reach lasts only while the arm needs it. Returns the degrees."""
+    cn = "clavicle_" + side
+    if cn not in L.arm.pose.bones:
+        return 0.0
+    pb = L.arm.pose.bones[cn]
+    if side not in CLAV:
+        CLAV[side] = pb.rotation_quaternion.copy()
+    if pb.rotation_quaternion != CLAV[side]:
+        pb.rotation_quaternion = CLAV[side]
+        bpy.context.view_layer.update()
+        L._put_hand(side, H)
+    need = L._limits()[0]["elbow_bend_min_deg"] + 5.0
+    if elbow_bend(side) >= need:
+        return 0.0
+    C = L._bw(cn).translation
+    S = L._bw(L._n("upperarm", side)).translation
+    axis = (S - C).cross(H.translation - C)
+    if axis.length < 1e-9:
+        return 0.0
+    axis.normalize()
+    deg = 0.0
+    while deg < 16.0 and elbow_bend(side) < need:
+        deg += 2.0
+        pb.rotation_quaternion = CLAV[side]
+        bpy.context.view_layer.update()
+        L._turn_about(cn, axis, deg, C)
+        bpy.context.view_layer.update()
+        L._put_hand(side, H)
+        bpy.context.view_layer.update()
+    return deg
 
 
 def blend(Ma, Mb, w):
@@ -918,22 +1031,30 @@ for cid, clip in job["clips"].items():
             if lift is not None:
                 H = Matrix.Translation(lift) @ H
             L._put_hand(side, H)
-            resting = h["w"] >= 1.0 and h["b"].get("space") == "gun" or (h["a"] == h["b"])
+            if STYLE and job.get("shoulder_reach", True):
+                shoulder_reach(side, H)                   # an arm at full stretch: the shoulder reaches too
+            on_gun = h["b"].get("space") == "gun"
+            resting = on_gun and (h["w"] >= 1.0 or h["a"] == h["b"])   # a hand waiting off the gun is mended too
             if side in MEND_SIDES and not resting:
                 # a hand on its way between holds keeps the last hold's turn while the arm moves: the wrist back
                 # inside its range, turned toward the forearm's line (Pose Lab's mend keeps the hand's back out of
                 # the gun)
                 L._mend_hand(side, fingers=True)
                 end_joints_flat(side)
+            fw = h["w"]
+            if h["a"].get("space") == "gun" and not on_gun:
+                fw = min(1.0, fw / 0.3)                   # a hand letting go opens first, then lifts off
             for n in FINGER_BONES[side]:
                 qa = (fa or {}).get(n)
                 qb = (fb or {}).get(n)
                 if qa is not None and qb is not None:
-                    L.arm.pose.bones[n].rotation_quaternion = qa.slerp(qb, h["w"])
-                elif qb is not None and h["w"] > 0.5 or qa is None and qb is not None:
+                    L.arm.pose.bones[n].rotation_quaternion = qa.slerp(qb, fw)
+                elif qb is not None and fw > 0.5 or qa is None and qb is not None:
                     L.arm.pose.bones[n].rotation_quaternion = qb
                 elif qa is not None:
                     L.arm.pose.bones[n].rotation_quaternion = qa
+            if STYLE and job.get("elbow_ease", True):
+                elbow_ease(side)                          # a wrist past its range: the elbow swings, the hand stays
             if TRIGGER and side == "r" and cid in STYLE.get("trigger_clips", []):
                 for n, q in TRIGGER.items():              # the trigger finger on the trigger for the shot
                     L.arm.pose.bones[n].rotation_quaternion = q
@@ -978,7 +1099,7 @@ for cid, clip in job["clips"].items():
                 for sc in STYLE["soft_contacts"]:
                     if c["segment"].startswith(sc["segment"]):
                         worst[sc["segment"]] = max(worst[sc["segment"]], c["depth_cm"])
-            k += 0.1
+            k += job.get("diagnose_step", 0.05)
         if isinstance(cs, dict):
             cs["soft_contacts"] = {sc["segment"]: {"worst_cm": round(worst[sc["segment"]], 2), "max_cm": sc["max_cm"],
                                                    "ok": worst[sc["segment"]] <= sc["max_cm"]} for sc in STYLE["soft_contacts"]}
@@ -995,7 +1116,7 @@ for cid, clip in job["clips"].items():
             rows.append({"t": round(k, 2), "l_doing": [fr["hands"]["l"]["a"].get("name"), fr["hands"]["l"]["b"].get("name"), round(fr["hands"]["l"]["w"], 2)],
                          "anatomy": {sd: an.get(sd, {}).get("bad", []) for sd in ("l", "r")},
                          "grip": {sd: gr.get(sd, {}).get("bad", []) for sd in ("l", "r")}, "clearance": cl["contacts"]})
-            k += 0.1
+            k += job.get("diagnose_step", 0.05)
         report.setdefault("diagnose", {})[cid] = rows
     expects = []
     for x in clip.get("expect", []):

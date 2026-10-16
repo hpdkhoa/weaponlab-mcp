@@ -41,15 +41,15 @@
    "events": [], "expect": [{"at": [0.0, 0.25], "on": {"r": "grip", "l": "support"}}]},
   "equip": {"seconds": 0.6,
    "gun": [
-    {"from": 0.0, "to": 0.0, "pitch": -80.0, "move": [-14.0, -30.0, -45.0]},
+    {"from": 0.0, "to": 0.0, "pitch": -80.0, "move": [-14.0, -27.0, -27.0]},
     {"from": 0.0, "to": 0.6, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "out"}],
    "events": [
-    {"hand": "l", "from": 0.0, "to": 0.0, "go": {"place": "low_ready"}, "why": "the support hand waits in front of the body"},
+    {"hand": "l", "from": 0.0, "to": 0.0, "go": {"place": "chest_l"}, "why": "the support hand waits in front of the body"},
     {"hand": "l", "from": 0.25, "to": 0.5, "go": {"mark": "support"}, "why": "it meets the gun as it comes up and wraps the grip"}],
    "expect": [{"at": [0.55, 0.6], "on": {"r": "grip", "l": "support"}}]},
   "holster": {"seconds": 0.5,
-   "gun": [{"from": 0.0, "to": 0.5, "pitch": -80.0, "move": [-14.0, -30.0, -45.0], "ease": "in"}],
-   "events": [{"hand": "l", "from": 0.0, "to": 0.2, "go": {"place": "low_ready"}, "why": "the support hand lets go first"}],
+   "gun": [{"from": 0.0, "to": 0.5, "pitch": -80.0, "move": [-14.0, -27.0, -27.0], "ease": "in"}],
+   "events": [{"hand": "l", "from": 0.0, "to": 0.2, "go": {"place": "chest_l"}, "why": "the support hand lets go first"}],
    "expect": []}
  }
 }
