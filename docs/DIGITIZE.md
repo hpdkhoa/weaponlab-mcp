@@ -27,12 +27,12 @@ a design anyone could make parts from.
 | 3. Figures | Blueprint Lab `figures`, `calibrate`, `trace` | a side view or section, scaled by a known length | each part's outline in cm |
 | 4. Blueprint | Blueprint Lab `blueprint` | outlines, facts, parts list, the action family | `weaponlab-blueprint/1` |
 | 5. Check | Blueprint Lab `check` | the blueprint, its figures and facts | outline overlap, length and weight sums, a labelled overlay picture |
-| 6. Model | Model Lab `build_blueprint` | the blueprint | the model: one object a part, named for its role |
+| 6. Model | Blueprint Lab `build` | the blueprint | the model: one object a part, named for its role, and its parts map |
 | 7. Motion | Gun Kit | the model and its action family | rig, gun clips, hand clips, read-back, checks |
 | 8. Export | Gun Kit `export` | everything above | FBX files, a data file, the blueprint; one adapter a game |
 
-Steps 1 to 5 are new. Step 6 is a general version of Model Lab's builder: today it holds one platform written by
-hand (the AR-15), which stays as the builder's test. Steps 7 and 8 exist (docs/GUNKIT.md).
+Steps 1 to 6 are Blueprint Lab (docs/BLUEPRINT.md). The general builder lives there, beside the blueprint it reads;
+Model Lab's AR-15 platform, written by hand, stays as its test. Steps 7 and 8 are Gun Kit (docs/GUNKIT.md).
 
 ## Sources
 
@@ -82,7 +82,7 @@ schema and against what a schema cannot say: ids that must exist, the source of 
 
 1. Blueprint Lab steps 1 to 5 on the gun with the best sources: the M1911 (a 1940 field manual with a data table and
    sections along the bore).
-2. Model Lab `build_blueprint`, then that gun through Gun Kit.
+2. The general builder, then that gun through Gun Kit.
 3. The AR-15 from its blueprint, checked against Model Lab's hand-built AR-15 (within 1 cm).
 4. One gun for each action family, picked by how good its sources are.
 
@@ -100,6 +100,23 @@ schema and against what a schema cannot say: ids that must exist, the source of 
 7. **The only check is against the same sources.** There is no 3D truth. A photo gives a second check.
 8. **One heavy job at a time.** A gun takes minutes in Blender.
 9. **The hand clips fail their checks today** (docs/GUNKIT.md). That must be fixed before a copy passes.
+
+## Built (2026-10-16)
+
+- **Contracts:** the three schemas and their checks (`src/weaponlab/contracts/`).
+- **Blueprint Lab:** steps 1 to 6 as code and as 21 `blueprint_` MCP tools (docs/BLUEPRINT.md).
+- **The M1911A1 through the whole chain**, from FM 23-35 (1940) to Gun Kit (`examples/m1911a1/`):
+  - outline IoU 0.997 against the source photo
+  - every gun clip read back within 0.0005 cm
+
+Not done yet:
+
+1. **The hand clips fail their anatomy and grip checks** on every gun, the M1911A1 as well. This is limit 9 above,
+   and it comes first.
+2. **The AR-15 from its blueprint**, checked against Model Lab's AR-15 (order step 3).
+3. **One gun for each action family** (order step 4). Each needs its manual's figures read the way the M1911A1's
+   were.
+4. **OCR** for the scanned manuals without text.
 
 ## Later: digital design for any object
 

@@ -10,7 +10,7 @@
   <a href="https://pypi.org/project/weaponlab-mcp/"><img alt="PyPI: weaponlab-mcp" src="https://img.shields.io/pypi/v/weaponlab-mcp?label=PyPI&logo=pypi&logoColor=white&color=3775a9"></a>
   <a href="https://registry.modelcontextprotocol.io/v0/servers?search=weaponlab-mcp"><img alt="MCP Registry: weaponlab-mcp" src="https://img.shields.io/badge/MCP%20Registry-weaponlab--mcp-6f42c1"></a>
   <a href="https://www.blender.org/download/"><img alt="Blender: 4.4+ (Motion Lab)" src="https://img.shields.io/badge/Blender-4.4%2B%20(Motion%20Lab)-e87d0d?logo=blender&logoColor=white"></a>
-  <a href="#what-it-does"><img alt="tools: 41" src="https://img.shields.io/badge/tools-41-orange"></a>
+  <a href="#what-it-does"><img alt="tools: 62" src="https://img.shields.io/badge/tools-62-orange"></a>
   <a href="docs/PROBE_CONTRACT.md"><img alt="probe contract: v1" src="https://img.shields.io/badge/probe%20contract-v1-orange"></a>
 </p>
 
@@ -36,6 +36,7 @@ writes back.
 | Specs | `spec_list`, `spec_read`, `spec_validate`, `spec_write` | One file a weapon: marks (grip, support), anchors (pieces to find), facts, limits. |
 | Contract | `contract_check` | Checks a probe's job, rows or parts dump. |
 | Gun Kit | `gunkit_inspect`, `gunkit_draft`, `gunkit_from_modellab`, `gunkit_proxy`, `gunkit_rig`, `gunkit_build`, `gunkit_verify`, `gunkit_export`, `gunkit_cases`, `gunkit_actions`, `gunkit_action` | Takes any gun model to the game: rigs it for one of 18 actions, makes its own clips and the hand clips on one shared pair of arms, checks them, stages the files. See [docs/GUNKIT.md](docs/GUNKIT.md). |
+| Blueprint Lab | `blueprint_source_add`, `blueprint_scan`, `blueprint_specs`, `blueprint_figure_add`, `blueprint_calibrate`, `blueprint_trace`, `blueprint_part`, `blueprint_check`, `blueprint_build`, `blueprint_to_gunkit`, ... | Makes a real gun's visual copy from its public sources (manuals, patents, photos): facts from the data tables, outlines traced from scaled figures, a blueprint with the source of every number, the model built in Blender. See [docs/BLUEPRINT.md](docs/BLUEPRINT.md). |
 
 ## Try it on the demo
 
