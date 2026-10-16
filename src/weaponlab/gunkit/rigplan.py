@@ -24,7 +24,9 @@ def plan(partsmap, centres, model=None):
         want = a["parts"].get(role)
         if not want:
             raise ValueError("the %s action has no part %s; its parts: %s" % (a["id"], role, ", ".join(a["parts"])))
-        kind = want["kind"]
+        kind = p.get("kind") or want["kind"]          # a gun may pick another kind its action allows
+        if kind not in want.get("kinds", [want["kind"]]):
+            raise ValueError("part %s: %s moves it as %s, not %s" % (role, a["id"], " or ".join(want.get("kinds", [want["kind"]])), kind))
         name = bone_name(role)
         if kind == "turn":
             head = list(p["pivot"])

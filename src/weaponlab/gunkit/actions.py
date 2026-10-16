@@ -108,6 +108,8 @@ def check(action):
     for role, p in parts.items():
         if p.get("kind") not in ("slide", "turn", "free"):
             bad.append("part %s: kind %r" % (role, p.get("kind")))
+        if "kinds" in p and (p.get("kind") not in p["kinds"] or "free" in p["kinds"] or set(p["kinds"]) - {"slide", "turn"}):
+            bad.append("part %s: kinds %r lists its kind and only slide or turn" % (role, p["kinds"]))
     for cid, c in action["gun_clips"].items():
         if cid not in GUN_CLIPS:
             bad.append("gun clip %s: not one of %s" % (cid, ", ".join(GUN_CLIPS)))

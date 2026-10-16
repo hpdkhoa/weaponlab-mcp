@@ -38,6 +38,7 @@
       "properties": {
         "objects": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         "vertex_groups": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "kind": {"enum": ["slide", "turn", "free"], "description": "how it moves, when the action allows more than one way (else the action's)"},
         "axis": {"$ref": "#/$defs/vec3"},
         "travel_cm": {"type": "number"},
         "turn_deg": {"type": "number"},

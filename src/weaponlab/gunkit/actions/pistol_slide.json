@@ -13,7 +13,7 @@
   "stop": {"kind": "turn", "what": "the slide stop, up to hold the slide open", "required": false},
   "release": {"kind": "slide", "what": "the magazine release behind the trigger guard", "travel_cm": 0.4, "required": false},
   "hammer": {"kind": "turn", "what": "an exposed hammer (M1911, Makarov)", "required": false},
-  "trigger": {"kind": "turn", "what": "the trigger", "required": false},
+  "trigger": {"kind": "turn", "kinds": ["turn", "slide"], "what": "the trigger: it turns on a pin in most pistols; the M1911's slides straight back", "required": false},
   "magazine": {"kind": "free", "what": "the magazine in the grip"}
  },
  "marks": ["grip", "support", "slide_rear", "slide_front", "port", "mag_well", "mag_grab", "mag_lips", "release", "stop"],

@@ -72,8 +72,8 @@ def check(facts, action=None):
         for role, want in action["parts"].items():
             if want.get("required", True) and role not in facts["parts"]:
                 bad.append("the %s action needs the part %s (%s)" % (action["id"], role, want.get("what", "")))
-            elif role in facts["parts"] and facts["parts"][role]["kind"] != want["kind"]:
-                bad.append("part %s: the action moves it as %s, the facts say %s" % (role, want["kind"], facts["parts"][role]["kind"]))
+            elif role in facts["parts"] and facts["parts"][role]["kind"] not in want.get("kinds", [want["kind"]]):
+                bad.append("part %s: the action moves it as %s, the facts say %s" % (role, " or ".join(want.get("kinds", [want["kind"]])), facts["parts"][role]["kind"]))
         for m in action.get("marks", []):
             if m not in facts["marks"]:
                 bad.append("the %s action needs the mark %s" % (action["id"], m))
