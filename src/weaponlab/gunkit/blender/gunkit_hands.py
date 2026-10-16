@@ -34,7 +34,8 @@ os.makedirs(OUT, exist_ok=True)
 facts = job["facts"]
 A = job["arms"]
 rigs = {"gunkit": {"title": "Gun Kit: %s on the shared arms" % facts["name"], "folder": A["folder"], "arms": A["arms"],
-                   "idle": A["idle"], "gun": job["gun_fbx"], "gun_offset": [0.0, 0.0, 0.0], "eye": A["eye"]}}
+                   "idle": A["idle"], "gun": job["gun_fbx"], "gun_offset": [0.0, 0.0, 0.0], "eye": A["eye"],
+                   "styled": bool(job.get("character"))}}            # the character's colours and the gun's finishes
 rigs_file = os.path.join(OUT, "gunkit_rigs.json")
 json.dump(rigs, open(rigs_file, "w", encoding="utf-8"), indent=1)
 L = PL.Lab(rigs_file, OUT)
@@ -116,6 +117,53 @@ def palm_r():
     return L._bw(L._n("hand", "r")).translation.lerp(L._bw(L._n("finger", "r", "middle", "01")).translation, 0.5)
 
 
+# --- the character's gloves: the hands' surface thickened and coloured (the checks count the glove already) --------
+def put_gloves():
+    cov = (CHAR or {}).get("covering") or {}
+    if cov.get("kind") not in ("full_gloves", "fingerless_gloves") or not GLOVE:
+        return None
+    col = ((CHAR.get("finish") or {}).get("colors") or {}).get("glove", [0.23, 0.26, 0.2])
+    mat = bpy.data.materials.new("M_glove_" + CHAR["id"])
+    mat.use_nodes = True
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    bsdf.inputs["Base Color"].default_value = (*col, 1.0)
+    bsdf.inputs["Roughness"].default_value = 0.85
+    mat.diffuse_color = (*col, 1.0)
+    hand_bones = {L._n("hand", sd) for sd in ("l", "r")} | set(FINGER_BONES["l"]) | set(FINGER_BONES["r"])
+    if cov["kind"] == "fingerless_gloves":
+        hand_bones = {b for b in hand_bones if not b.endswith(("02_l", "03_l", "02_r", "03_r"))}
+    done = 0
+    for ob in L.meshes:
+        groups = {vg.index: vg.name for vg in ob.vertex_groups}
+        me = ob.data
+        gloved = set()
+        for v in me.vertices:
+            w_hand = sum(gr.weight for gr in v.groups if groups.get(gr.group) in hand_bones)
+            w_all = sum(gr.weight for gr in v.groups) or 1.0
+            if w_hand / w_all >= 0.5:
+                gloved.add(v.index)
+        if not gloved:
+            continue
+        me.calc_normals() if hasattr(me, "calc_normals") else None
+        unit = 1.0 / (ob.matrix_world.to_scale().x or 1.0)          # the glove's thickness in the mesh's own units
+        for i in gloved:
+            v = me.vertices[i]
+            v.co = v.co + v.normal * (GLOVE / 100.0) * unit
+        sleeve_col = ((CHAR.get("finish") or {}).get("colors") or {}).get("sleeve", [0.24, 0.26, 0.2])
+        sleeve = bpy.data.materials.get("M_sleeve_" + CHAR["id"]) or bpy.data.materials.new("M_sleeve_" + CHAR["id"])
+        sleeve.diffuse_color = (*sleeve_col, 1.0)
+        me.materials.append(mat)
+        k = len(me.materials) - 1
+        me.materials.append(sleeve)
+        ks = len(me.materials) - 1
+        for poly in me.polygons:                      # the hands gloved, the rest of the arms in the character's sleeves
+            poly.material_index = k if sum(1 for i in poly.vertices if i in gloved) * 2 >= len(poly.vertices) else ks
+        me.update()
+        done += len(gloved)
+    return {"vertices": done, "thickness_cm": GLOVE, "color": col, "material": mat.name}
+
+
+
 # --- the hold: the gun moved so the right palm meets its grip, then each hand's hold searched ---------------------
 rest_parts()
 L.pose_idle()
@@ -123,6 +171,7 @@ shift = palm_r() - mark_world("grip")
 L.rifle_rest = Matrix.Translation(shift) @ L.rifle_rest
 L._place_rifle()
 FINGER_BONES = {s: [pb.name for pb in L.arm.pose.bones if any(pb.name.startswith(f + "_") and pb.name.endswith("_" + s) for f in PL.FINGERS)] for s in ("l", "r")}
+report["gloves"] = put_gloves()
 GRASPS = {}
 
 
@@ -396,6 +445,38 @@ def thumb_wrap(side, max_curl, tree):
         prev = b
 
 
+def thumb_to(side, target, tree, rounds=12, step_deg=8.0):
+    """The thumb's tip brought to a rest point: each of its joints, tip to base, turned about its head toward the
+    point by at most step_deg a round (cyclic coordinate descent); a turn that breaks a thumb rule or puts the thumb
+    deeper in the gun is undone. Returns the tip's distance left, cm."""
+    rules0 = len(L._thumb_report(side, _TL)[1])
+    for _ in range(rounds):
+        moved = False
+        for j in ("03", "02", "01"):
+            n = L._n("finger", side, "thumb", j)
+            head = L._bw(n).translation.copy()
+            tip = L._finger_tip("thumb", side)
+            a, b = (tip - head), (target - head)
+            if a.length < 1e-6 or b.length < 1e-6:
+                continue
+            axis = a.cross(b)
+            if axis.length < 1e-9:
+                continue
+            ang = min(step_deg, math.degrees(a.angle(b)))
+            if ang < 0.5:
+                continue
+            M = L._bw(n)
+            gap0 = finger_gap(side, "thumb", tree)
+            L._turn_about(n, axis.normalized(), ang, head)
+            if len(L._thumb_report(side, _TL)[1]) > rules0 or finger_gap(side, "thumb", tree) < min(gap0, GLOVE) - 0.05:
+                L._set_world(n, M)
+                continue
+            moved = True
+        if not moved:
+            break
+    return (L._finger_tip("thumb", side) - target).length * 100.0
+
+
 def apply_hold(side, mark):
     """A working hold's fingers (the support hand racking the slide, seating a magazine)."""
     h = (STYLE or {}).get("hands", {}).get(side) or {}
@@ -448,12 +529,17 @@ def apply_style(side, trigger=False, normal=None):
     allowed = max(0.0, 0.2 - GLOVE)
     hn = L._n("hand", side)
     pose_digits(side, h, trigger, tree)
+    if h.get("thumb_rest") and not trigger:
+        tr = h["thumb_rest"]
+        left = thumb_to(side, mark_world(tr["mark"], offset=tr["offset"]), tree)
+        thumb_clear(side, tree)
+        report.setdefault("thumb_rest_cm", {})[side] = round(left, 2)
     if normal is not None and not trigger:
         # each press the style does not allow undone along its own way out, by its excess (at most 0.8 cm), the
         # fingers closed again after each move
         # (off: moving the support hand out of a press put the back of its index into the gun; the support fingers
         # need the firing hand's fingers as something to wrap over, which Pose Lab's tests do not hold yet)
-        for _ in range(int(job.get("press_moves", 0))):
+        for _ in range(3 if side in tuple(job.get("press_sides", ())) else 0):
             pr = deepest_press(side, tree)
             if pr is None:
                 break
@@ -505,6 +591,33 @@ def turn_search(side, at, n, toward):
     return lay_palm(side, at, n, toward=best[1])
 
 
+def contact_search(side, mark, at, n, tw):
+    """Where on its contact the hand lies: the palm laid at a few places down and up the grip and forward and back,
+    each scored by the presses the style does not allow (the web through a pistol's tang), the palm's gap and the
+    arm's limits; the best place is kept."""
+    q = RA.matrix_world.to_quaternion()
+    up, fwd = (q @ g((0.0, 0.0, 1.0))).normalized(), (q @ g((0.0, 1.0, 0.0))).normalized()
+    tree = L._tree()
+    L.snapshot("save", "contact_search")
+    best = None
+    for dz in (0.0, -0.5, -1.0, -1.5, -2.0, 0.5):
+        for dy in (0.0, 0.5, -0.5, 1.0):
+            L.snapshot("load", "contact_search")
+            p_ = at + (up * dz + fwd * dy) / 100.0
+            short = turn_search(side, p_, n, tw) if STYLE else lay_palm(side, p_, n, toward=tw)
+            settle(side)
+            pr = deepest_press(side, tree)
+            gap = L.grip(side, hold=False)[side].get("palm_gap_cm")
+            gap = 3.0 if gap is None else gap
+            score = (pr[0] if pr else 0.0) * 4.0 + max(0.0, gap - 0.3) * 2.0 + arm_over(side) * 0.1 + 4.0 * short
+            if best is None or score < best[0] - 1e-6:
+                best = (score, p_, dz, dy)
+    L.snapshot("load", "contact_search")
+    short = turn_search(side, best[1], n, tw) if STYLE else lay_palm(side, best[1], n, toward=tw)
+    report.setdefault("contact_place", {})["%s:%s" % (side, mark)] = {"down_cm": -best[2], "forward_cm": best[3], "score": round(best[0], 3)}
+    return short
+
+
 def grasp(side, mark, part=None, offset=None, start=None):
     """The hand's hold on a mark, solved once with the parts as they are now: (the hand against the mark's bone, the
     fingers' turns, whether a hold passed). The palm is first laid on the surface facing into it (the support hand
@@ -520,11 +633,16 @@ def grasp(side, mark, part=None, offset=None, start=None):
     slid = 0.0
     if start:
         L.snapshot("load", start)                 # the hands as the placement search left them, already settled
+        if STYLE and side == "r" and (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark:
+            tw0 = TOWARD.get(mark)
+            contact_search(side, mark, at, surface_normal(at, mark), (RA.matrix_world.to_quaternion() @ g(tw0)).normalized() if tw0 else None)
+            settle(side)
     else:
         n = surface_normal(at, mark)
         tw = TOWARD.get(mark)
         tw = (RA.matrix_world.to_quaternion() @ g(tw)).normalized() if tw else None
-        short = turn_search(side, at, n, tw) if STYLE else lay_palm(side, at, n, toward=tw)
+        own = STYLE and (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark and side == "r"
+        short = contact_search(side, mark, at, n, tw) if own else (turn_search(side, at, n, tw) if STYLE else lay_palm(side, at, n, toward=tw))
         while short > 0.3 and mark == "support" and slid < 14.0:      # beyond the arm's reach: slide back along the bore
             slid += 2.0
             L.snapshot("load", "before_grasp")

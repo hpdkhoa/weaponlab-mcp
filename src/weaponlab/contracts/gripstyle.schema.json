@@ -298,6 +298,28 @@
               }
             }
           }
+        },
+        "thumb_rest": {
+          "type": "object",
+          "required": [
+            "mark",
+            "offset",
+            "why"
+          ],
+          "additionalProperties": false,
+          "description": "where the thumb's tip rests on the hold: a mark and an offset from it (gun space, cm; out by the thumb's radius and the glove)",
+          "properties": {
+            "mark": {
+              "type": "string"
+            },
+            "offset": {
+              "$ref": "#/$defs/vec3"
+            },
+            "why": {
+              "type": "string",
+              "minLength": 8
+            }
+          }
         }
       },
       "additionalProperties": false

@@ -338,17 +338,5 @@
    "where": "Section on the grip, page 47",
    "status": "to read"
   }
- ],
- "soft_contacts": [
-  {
-   "segment": "thumb1",
-   "max_cm": 1.1,
-   "why": "in a high pistol grip the tang sits in the web between the thumb and the index; Pose Lab draws the web as a 1.5 cm capsule round the thumb's base bone, which overstates it by about as much"
-  },
-  {
-   "segment": "thumb2_r",
-   "max_cm": 0.9,
-   "why": "the firing thumb's knuckle at that same web, where the thumb's base and middle bones meet over the tang"
-  }
  ]
 }
