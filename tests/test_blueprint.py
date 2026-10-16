@@ -168,3 +168,15 @@ def test_views_features_and_the_parts_list(gun):
     r = K.run(G, reference="outline")
     assert r["detail"]["missing"] == [] and r["detail"]["ok"]
     assert C.check_blueprint(P.store.load(G, "blueprint"), sources=P.store.load(G, "sources")) == []
+
+
+def test_smoothing_takes_out_edge_noise_and_keeps_corners():
+    import numpy as np
+    rng = np.random.default_rng(1)
+    side = np.linspace(0, 200, 201)[:-1]
+    sq = np.concatenate([np.c_[side, 0 * side], np.c_[0 * side + 200, side], np.c_[200 - side, 0 * side + 200], np.c_[0 * side, 200 - side]])
+    noisy = sq + rng.normal(0, 1.5, sq.shape) * [[0, 1]] * (np.arange(len(sq)) < 200)[:, None]    # noise on the first edge
+    out = T.smooth(noisy, 13, 40)
+    assert np.abs(out[20:180, 1]).max() < 1.0                    # the noisy edge comes out within 1 px of straight
+    for c in ([200, 0], [200, 200], [0, 200]):
+        assert np.min(np.hypot(*(out - c).T)) < 2.5              # its corners stay (within 2.5 px beside the noise)

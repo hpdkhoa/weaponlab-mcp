@@ -29,14 +29,67 @@ def ink(gun, f, threshold=None, invert=False):
     return (255 - m) if invert else m
 
 
+SMOOTH = {"window_px": 0, "corner_deg": 35.0}      # set by smoothing(); 0 keeps the raw contour
+
+
+def smooth(points, window_px, corner_deg=35.0):
+    """A traced contour's edge noise (a halftone's dots, a scan's grain) taken out: the corners found first (where the
+    outline turns more than corner_deg over a window), then each run between two corners averaged over the window
+    with its two corner ends held. Straight edges come out straight, curves even, corners sharp."""
+    cv2, np = _cv()
+    P = np.asarray(points, dtype=float)
+    n = len(P)
+    h = max(2, int(window_px // 2))
+    if n < 4 * h:
+        return P
+    hc = 2 * h                                       # corners judged over twice the smoothing span: noise is no corner
+    a = P[(np.arange(n) - hc) % n]
+    b = P[(np.arange(n) + hc) % n]
+    u, v = P - a, b - P
+    cos = (u * v).sum(1) / (np.linalg.norm(u, axis=1) * np.linalg.norm(v, axis=1) + 1e-9)
+    turn = np.degrees(np.arccos(np.clip(cos, -1, 1)))
+    corners = [i for i in range(n) if turn[i] >= corner_deg and turn[i] >= turn[(i - 1) % n] and turn[i] >= turn[(i + 1) % n]]
+    keep = []                                        # corners closer than the window are one corner
+    for i in corners:
+        if not keep or i - keep[-1] > hc:
+            keep.append(i)
+    if len(keep) > 1 and keep[0] + n - keep[-1] <= hc:
+        keep.pop()
+    out = P.copy()
+    if not keep:
+        k = np.ones(2 * h + 1) / (2 * h + 1)
+        for d in range(2):
+            ext = np.concatenate([P[-h:, d], P[:, d], P[:h, d]])
+            out[:, d] = np.convolve(ext, k, mode="valid")
+        return out
+    for j, c0 in enumerate(keep):
+        c1 = keep[(j + 1) % len(keep)]
+        idx = [(c0 + t) % n for t in range(((c1 - c0) % n) + 1)]
+        seg = P[idx]
+        m = len(seg)
+        for t in range(1, m - 1):
+            w = min(h, t, m - 1 - t)                  # the window shrinks toward the corners, which stay put
+            out[idx[t]] = seg[t - w:t + w + 1].mean(axis=0)
+    return out
+
+
+def smoothing(window_px=0, corner_deg=35.0):
+    """Turns edge smoothing on for the traces that follow (window_px 0 turns it off)."""
+    SMOOTH.update({"window_px": int(window_px), "corner_deg": float(corner_deg)})
+    return dict(SMOOTH)
+
+
 def _outline(mask, eps_px):
     cv2, np = _cv()
     cs, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     if not cs:
         raise ValueError("nothing found")
     c = max(cs, key=cv2.contourArea)
+    if SMOOTH["window_px"]:
+        sm = smooth(c[:, 0, :], SMOOTH["window_px"], SMOOTH["corner_deg"])
+        c = sm.astype(np.float32).reshape(-1, 1, 2)
     poly = cv2.approxPolyDP(c, eps_px, True)[:, 0, :]
-    return [[float(x), float(y)] for x, y in poly], float(cv2.contourArea(c))
+    return [[float(x), float(y)] for x, y in poly], float(abs(cv2.contourArea(c)))
 
 
 def _fill_holes(mask):
@@ -51,6 +104,8 @@ def _fill_holes(mask):
 def _result(gun, f, poly_px, area_px, what, extra=None):
     cv2, np = _cv()
     out = {"figure": f["id"], "method": what, "points": len(poly_px), "outline_px": [[round(x, 1), round(y, 1)] for x, y in poly_px]}
+    if SMOOTH["window_px"]:
+        out["smoothed"] = {"window_px": SMOOTH["window_px"], "corner_deg": SMOOTH["corner_deg"]}
     if "scale" in f:
         out["area_cm2"] = round(area_px * f["scale"]["cm_per_px"] ** 2, 3)
     if "scale" in f and "frame" in f:

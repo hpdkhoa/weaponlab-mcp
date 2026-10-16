@@ -189,6 +189,8 @@ def extrude(gun, part_id, role, finish, trace_name, x, x_source, clips=(), name=
             ref[key] = (ref.get(key, "") + "; " if ref.get(key) else "") + "; ".join(notes)
     else:
         ref = {"figure": t["figure"], "method": t["method"] if t["method"] in ("traced", "snapped", "read") else ("snapped" if t["method"] == "snap" else "traced")}
+        if t.get("smoothed"):
+            notes.insert(0, "edge noise smoothed over %d px, corners over %.0f degrees kept" % (t["smoothed"]["window_px"], t["smoothed"]["corner_deg"]))
         if notes:
             ref["note"] = "; ".join(notes)
     sources = {"outline": ref, "x": x_source}
@@ -331,4 +333,14 @@ def rounded(x0, x1, z0, z1, r, steps=4):
         for k in range(steps + 1):
             a = math.radians(a0 + 90.0 * k / steps)
             out.append([round(cx + r * math.cos(a), 4), round(z1 - r + r * math.sin(a), 4)])
+    return out
+
+
+def dense(outline, step_cm=0.05):
+    """An outline with points every step along each edge: readings off a smoothed outline see its edges, not only
+    its corners."""
+    out = []
+    for a, c in zip(outline, outline[1:] + outline[:1]):
+        n = max(1, int(math.hypot(c[0] - a[0], c[1] - a[1]) / step_cm))
+        out += [[a[0] + (c[0] - a[0]) * k / n, a[1] + (c[1] - a[1]) * k / n] for k in range(n)]
     return out

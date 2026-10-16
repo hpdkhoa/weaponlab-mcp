@@ -438,10 +438,13 @@ def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(descr
                     rough: Annotated[list[list[float]] | None, Field(description="snap: a rough outline in px")] = None,
                     box: Annotated[list[float] | None, Field(description="blob: [x0, y0, x1, y1] px round the patch (with seed inside)")] = None,
                     light: bool = True,
-                    close_px: int = 7, gap_px: int = 2, radius_px: int = 10, eps_px: float = 1.5) -> dict:
-    """An outline from a figure, kept for the plan: the whole silhouette, a closed area round a seed, or a rough
-    outline snapped onto the ink. Look at the picture it writes."""
+                    close_px: int = 7, gap_px: int = 2, radius_px: int = 10, eps_px: float = 1.5,
+                    smooth_px: Annotated[int, Field(description="take out edge noise (a halftone's dots): average runs between corners over this many px (0: off)")] = 0,
+                    corner_deg: Annotated[float, Field(description="with smooth_px: turns this sharp or sharper stay corners")] = 40.0) -> dict:
+    """An outline from a figure, kept for the plan: the whole silhouette, a closed area round a seed, a rough
+    outline snapped onto the ink, or a patch in a halftone. Look at the picture it writes."""
     BR = _bp()[3]
+    BR.smoothing(smooth_px, corner_deg)
     if method == "silhouette":
         r = _err(BR.silhouette, gun, figure_id, region, close_px, eps_px)
     elif method == "region":
@@ -452,6 +455,7 @@ def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(descr
         r = _err(BR.blob, gun, figure_id, box, seed, light, 3, eps_px, keep_as)
     else:
         raise ToolError("method: silhouette, region, snap or blob")
+    BR.smoothing(0)
     BR.save(gun, keep_as, r)
     return {k: v for k, v in r.items() if k not in ("outline_px", "outline_cm")} | {"kept": keep_as}
 
@@ -572,6 +576,16 @@ def blueprint_build(gun: str, render: bool = True) -> dict:
     if render:
         out["views"] = _err(BB.render, gun)
     return out
+
+
+@mcp.tool()
+def blueprint_showcase(gun: str, title: str | None = None, source_note: str | None = None,
+                       compare_figure: Annotated[str | None, Field(description="a source figure shown beside the copy")] = None) -> dict:
+    """A showcase of a built gun that has been through Gun Kit (minutes in Blender): a title card, the source beside
+    the copy, a turn round it, its clips (fire slowed, the reloads, the checks); as a GIF and an MP4, every frame
+    labelled as a Blueprint Lab model view."""
+    from .blueprint import showcase as SC
+    return _err(SC.make, gun, title, source_note, compare_figure=compare_figure)
 
 
 @mcp.tool()
