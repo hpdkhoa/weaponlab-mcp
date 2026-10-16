@@ -896,25 +896,38 @@ def arc_dir(a, b):
     return (d if d.length > 1e-6 else na).normalized()
 
 
-def clear_lift(side, d, step_cm=0.5, most_cm=8.0):
+def press_now(side, tree):
+    """What a moving hand still does wrong: its presses past the allowance (kept 0.05 cm inside it, as the clearance
+    check samples finer) and the grip's rules (the back of the hand toward the gun)."""
+    pen = L.hand_presses(side, tree, GLOVE, allow_cm=0.15, palm_allow_cm=0.35, other=True, soft=SOFT)[0]
+    return pen + 5.0 * len(L.grip(side, hold=False).get(side, {}).get("bad", []))
+
+
+def clear_lift(side, d, step_cm=0.5, most_cm=10.0):
     """A hand on its way that still presses into the gun (or the other hand) is lifted further along d, half a
     centimetre at a time, until nothing presses past what is allowed; when d alone does not clear it, the view's up
     and the two blended are tried the same way. Returns the extra lift, cm."""
     tree = L._tree()
-    pen = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
+    pen = press_now(side, tree)
     if pen <= 0.0 or d is None:
         return 0.0
     hn = L._n("hand", side)
     H0 = L._bw(hn).copy()
     best = (pen, Vector((0.0, 0.0, 0.0)))
     up = Vector(PL.VIEW_UP).normalized()
-    for way in (d, (d + up).normalized(), up):
+    out = Vector(PL.VIEW_RIGHT).normalized() * (-1.0 if side == "l" else 1.0)   # the hand's own side
+    back = -Vector(PL.VIEW_FWD).normalized()
+    fwd = -back                                     # round the front of the other hand (under the gun to over it)
+    ways = [d, (d + up).normalized(), up, (d + out).normalized(), (up + out).normalized(), out,
+            (d + back).normalized(), (up + back).normalized(), (d + fwd).normalized(), (up + fwd).normalized(),
+            (out + fwd).normalized(), fwd]
+    for way in ways:
         k = step_cm
         while k <= most_cm + 1e-6:
             v = way * (k / 100.0)
             L._put_hand(side, Matrix.Translation(v) @ H0)
             bpy.context.view_layer.update()
-            pen = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
+            pen = press_now(side, tree)
             if pen < best[0] - 1e-9 or pen <= 0.0 and best[0] > 0.0:
                 best = (pen, v)
             if pen <= 0.0:
@@ -1014,6 +1027,36 @@ def shoulder_reach(side, H):
         L._put_hand(side, H)
         bpy.context.view_layer.update()
     return deg
+
+
+def wrist_turns(side, degs=(4.0, 8.0)):
+    """A wrist still past its range: the hand turned a little about its palm's middle (each world axis, each way),
+    the turn kept that leaves the arm least past its limits with the hand pressing no deeper. Returns the degrees."""
+    o0 = arm_over(side)
+    if o0 <= 0.0:
+        return 0.0
+    tree = L._tree()
+    p0 = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
+    hn = L._n("hand", side)
+    H0 = L._bw(hn).copy()
+    P = H0.translation.lerp(L._bw(L._n("finger", side, "middle", "01")).translation, 0.5)
+    best = (o0, None)
+    for deg in degs:
+        for ax in (Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))):
+            for sg in (1.0, -1.0):
+                q = Quaternion(ax, math.radians(deg * sg))
+                M = Matrix.Translation(P) @ q.to_matrix().to_4x4() @ Matrix.Translation(-P) @ H0
+                L._put_hand(side, Matrix.LocRotScale(M.translation, M.to_quaternion(), L._unit()))
+                bpy.context.view_layer.update()
+                o = arm_over(side)
+                if o < best[0] - 0.5 and L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0] <= p0 + 1e-6:
+                    best = (o, M)
+        if best[1] is not None and best[0] <= 0.0:
+            break
+    M = best[1] if best[1] is not None else H0
+    L._put_hand(side, Matrix.LocRotScale(M.translation, M.to_quaternion(), L._unit()))
+    bpy.context.view_layer.update()
+    return 0.0 if best[1] is None else 1.0
 
 
 def wrist_relief(side):
@@ -1179,12 +1222,20 @@ for cid, clip in job["clips"].items():
                     L.arm.pose.bones[n].rotation_quaternion = qb
                 elif qa is not None:
                     L.arm.pose.bones[n].rotation_quaternion = qa
-            if STYLE and job.get("clear_lift", True) and 0.0 < h["w"] < 1.0 and (mark_of(h["a"]) or mark_of(h["b"])):
-                clear_lift(side, arc_dir(h["a"], h["b"]))  # a hand on its way still in the gun: lifted further off
+            if STYLE and job.get("clear_lift", True) and h["w"] < 1.0 and h["a"] != h["b"] and (mark_of(h["a"]) or mark_of(h["b"])):
+                p0_ = L.hand_presses(side, None, GLOVE, other=True, soft=SOFT)
+                k_ = clear_lift(side, arc_dir(h["a"], h["b"]))  # a hand on its way still in the gun: lifted further off
+                if cid in job.get("diagnose", []) and p0_[0] > 0.0:
+                    p1_ = L.hand_presses(side, None, GLOVE, other=True, soft=SOFT)
+                    report.setdefault("lifts", {}).setdefault(cid, []).append(
+                        {"t": t, "side": side, "before": [round(p0_[0], 2), p0_[1][:2]], "lift_cm": round(k_, 1), "after": [round(p1_[0], 2), p1_[1][:2]]})
             if STYLE and job.get("elbow_ease", True):
                 elbow_ease(side)                          # a wrist past its range: the elbow swings, the hand stays
             if STYLE and job.get("wrist_relief", True) and resting and arm_over(side) > 0.0:
                 wrist_relief(side)                        # still past: the hand turns back toward the forearm
+            if STYLE and job.get("wrist_turns", True) and arm_over(side) > 0.0:
+                wrist_turns(side, (4.0, 8.0) if resting else (4.0, 8.0, 12.0, 16.0, 20.0, 24.0))   # still past: turns about the palm
+                                                          # (a hand on its way holds nothing: it may turn further)
             if TRIGGER and side == "r" and cid in STYLE.get("trigger_clips", []):
                 for n, q in TRIGGER.items():              # the trigger finger on the trigger for the shot
                     L.arm.pose.bones[n].rotation_quaternion = q

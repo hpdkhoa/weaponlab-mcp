@@ -85,7 +85,7 @@
     {"hand": "l", "from": 1.55, "to": 1.85, "go": {"mark": "support"}, "why": "back round the grip"}],
    "expect": [{"at": 1.12, "seated": "magazine"}, {"at": [1.9, 2.2], "on": {"r": "grip", "l": "support"}}]},
   "charge": {"seconds": 1.1,
-   "gun": [{"from": 0.05, "to": 0.3, "roll": -10.0, "pitch": 5.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
+   "gun": [{"from": 0.05, "to": 0.3, "roll": -10.0, "pitch": 5.0, "move": [0.0, -7.0, -3.0], "ease": "inout"},
            {"from": 0.7, "to": 1.1, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
    "events": [
     {"hand": "l", "from": 0.1, "to": 0.38, "go": {"part": "slide", "mark": "slide_rear"}, "grasp": "pinch", "why": "the support hand over the slide, fingers on the rear serrations"},
