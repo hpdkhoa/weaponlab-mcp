@@ -13,8 +13,9 @@ blueprint names its source.
 | 1. Sources | `blueprint_source_add`, `blueprint_scan`, `blueprint_page`, `blueprint_text` | registers a file with its license, sorts its pages (text, table, figure), draws pages to read |
 | 2. Facts | `blueprint_specs`, `blueprint_fact_add` | finds the data table's quantities, records each one in cm or kg with its page and quote |
 | 3. Figures | `blueprint_figure_add`, `blueprint_grid`, `blueprint_calibrate`, `blueprint_frame`, `blueprint_align` | cuts a figure from a page, stands it upright, scales it, places it in gun space |
-| 3. Readings | `blueprint_trace`, `blueprint_measure` | outlines (silhouette, region, snap), ink spans, scale bar ticks, distances |
+| 3. Readings | `blueprint_trace`, `blueprint_measure` | outlines (silhouette, region, snap, blob), ink spans, scale bar ticks, faint marks' count and pitch (peaks), distances |
 | 4. Blueprint | `blueprint_new`, `blueprint_part`, `blueprint_hole`, `blueprint_mark`, `blueprint_read` | writes the parts (extrude or lathe, clipped where neighbours meet), cuts, marks |
+| Detail | `blueprint_views`, `blueprint_feature`, `blueprint_parts_list`, `blueprint_numbers` | shapes parts by three views, adds grooves, screws and textures, holds every visible listed part to a blueprint part |
 | 5. Check | `blueprint_check` | contract, outline overlap with the reference, length and weight sums, overlay pictures |
 | 6. Model | `blueprint_build` | the model in Blender, one object a part, its parts map, labelled pictures |
 | 7. Motion | `blueprint_to_gunkit` | Gun Kit: rig, hand clips, gun clips, read-back |
@@ -48,18 +49,40 @@ A part's role is `body` or one of its action family's part roles. A moving part'
 `free`. An action may let a part move in more than one way. A pistol's trigger, for one, turns or slides
 (`kinds` in the action file).
 
+## The detail pass
+
+A blueprint made from side outlines alone is the gun's silhouette: every part a slab. The detail pass makes it look
+like the gun.
+
+- **Three views.** `blueprint_views` turns a part into `views`: its side outline (y, z), front sections (x, z) over
+  runs of y, and a top outline (y, x). The builder keeps what all three share, so a slide gets its rounded top from a
+  front section and a stock its curve from a plan view.
+- **Every visible part.** `blueprint_parts_list` records the source's parts, the labels on its sections, read off
+  the figure, each marked visible or hidden, and why. Each blueprint part names the numbers it stands for
+  (`blueprint_numbers`). A visible part with no blueprint part fails the check. A part the text names without a
+  number matches by its name.
+- **Surface features.** `blueprint_feature`:
+  - `grooves` (serrations): cut into a face, counted and spaced from the figure (`blueprint_measure` with `peaks`).
+  - `screw`: a head standing on a face, slotted.
+  - `texture` (checkering, knurling, stippling, markings): too fine for the mesh, so it goes to the finish. The build
+    lists them in `build.json`.
+
+The check's `detail` result gives the listed and visible parts, the missing ones, how many parts are shaped, slabs
+or round, and the features by kind.
+
 ## Checks
 
 | Check | Pass |
 |---|---|
 | contract | no problems: every number has a source, every role fits the action |
+| detail | every visible part in the source's parts list has a blueprint part |
 | outline | IoU at least 0.95 and a mean edge gap at most 0.15 cm against the reference silhouette |
 | length | within 1 percent of the overall length fact |
 | weight | warns only: the copy is solid where the gun is hollow |
 
 ## The worked example: M1911A1
 
-`examples/m1911a1/sources.py` and `blueprint.py` build the M1911A1 from FM 23-35 (War Department, 1940).
+`examples/m1911a1/sources.py`, `blueprint.py` and `detail.py` build the M1911A1 from FM 23-35 (War Department, 1940).
 
 | Source in the manual | Used for |
 |---|---|
@@ -77,6 +100,25 @@ Result (2026-10-16):
   - slide 2.43 cm wide
   - grip 3.29 cm across the stocks
 - **Gun Kit:** every gun clip reads back within 0.0005 cm.
+
+After the detail pass (`detail.py`):
+
+- **Blueprint:** 18 parts. The new ones are the sights, the slide's front lobe, the hammer, the grip safety, the
+  mainspring housing, the lanyard loop, the trigger, the magazine catch, the slide stop, the thumb safety, the
+  bushing and the recoil spring plug.
+- **Parts list:** 43 parts read off the sections and the text, 20 of them visible, all 20 in the blueprint.
+- **Shaped parts:**
+  - the slide: its rounded top from section A-A
+  - the stocks: their curve from the plan view
+- **Features:**
+  - 14 rear serrations at 0.176 cm (counted on the photo)
+  - two screws on each stock
+  - checkering on the stocks and the magazine catch
+  - knurling on the trigger and the mainspring housing (from the text)
+- **Outline:** IoU 0.991 against the photo.
+
+Still slabs: the frame, the magazine and the small parts (no front or top view shows them). The traced edges carry
+about 0.1 cm of the photo's halftone noise.
 
 What the example found about its sources:
 

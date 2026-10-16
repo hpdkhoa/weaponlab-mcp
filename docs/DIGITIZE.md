@@ -45,6 +45,23 @@ Model Lab's AR-15 platform, written by hand, stays as its test. Steps 7 and 8 ar
 
 Every number in a blueprint names its source: file, page, figure. A number without one is marked as a guess.
 
+## The detail pass
+
+Steps 1 to 6 make the gun's silhouette: each part is one side outline pushed straight across its width. The detail
+pass makes the copy look like the gun, from the same sources. It runs between the check (step 5) and the build:
+
+1. **Three views a part.** A part is the shape its side outline, its front sections and its top outline share (the
+   three views of a drawing, intersected). The plan section gives the top outlines, a front section the rounded
+   slide top, and a part without one keeps a guess with its reason.
+2. **Every visible part.** The source's parts list (the labels on its sections, read off the figure) goes into the
+   sources with each part marked visible or hidden, and why. Each visible part gets its own blueprint part, traced
+   on its figure.
+3. **Surface features.** Grooves (serrations), screw heads and knurling or checkering, with their counts and
+   spacing measured on the figure or given by the text. Grooves and screws are cut into the mesh; knurling and
+   checkering go to the finish as a texture, since they are too fine for the mesh.
+4. **The detail check.** Every visible part in the parts list has a blueprint part, and each feature names its
+   source. A missing visible part fails the check.
+
 ## The action families
 
 A gun's action family decides its moving parts and its clips. There are 18 families in `gunkit/actions/`:
@@ -83,8 +100,9 @@ schema and against what a schema cannot say: ids that must exist, the source of 
 1. Blueprint Lab steps 1 to 5 on the gun with the best sources: the M1911 (a 1940 field manual with a data table and
    sections along the bore).
 2. The general builder, then that gun through Gun Kit.
-3. The AR-15 from its blueprint, checked against Model Lab's hand-built AR-15 (within 1 cm).
-4. One gun for each action family, picked by how good its sources are.
+3. The detail pass on that gun: three views a part, every visible part, surface features.
+4. The AR-15 from its blueprint, checked against Model Lab's hand-built AR-15 (within 1 cm).
+5. One gun for each action family, picked by how good its sources are.
 
 ## Limits of version 1
 
@@ -111,12 +129,13 @@ schema and against what a schema cannot say: ids that must exist, the source of 
 
 Not done yet:
 
-1. **The hand clips fail their anatomy and grip checks** on every gun, the M1911A1 as well. This is limit 9 above,
-   and it comes first.
-2. **The AR-15 from its blueprint**, checked against Model Lab's AR-15 (order step 3).
-3. **One gun for each action family** (order step 4). Each needs its manual's figures read the way the M1911A1's
+1. **The detail pass** (above), on the M1911A1 first.
+2. **The hand clips fail their anatomy and grip checks** on every gun, the M1911A1 as well. This is limit 9 above,
+   and it comes after the detail pass: the hands grip the real shapes.
+3. **The AR-15 from its blueprint**, checked against Model Lab's AR-15 (order step 4).
+4. **One gun for each action family** (order step 5). Each needs its manual's figures read the way the M1911A1's
    were.
-4. **OCR** for the scanned manuals without text.
+5. **OCR** for the scanned manuals without text.
 
 ## Later: digital design for any object
 

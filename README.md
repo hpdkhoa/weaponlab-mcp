@@ -10,7 +10,7 @@
   <a href="https://pypi.org/project/weaponlab-mcp/"><img alt="PyPI: weaponlab-mcp" src="https://img.shields.io/pypi/v/weaponlab-mcp?label=PyPI&logo=pypi&logoColor=white&color=3775a9"></a>
   <a href="https://registry.modelcontextprotocol.io/v0/servers?search=weaponlab-mcp"><img alt="MCP Registry: weaponlab-mcp" src="https://img.shields.io/badge/MCP%20Registry-weaponlab--mcp-6f42c1"></a>
   <a href="https://www.blender.org/download/"><img alt="Blender: 4.4+ (Motion Lab)" src="https://img.shields.io/badge/Blender-4.4%2B%20(Motion%20Lab)-e87d0d?logo=blender&logoColor=white"></a>
-  <a href="#what-it-does"><img alt="tools: 62" src="https://img.shields.io/badge/tools-62-orange"></a>
+  <a href="#what-it-does"><img alt="tools: 66" src="https://img.shields.io/badge/tools-66-orange"></a>
   <a href="docs/PROBE_CONTRACT.md"><img alt="probe contract: v1" src="https://img.shields.io/badge/probe%20contract-v1-orange"></a>
 </p>
 
