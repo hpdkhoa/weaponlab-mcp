@@ -1,0 +1,20 @@
+{
+ "contract": "weaponlab-character/1",
+ "id": "nomex_full_gloves",
+ "name": "Soldier, Nomex full gloves",
+ "handed": "right",
+ "hands": {"scale": 1.0, "why": "the arms model's own hands (an average adult hand)"},
+ "covering": {
+  "kind": "full_gloves",
+  "material": "Nomex (aramid knit)",
+  "thickness_cm": 0.15,
+  "why": "a close-fitting Nomex glove: about 1.5 mm of fabric over every finger and the palm (a guess for a thin flame-resistant glove)"
+ },
+ "finish": {
+  "skin": "skin",
+  "glove": "nomex",
+  "sleeve": "uniform",
+  "colors": {"glove": [0.23, 0.26, 0.2], "skin": [0.62, 0.45, 0.36], "sleeve": [0.24, 0.26, 0.2]}
+ },
+ "sources": ["the user's choice: full gloves, Nomex (2026-10-16)"]
+}

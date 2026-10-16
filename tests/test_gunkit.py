@@ -160,3 +160,19 @@ def test_a_magazine_leaves_along_its_well():
     beats = T._beats([{"part": "magazine", "from": 0, "to": 1, "well": 4.0, "offset": [0, 0, -1.0], "why": "x"}], facts)
     assert beats[0]["offset"][2] == pytest.approx(4.0 * line["axis"][2] - 1.0)
     assert T.well({}, 2.0) == [0.0, 0.0, -2.0]                               # no axis known: straight down
+
+
+def test_grip_styles_and_characters_follow_their_contracts():
+    """Each grip style and character shipped checks clean; an action family finds its style; a glove's thickness is
+    read off the character."""
+    from weaponlab import contracts as C
+    from weaponlab.gunkit import setup as SU
+    for i in SU.ids("gripstyles"):
+        assert C.check(SU.style(i)) == [], i
+    for i in SU.ids("characters"):
+        assert C.check(SU.character(i)) == [], i
+    assert SU.style_for("pistol_slide")["id"] == "pistol_two_hand"
+    assert SU.glove_cm(SU.character("nomex_full_gloves")) == pytest.approx(0.15)
+    st = dict(SU.style("pistol_two_hand"))
+    st["hands"] = {"r": dict(st["hands"]["r"], contact=dict(st["hands"]["r"]["contact"], mark="nowhere")), "l": st["hands"]["l"]}
+    assert any("nowhere" in b for b in C.check(st))

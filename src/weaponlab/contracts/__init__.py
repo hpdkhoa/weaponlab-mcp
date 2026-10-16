@@ -3,6 +3,8 @@
     weaponlab-sources/1    one gun's sources: files and licenses, pages, figures (scale, frame), facts
     weaponlab-blueprint/1  the gun's visual copy as data: each part's shape, holes, role, motion, finish, sources
     weaponlab-partsmap/1   how a model maps onto its action (the blueprint's build writes one)
+    weaponlab-gripstyle/1  how a kind of gun is held: each hand's contact and fingers (Gun Kit's hand step)
+    weaponlab-character/1  who holds it: the hands' size, covering and finish (set before any hand clip)
 
 check(doc) gives every problem as a sentence, empty when the document follows its contract: first the schema, then
 what a schema cannot say (ids that must exist, the source of every number, the scale's own sum)."""
@@ -14,7 +16,8 @@ from pathlib import Path
 import jsonschema
 
 HERE = Path(__file__).resolve().parent
-NAMES = {"weaponlab-sources/1": "sources", "weaponlab-blueprint/1": "blueprint", "weaponlab-partsmap/1": "partsmap"}
+NAMES = {"weaponlab-sources/1": "sources", "weaponlab-blueprint/1": "blueprint", "weaponlab-partsmap/1": "partsmap",
+         "weaponlab-gripstyle/1": "gripstyle", "weaponlab-character/1": "character"}
 
 
 @lru_cache(maxsize=None)
@@ -176,7 +179,32 @@ def check(doc, **kw):
     name = NAMES.get(doc.get("contract") if isinstance(doc, dict) else None)
     if not name:
         return ["contract: one of %s, got %r" % (", ".join(NAMES), doc.get("contract") if isinstance(doc, dict) else doc)]
+    if name == "gripstyle":
+        return check_gripstyle(doc)
+    if name == "character":
+        return _schema_problems(doc, "character")
     return {"sources": check_sources, "blueprint": check_blueprint, "partsmap": check_partsmap}[name](doc, **kw)
+
+
+def check_gripstyle(doc):
+    bad = _schema_problems(doc, "gripstyle")
+    if bad:
+        return bad
+    try:
+        from ..gunkit import actions as A
+        for fam in doc["families"]:
+            a = A.load(fam)
+            for side, h in doc["hands"].items():
+                if h["contact"]["mark"] not in a.get("marks", []):
+                    bad.append("hand %s: the mark %s is not one of %s's marks" % (side, h["contact"]["mark"], fam))
+            for c in doc.get("trigger_clips", []):
+                if c not in a["hand_clips"]:
+                    bad.append("trigger clip %s is not a hand clip of %s" % (c, fam))
+    except ValueError as e:
+        bad.append(str(e))
+    if doc["hands"]["r"]["role"] == doc["hands"].get("l", {}).get("role"):
+        bad.append("the two hands have one role")
+    return bad
 
 
 def check_file(path, **kw):

@@ -1,0 +1,39 @@
+{
+ "contract": "weaponlab-gripstyle/1",
+ "id": "pistol_two_hand",
+ "name": "Pistol, two hands",
+ "families": ["pistol_slide", "energy_cell_pistol"],
+ "hands": {
+  "r": {
+   "role": "firing",
+   "contact": {"mark": "grip", "face": [-1.0, 0.0, 0.0],
+               "why": "the firing palm on the grip's right side, the web of the hand high under the tang (FM 3-23.35 2-3)"},
+   "fingers": {
+    "index": {"pose": "straight", "curl": [8.0, 6.0, 4.0], "why": "the trigger finger straight along the frame, off the trigger until the shot"},
+    "middle": {"pose": "wrap", "max_curl": [80.0, 95.0, 60.0], "why": "wraps the front strap under the trigger guard"},
+    "ring": {"pose": "wrap", "max_curl": [80.0, 95.0, 60.0], "why": "wraps the front strap"},
+    "pinky": {"pose": "wrap", "max_curl": [80.0, 95.0, 60.0], "why": "wraps the front strap at the grip's bottom"},
+    "thumb": {"pose": "straight", "curl": [0.0, 8.0, 4.0], "why": "the firing thumb forward along the frame's left side, over the safety, clear of the slide"}
+   },
+   "trigger": {"pose": "wrap", "max_curl": [45.0, 55.0, 30.0], "why": "the trigger finger's pad on the trigger for the shot"}
+  },
+  "l": {
+   "role": "support",
+   "contact": {"mark": "support", "face": [1.0, 0.0, 0.0],
+               "why": "the support palm on the grip's left side, filling what the firing hand leaves open (FM 3-23.35 2-3)"},
+   "fingers": {
+    "index": {"pose": "wrap", "max_curl": [75.0, 90.0, 55.0], "why": "the support fingers wrap over the firing hand's fingers, under the trigger guard"},
+    "middle": {"pose": "wrap", "max_curl": [75.0, 90.0, 55.0], "why": "wraps over the firing fingers"},
+    "ring": {"pose": "wrap", "max_curl": [75.0, 90.0, 55.0], "why": "wraps over the firing fingers"},
+    "pinky": {"pose": "wrap", "max_curl": [75.0, 90.0, 55.0], "why": "wraps over the firing fingers"},
+    "thumb": {"pose": "straight", "curl": [0.0, 8.0, 4.0], "why": "the support thumb forward along the frame under the firing thumb, clear of the slide's path"}
+   }
+  }
+ },
+ "stance": {"view_cm": [7.0, 42.0, -13.0],
+            "why": "both arms out in front, the pistol below the line of sight and a little right of it (a two-handed ready hold; aimed, it rises to the eye); a guess at the first-person view"},
+ "trigger_clips": ["fire"],
+ "rules": ["both thumbs below the slide's lower edge (clear of the slide's path)", "the trigger finger off the trigger outside the trigger clips"],
+ "sources": [{"title": "FM 3-23.35, Combat Training with Pistols M9 and M11 (2003)", "where": "paragraph 2-3, Grip (two-handed grip)", "status": "read"},
+             {"title": "FM 23-35, Basic Field Manual: Automatic Pistol, Caliber .45 (1940)", "where": "Section on the grip, page 47", "status": "to read"}]
+}

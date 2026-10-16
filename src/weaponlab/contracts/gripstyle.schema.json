@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "weaponlab-gripstyle/1",
+  "title": "weaponlab-gripstyle/1",
+  "description": "How a kind of gun is held: each hand's contact (the mark it holds and the face of the gun it lies on), each finger's pose, the clips where the trigger finger goes to the trigger, and the sources. One skeleton holds every style; the style is the hand setup on it. Faces are gun-space directions (+X the gun's left, +Y the muzzle, +Z up).",
+  "type": "object",
+  "required": [
+    "contract",
+    "id",
+    "name",
+    "families",
+    "hands",
+    "sources"
+  ],
+  "properties": {
+    "contract": {
+      "const": "weaponlab-gripstyle/1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "families": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "the action families it is the default for"
+    },
+    "hands": {
+      "type": "object",
+      "properties": {
+        "r": {
+          "$ref": "#/$defs/hand"
+        },
+        "l": {
+          "$ref": "#/$defs/hand"
+        }
+      },
+      "required": [
+        "r"
+      ],
+      "additionalProperties": false
+    },
+    "trigger_clips": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "the hand clips where the firing hand's trigger finger is on the trigger (off it in every other)"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "the style's own rules, in words, each a check the hand step makes"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "title",
+          "where"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "where": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "read",
+              "to read"
+            ]
+          }
+        }
+      }
+    },
+    "stance": {
+      "type": "object",
+      "required": [
+        "view_cm",
+        "why"
+      ],
+      "additionalProperties": false,
+      "description": "where the gun sits in front of the eye at the hold: its bolt face at view_cm (cm: right, forward, up from the eye), the bore straight ahead; the hands reach it",
+      "properties": {
+        "view_cm": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "why": {
+          "type": "string",
+          "minLength": 8
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "finger": {
+      "type": "object",
+      "required": [
+        "pose",
+        "why"
+      ],
+      "properties": {
+        "pose": {
+          "enum": [
+            "straight",
+            "wrap",
+            "rest"
+          ],
+          "description": "straight: held at the curls given; wrap: closed until it meets the gun (or its most curl); rest: left as the hold leaves it"
+        },
+        "curl": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "straight: the three joints' curl, degrees (a thumb uses the last two)"
+        },
+        "max_curl": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "wrap: the most each joint closes"
+        },
+        "why": {
+          "type": "string",
+          "minLength": 8
+        }
+      },
+      "additionalProperties": false
+    },
+    "hand": {
+      "type": "object",
+      "required": [
+        "role",
+        "contact",
+        "fingers"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "firing",
+            "support"
+          ]
+        },
+        "contact": {
+          "type": "object",
+          "required": [
+            "mark",
+            "face",
+            "why"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "mark": {
+              "type": "string"
+            },
+            "face": {
+              "$ref": "#/$defs/vec3",
+              "description": "the way the gun's surface faces where the palm lies"
+            },
+            "why": {
+              "type": "string",
+              "minLength": 8
+            }
+          }
+        },
+        "fingers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "index": {
+              "$ref": "#/$defs/finger"
+            },
+            "middle": {
+              "$ref": "#/$defs/finger"
+            },
+            "ring": {
+              "$ref": "#/$defs/finger"
+            },
+            "pinky": {
+              "$ref": "#/$defs/finger"
+            },
+            "thumb": {
+              "$ref": "#/$defs/finger"
+            }
+          }
+        },
+        "trigger": {
+          "$ref": "#/$defs/finger",
+          "description": "the trigger finger in the trigger clips"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
