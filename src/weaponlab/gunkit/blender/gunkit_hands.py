@@ -898,27 +898,31 @@ def arc_dir(a, b):
 
 def clear_lift(side, d, step_cm=0.5, most_cm=8.0):
     """A hand on its way that still presses into the gun (or the other hand) is lifted further along d, half a
-    centimetre at a time, until nothing presses past what is allowed. Returns the extra lift, cm."""
+    centimetre at a time, until nothing presses past what is allowed; when d alone does not clear it, the view's up
+    and the two blended are tried the same way. Returns the extra lift, cm."""
     tree = L._tree()
     pen = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
     if pen <= 0.0 or d is None:
         return 0.0
     hn = L._n("hand", side)
     H0 = L._bw(hn).copy()
-    best = (pen, 0.0)
-    k = step_cm
-    while k <= most_cm + 1e-6:
-        L._put_hand(side, Matrix.Translation(d * (k / 100.0)) @ H0)
-        bpy.context.view_layer.update()
-        pen = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
-        if pen < best[0]:
-            best = (pen, k)
-        if pen <= 0.0:
-            return k
-        k += step_cm
-    L._put_hand(side, Matrix.Translation(d * (best[1] / 100.0)) @ H0)
+    best = (pen, Vector((0.0, 0.0, 0.0)))
+    up = Vector(PL.VIEW_UP).normalized()
+    for way in (d, (d + up).normalized(), up):
+        k = step_cm
+        while k <= most_cm + 1e-6:
+            v = way * (k / 100.0)
+            L._put_hand(side, Matrix.Translation(v) @ H0)
+            bpy.context.view_layer.update()
+            pen = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
+            if pen < best[0] - 1e-9 or pen <= 0.0 and best[0] > 0.0:
+                best = (pen, v)
+            if pen <= 0.0:
+                return k
+            k += step_cm
+    L._put_hand(side, Matrix.Translation(best[1]) @ H0)
     bpy.context.view_layer.update()
-    return best[1]
+    return best[1].length * 100.0
 
 
 def arc(a, b, w):
@@ -1010,6 +1014,22 @@ def shoulder_reach(side, H):
         L._put_hand(side, H)
         bpy.context.view_layer.update()
     return deg
+
+
+def wrist_relief(side):
+    """A hand resting on a hold the gun has turned away from (the hold was solved at another gun pose) with its wrist
+    past range: Pose Lab's mend turns it back inside, kept only when it leaves the arm less past its limits and the
+    hand pressing no deeper into the gun or the other hand."""
+    tree = L._tree()
+    o0 = arm_over(side)
+    p0 = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
+    L.snapshot("save", "_relief")
+    L._mend_hand(side, fingers=False)
+    bpy.context.view_layer.update()
+    if arm_over(side) < o0 and L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0] <= p0 + 1e-6:
+        return True
+    L.snapshot("load", "_relief")
+    return False
 
 
 def blend(Ma, Mb, w):
@@ -1163,6 +1183,8 @@ for cid, clip in job["clips"].items():
                 clear_lift(side, arc_dir(h["a"], h["b"]))  # a hand on its way still in the gun: lifted further off
             if STYLE and job.get("elbow_ease", True):
                 elbow_ease(side)                          # a wrist past its range: the elbow swings, the hand stays
+            if STYLE and job.get("wrist_relief", True) and resting and arm_over(side) > 0.0:
+                wrist_relief(side)                        # still past: the hand turns back toward the forearm
             if TRIGGER and side == "r" and cid in STYLE.get("trigger_clips", []):
                 for n, q in TRIGGER.items():              # the trigger finger on the trigger for the shot
                     L.arm.pose.bones[n].rotation_quaternion = q
