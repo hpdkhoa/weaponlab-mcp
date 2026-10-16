@@ -869,6 +869,8 @@ def target_matrix(side, tgt, current):
 
 
 ARC_CM = float(job.get("arc_cm", 5.5))
+REGRIP = float(job.get("regrip", 0.2))      # the share of a hold-to-hold move spent letting go, and taking hold
+OPEN = {sd: {n: Quaternion() for n in FINGER_BONES[sd]} for sd in ("l", "r")}   # the digits at rest: an open hand
 
 
 def _face_world(tgt):
@@ -923,6 +925,16 @@ def elbow_ease(side):
 
 
 CLAV = {}                    # the clavicles' turns in the hold: each frame starts from them
+ARM_HOLD = {}                # the arm bones' turns in the hold
+
+
+def arm_from_hold(side):
+    names = [L._n("upperarm", side), L._n("lowerarm", side), L._n("hand", side)] + [n for _, n in L._twist_bones(side)]
+    if side not in ARM_HOLD:
+        ARM_HOLD[side] = {n: L.arm.pose.bones[n].rotation_quaternion.copy() for n in names}
+    for n, q in ARM_HOLD[side].items():
+        L.arm.pose.bones[n].rotation_quaternion = q
+    bpy.context.view_layer.update()
 
 
 def elbow_bend(side):
@@ -985,22 +997,58 @@ if job.get("render"):
     report["view_axes"] = {"right": list(PL.VIEW_RIGHT), "forward": list(PL.VIEW_FWD), "up": list(PL.VIEW_UP)}
 
 # --- every hold the clips need, solved once with the parts at rest ----------------------------------------------
-need = set()
-for clip in job["clips"].values():
+# each where the clips first use it: the gun posed as on the first frame the hand arrives (a working hold is taken
+# with the gun pulled in, where the arm reaches it), the other hand on its own hold then, so the solver keeps clear
+# of it
+def mark_of(tg):
+    if tg["space"] != "gun" or tg["point"] is None:
+        return None
+    n = tg["name"]
+    return n if n in facts["marks"] else ("mag_grab" if n in facts["parts"] and "mag_grab" in facts["marks"] else None)
+
+
+need = {}
+for cid_, clip in job["clips"].items():
+    stays = {}
     for fr in clip["frames"]:
         for side, h in fr["hands"].items():
             for k in ("a", "b"):
-                tg = h[k]
-                if tg["space"] != "gun" or tg["point"] is None:
+                mk = mark_of(h[k])
+                if not mk:
                     continue
-                n = tg["name"]
-                mk = n if n in facts["marks"] else ("mag_grab" if n in facts["parts"] and "mag_grab" in facts["marks"] else None)
-                if mk:
-                    need.add((side, mk))
-L.snapshot("load", "hold")
-rest_parts()
-for side, mk in sorted(need):
-    grasp(side, mk)
+                if (side, mk) not in need:
+                    need[(side, mk)] = (fr, None, False)
+                on = k == "b" and h["w"] >= 0.999 or k == "a" and h["w"] <= 0.001
+                if on:
+                    stays.setdefault((side, mk), []).append(fr)
+    for sk, frs in stays.items():
+        if not need[sk][2]:
+            need[sk] = (frs[len(frs) // 2], cid_, True)       # the middle of the first clip's stay on the hold
+for (side, mk), (fr, cid_, _) in sorted(need.items()):
+    key = (side, mk, None, ())
+    if key in GRASPS:
+        continue
+    L.snapshot("load", "hold")
+    rest_parts()
+    if job.get("solve_at_use", True):
+        gun_pose(fr["gun"])
+        tr_ = job["tracks"].get(cid_) if cid_ else None
+        if tr_ and not free_mark(mk):
+            at_t = {round(f["t"], 5): f["bones"] for f in tr_["frames"]}.get(round(fr["t"], 5))
+            if at_t:
+                pose_parts(at_t)                          # the slide back on a press check, as the hand holds it
+        o = "l" if side == "r" else "r"
+        ho = fr["hands"][o]
+        omk = mark_of(ho["b"] if ho["w"] >= 0.5 else ho["a"])
+        if omk and (o, omk, None, ()) in GRASPS:
+            rel, fingers, _ = GRASPS[(o, omk, None, ())]
+            B = RA.matrix_world if free_mark(omk) else bone_world(mark_bone(omk))
+            L._put_hand(o, B @ rel)
+            for n, q in fingers.items():
+                L.arm.pose.bones[n].rotation_quaternion = q
+        bpy.context.view_layer.update()
+    L.snapshot("save", "at_use")
+    grasp(side, mk, start="at_use")
 L.snapshot("load", "hold")
 report["holds"] = {"%s:%s" % (k[0], k[1]): ("found" if v[2] else "laid") for k, v in GRASPS.items()}
 
@@ -1026,16 +1074,27 @@ for cid, clip in job["clips"].items():
             cur = L._bw(hn).copy()
             Ma, fa = target_matrix(side, h["a"], cur)
             Mb, fb = target_matrix(side, h["b"], cur)
-            H = blend(Ma, Mb, h["w"])
-            lift = arc(h["a"], h["b"], h["w"])
+            # between two holds on the gun the hand lets go first (its fingers open where they are), moves open,
+            # and closes on the new hold once there: wrapped fingers never drag through the gun
+            regrip = REGRIP > 0.0 and mark_of(h["a"]) and mark_of(h["b"]) and mark_of(h["a"]) != mark_of(h["b"]) and 0.0 < h["w"] < 1.0
+            wm = min(1.0, max(0.0, (h["w"] - REGRIP) / (1.0 - 2.0 * REGRIP))) if regrip else h["w"]
+            H = blend(Ma, Mb, wm)
+            lift = arc(h["a"], h["b"], wm)
             if lift is not None:
                 H = Matrix.Translation(lift) @ H
+            if job.get("arm_from_hold", True):
+                # each frame's arm starts from the hold's, as the solver's does: the forearm's roll is the hand's
+                # turn from there, not the sum of every frame's change (that wound the forearm the long way round)
+                arm_from_hold(side)
             L._put_hand(side, H)
             if STYLE and job.get("shoulder_reach", True):
                 shoulder_reach(side, H)                   # an arm at full stretch: the shoulder reaches too
             on_gun = h["b"].get("space") == "gun"
             resting = on_gun and (h["w"] >= 1.0 or h["a"] == h["b"])   # a hand waiting off the gun is mended too
-            if side in MEND_SIDES and not resting:
+            mb = mark_of(h["b"])
+            carrying_out = (on_gun and mb and free_mark(mb) and h["b"].get("point") is not None
+                            and (Vector(h["b"]["point"]) - Vector(facts["marks"][mb])).length > 1.5)
+            if side in MEND_SIDES and (not resting or carrying_out):
                 # a hand on its way between holds keeps the last hold's turn while the arm moves: the wrist back
                 # inside its range, turned toward the forearm's line (Pose Lab's mend keeps the hand's back out of
                 # the gun)
@@ -1044,6 +1103,17 @@ for cid, clip in job["clips"].items():
             fw = h["w"]
             if h["a"].get("space") == "gun" and not on_gun:
                 fw = min(1.0, fw / 0.3)                   # a hand letting go opens first, then lifts off
+            if regrip and fa and fb:
+                # the four fingers open and close; the thumb, lying along the gun, goes from one hold's turn to the
+                # next with the hand (opened to rest, it would swing into the frame)
+                op = {k: (fb[k] if k.startswith("thumb") else OPEN[side][k]) for k in fb}
+                st = {k: (fa[k].slerp(fb[k], wm) if k.startswith("thumb") and k in fa else None) for k in fb}
+                if h["w"] < REGRIP:
+                    fa, fb, fw = fa, {k: st[k] or op[k] for k in op}, h["w"] / REGRIP
+                elif h["w"] > 1.0 - REGRIP:
+                    fa, fb, fw = {k: st[k] or op[k] for k in op}, fb, (h["w"] - 1.0 + REGRIP) / REGRIP
+                else:
+                    fa, fb, fw = {k: st[k] or op[k] for k in op}, None, 0.0
             for n in FINGER_BONES[side]:
                 qa = (fa or {}).get(n)
                 qb = (fb or {}).get(n)
