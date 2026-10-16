@@ -30,7 +30,10 @@
     {"from": 0.15, "to": 0.3, "pitch": -33.0, "move": [0.0, -18.0, -12.5], "ease": "inout"},
     {"from": 0.3, "to": 0.45, "pitch": -35.0, "move": [0.0, -18.0, -14.0], "ease": "inout"},
     {"from": 0.45, "to": 0.6, "pitch": -33.0, "move": [0.0, -18.0, -12.5], "ease": "inout"}],
-   "events": [], "expect": [{"at": [0.0, 0.6], "on": {"r": "grip", "l": "support"}}]},
+   "events": [
+    {"hand": "l", "from": 0.0, "to": 0.0, "go": {"place": "swing_fwd_l"}, "why": "running with a pistol, the support hand comes off and swings; the firing hand carries the pistol low"},
+    {"hand": "l", "from": 0.0, "to": 0.3, "go": {"place": "swing_back_l"}, "why": "swung back with the stride"},
+    {"hand": "l", "from": 0.3, "to": 0.6, "go": {"place": "swing_fwd_l"}, "why": "and forward again: the loop starts and ends here"}], "expect": [{"at": [0.0, 0.6], "on": {"r": "grip", "l": "support"}}]},
   "fire": {"seconds": 0.25,
    "gun": [
     {"from": 0.0, "to": 0.025, "pitch": 6.0, "move": [0.0, -1.5, 0.8], "ease": "out"},

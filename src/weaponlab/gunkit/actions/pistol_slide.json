@@ -62,7 +62,7 @@
  },
  "hand_clips": {
   "reload": {"seconds": 2.0,
-   "gun": [{"from": 0.05, "to": 0.3, "roll": 10.0, "pitch": 15.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 10.0, "pitch": 6.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
            {"from": 1.6, "to": 2.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
    "events": [
     {"hand": "l", "from": 0.05, "to": 0.3, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "the support hand off the grip to cup the magazine's base"},
@@ -73,7 +73,7 @@
     {"hand": "l", "from": 1.4, "to": 1.65, "go": {"mark": "support"}, "why": "back round the grip"}],
    "expect": [{"at": 1.38, "seated": "magazine"}, {"at": [1.7, 2.0], "on": {"r": "grip", "l": "support"}}]},
   "reload_empty": {"seconds": 2.2,
-   "gun": [{"from": 0.05, "to": 0.3, "roll": 10.0, "pitch": 15.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 10.0, "pitch": 6.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
            {"from": 1.75, "to": 2.2, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
    "events": [
     {"hand": "l", "from": 0.1, "to": 0.5, "go": {"place": "pouch_l"}, "why": "the support hand to the pouch while the empty one falls"},
@@ -85,7 +85,7 @@
     {"hand": "l", "from": 1.55, "to": 1.85, "go": {"mark": "support"}, "why": "back round the grip"}],
    "expect": [{"at": 1.12, "seated": "magazine"}, {"at": [1.9, 2.2], "on": {"r": "grip", "l": "support"}}]},
   "charge": {"seconds": 1.1,
-   "gun": [{"from": 0.05, "to": 0.3, "roll": -10.0, "pitch": 10.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
+   "gun": [{"from": 0.05, "to": 0.3, "roll": -10.0, "pitch": 5.0, "move": [0.0, -12.0, -4.0], "ease": "inout"},
            {"from": 0.7, "to": 1.1, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
    "events": [
     {"hand": "l", "from": 0.1, "to": 0.38, "go": {"part": "slide", "mark": "slide_rear"}, "grasp": "pinch", "why": "the support hand over the slide, fingers on the rear serrations"},
@@ -100,7 +100,7 @@
     {"hand": "l", "from": 1.25, "to": 1.55, "go": {"mark": "support"}, "why": "back round the grip"}],
    "expect": [{"at": [0.75, 1.1], "visible": "port"}]},
   "check_mag": {"seconds": 2.0,
-   "gun": [{"from": 0.05, "to": 0.3, "roll": 15.0, "pitch": 15.0, "move": [0.0, -12.0, -2.0], "ease": "inout"},
+   "gun": [{"from": 0.05, "to": 0.3, "roll": 15.0, "pitch": 6.0, "move": [0.0, -12.0, -2.0], "ease": "inout"},
            {"from": 1.6, "to": 2.0, "roll": 0.0, "pitch": 0.0, "move": [0.0, 0.0, 0.0], "ease": "inout"}],
    "events": [
     {"hand": "l", "from": 0.05, "to": 0.3, "go": {"part": "magazine", "mark": "mag_grab"}, "grasp": "cup", "why": "under the magazine"},

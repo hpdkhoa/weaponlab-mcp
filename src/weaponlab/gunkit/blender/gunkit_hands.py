@@ -46,6 +46,11 @@ CHAR = job.get("character")
 GLOVE = float(job.get("glove_cm", 0.0))
 PALM_CM = 1.5 + GLOVE
 FACE = {h["contact"]["mark"]: h["contact"]["face"] for h in (STYLE or {}).get("hands", {}).values()}
+TOWARD = {h["contact"]["mark"]: h["contact"].get("fingers_toward") for h in (STYLE or {}).get("hands", {}).values()}
+for _h in (STYLE or {}).get("hands", {}).values():
+    for _m, _x in (_h.get("holds") or {}).items():
+        FACE.setdefault(_m, _x["face"])               # a working hold's face (the slide's top for a rack)
+        TOWARD.setdefault(_m, _x.get("fingers_toward"))
 report["style"] = STYLE["id"] if STYLE else None
 report["character"] = CHAR["id"] if CHAR else None
 report["glove_cm"] = GLOVE
@@ -152,7 +157,12 @@ def palm_frame(side):
     return w.lerp(mid, 0.5), (across.cross((mid - w).normalized()) * k).normalized()
 
 
-def lay_palm(side, at, normal, thickness_cm=None):
+def fingers_way(side):
+    hn = L._n("hand", side)
+    return (L._bw(L._n("finger", side, "middle", "01")).translation - L._bw(hn).translation).normalized()
+
+
+def lay_palm(side, at, normal, thickness_cm=None, toward=None):
     """The palm turned to face into the surface (the least turn) and its middle set a palm's thickness off it."""
     thickness_cm = PALM_CM if thickness_cm is None else thickness_cm
     hn = L._n("hand", side)
@@ -160,6 +170,15 @@ def lay_palm(side, at, normal, thickness_cm=None):
     P, facing = palm_frame(side)
     q = facing.rotation_difference(-normal)
     R = Matrix.Translation(P) @ q.to_matrix().to_4x4() @ Matrix.Translation(-P) @ H
+    if toward is not None:
+        # then turned about the face's normal so the fingers point the hold's way (a palm on a slide's top could
+        # face its fingers anywhere; the forearm wrings past its range if they point back)
+        fw = (R.to_quaternion() @ (H.to_quaternion().inverted() @ fingers_way(side))).normalized()
+        want = (toward - normal * toward.dot(normal)).normalized()
+        have = (fw - normal * fw.dot(normal)).normalized()
+        if want.length > 1e-6 and have.length > 1e-6:
+            q2 = have.rotation_difference(want)
+            R = Matrix.Translation(P) @ q2.to_matrix().to_4x4() @ Matrix.Translation(-P) @ R
     goal = at + normal * (thickness_cm / 100.0)
     R = Matrix.Translation(goal - P) @ R
     short = L._put_hand(side, Matrix.LocRotScale(R.translation, R.to_quaternion(), L._unit()))
@@ -315,9 +334,34 @@ def thumb_clear(side, tree, steps=16):
     return finger_gap(side, "thumb", tree)
 
 
-def pose_digits(side, h, trigger, tree):
+def end_joints_flat(side):
+    """Each finger's end joint turned back into its finger's plane (a wrap or a blend can twist it; Pose Lab's mend
+    straightens the knuckle and the middle joint only)."""
+    for _ in range(2):
+        rep_, _b, planes = L._finger_report(side, _FL)
+        for fi in DIGITS:
+            side_deg = rep_["%s_03" % fi][1]
+            lim = _FL["03"][2]
+            if abs(side_deg) < lim - 3.0:
+                continue
+            n = L._n("finger", side, fi, "03")
+            head = L._bw(n).translation.copy()
+            axis = (L._finger_tip(fi, side) - head).cross(planes[fi])
+            if axis.length < 1e-9:
+                continue
+            axis.normalize()
+            M = L._bw(n)
+            for sg in (1.0, -1.0):
+                L._turn_about(n, axis, -side_deg * 0.8 * sg, head)
+                if abs(L._finger_report(side, _FL)[0]["%s_03" % fi][1]) < abs(side_deg):
+                    break
+                L._set_world(n, M)
+
+
+def pose_digits(side, h, trigger, tree, fingers=None):
+    fingers = fingers or h["fingers"]
     for fi in DIGITS:
-        f = h["fingers"].get(fi)
+        f = fingers.get(fi)
         if trigger and fi == "index" and h.get("trigger"):
             f = h["trigger"]
         if not f or f["pose"] == "rest":
@@ -326,11 +370,71 @@ def pose_digits(side, h, trigger, tree):
             set_finger(side, fi, f["curl"])
         else:
             wrap(side, fi, f["max_curl"], tree)
-    t = h["fingers"].get("thumb")
+    t = fingers.get("thumb")
     if t and t["pose"] == "straight":
         set_thumb(side, t["curl"][1], t["curl"][2])
+    elif t and t["pose"] == "wrap":
+        thumb_wrap(side, t["max_curl"], tree)
     L._mend_hand(side)                                  # the joints back in range and in their fingers' planes
+    end_joints_flat(side)
     thumb_clear(side, tree)
+
+
+def thumb_wrap(side, max_curl, tree):
+    """The thumb's knuckle and end joint closed a step at a time (in their hinges' plane) until its skin is a
+    glove's thickness off the gun, or at its most bend; a step into the gun is taken back."""
+    prev = (6.0, 4.0)
+    set_thumb(side, *prev)
+    for k in range(1, 13):
+        b = (6.0 + (max_curl[1] - 6.0) * k / 12.0, 4.0 + (max_curl[2] - 4.0) * k / 12.0)
+        set_thumb(side, *b)
+        gap = finger_gap(side, "thumb", tree)
+        if gap <= GLOVE + 0.05:
+            if gap < GLOVE - 0.1:
+                set_thumb(side, *prev)
+            return
+        prev = b
+
+
+def apply_hold(side, mark):
+    """A working hold's fingers (the support hand racking the slide, seating a magazine)."""
+    h = (STYLE or {}).get("hands", {}).get(side) or {}
+    x = (h.get("holds") or {}).get(mark)
+    if not x:
+        return False
+    tree = L._tree()
+    pose_digits(side, h, False, tree, fingers=x["fingers"])
+    L._clear_fingers(side)
+    bpy.context.view_layer.update()
+    return True
+
+
+SOFT = {c["segment"]: c["max_cm"] for c in (STYLE or {}).get("soft_contacts", [])}
+
+
+def deepest_press(side, tree):
+    """The hand's deepest press into the gun that the style does not allow, and the way out of it: (excess cm, world
+    direction from the gun's surface out through the body part). A soft contact counts past 80 percent of its own
+    most; the thumb's middle and end are the thumb's own (thumb_clear); the forearm and the palm are left out."""
+    allowed = max(0.0, 0.2 - GLOVE)
+    best = None
+    for name, a, b, r in L._segments(side):
+        if name.startswith(("forearm", "palm", "thumb2", "thumb3")) and not any(name.startswith(k) for k in SOFT):
+            continue
+        lim = next((0.8 * v for k, v in SOFT.items() if name.startswith(k)), allowed)
+        n = max(2, int((b - a).length / 0.003))
+        for i in range(n + 1):
+            pt = a.lerp(b, i / n)
+            q, dq = tree.nearest(pt)
+            if q is None or dq >= r:
+                continue
+            depth = (r - dq) * 100.0
+            excess = depth - lim
+            if excess > 0 and (best is None or excess > best[0]):
+                out = (pt - q) if dq >= 0.0 else (q - pt)
+                if out.length > 1e-9:
+                    best = (excess, out.normalized(), name)
+    return best
 
 
 def apply_style(side, trigger=False, normal=None):
@@ -343,10 +447,22 @@ def apply_style(side, trigger=False, normal=None):
     tree = L._tree()
     allowed = max(0.0, 0.2 - GLOVE)
     hn = L._n("hand", side)
-    for _ in range(4):
-        pose_digits(side, h, trigger, tree)
-        if normal is None or trigger:
-            break
+    pose_digits(side, h, trigger, tree)
+    if normal is not None and not trigger:
+        # each press the style does not allow undone along its own way out, by its excess (at most 0.8 cm), the
+        # fingers closed again after each move
+        # (off: moving the support hand out of a press put the back of its index into the gun; the support fingers
+        # need the firing hand's fingers as something to wrap over, which Pose Lab's tests do not hold yet)
+        for _ in range(int(job.get("press_moves", 0))):
+            pr = deepest_press(side, tree)
+            if pr is None:
+                break
+            hw = L._bw(hn)
+            L._put_hand(side, Matrix.LocRotScale(hw.translation + pr[1] * (min(pr[0] + 0.03, 0.8) / 100.0), hw.to_quaternion(), L._unit()))
+            bpy.context.view_layer.update()
+            pose_digits(side, h, trigger, tree)
+        report.setdefault("presses", {})[side] = None if deepest_press(side, tree) is None else round(deepest_press(side, tree)[0], 2)
+    for _ in range(0):
         # the thumb lies on the gun's far side (a pistol's firing thumb on its left): backing the palm off moves it in,
         # so the thumbs are cleared on their own (thumb_clear)
         depth = L.clearance(parts=side, ignore=["forearm*", "thumb2*", "thumb3*"], top=1)["worst_cm"]
@@ -358,6 +474,35 @@ def apply_style(side, trigger=False, normal=None):
     thumb_clear(side, tree, steps=30)
     L._clear_fingers(side)
     bpy.context.view_layer.update()
+
+
+def arm_over(side):
+    """How far the arm is past its limits now: the wrist's bend and side bends and the forearm's roll, degrees over."""
+    Lm = L._limits()[0]
+    rep_, bad = L._arm_report(side, Lm)
+    over = max(0.0, rep_.get("wrist_bend_deg", 0.0) - Lm["wrist_max_deg"])
+    over += max(0.0, rep_.get("wrist_radial_deg", 0.0) - Lm["wrist_radial_deg"]) + max(0.0, -rep_.get("wrist_radial_deg", 0.0) - Lm["wrist_ulnar_deg"])
+    return over + 10.0 * len(bad)
+
+
+def turn_search(side, at, n, toward):
+    """The palm laid on the face at seven turns about its normal, 30 degrees apart round the style's finger direction
+    (or the least turn): the one that leaves the arm least past its limits, then the closest to the hand's reach."""
+    base = toward
+    if base is None:
+        base = fingers_way(side)
+    base = (base - n * base.dot(n)).normalized()
+    L.snapshot("save", "turn_search")
+    best = None
+    for k in (0, -1, 1, -2, 2, -3, 3):
+        L.snapshot("load", "turn_search")
+        way = Quaternion(n, math.radians(30.0 * k)) @ base
+        short = lay_palm(side, at, n, toward=way)
+        score = arm_over(side) + 4.0 * short
+        if best is None or score < best[0] - 1e-6:
+            best = (score, way, short)
+    L.snapshot("load", "turn_search")
+    return lay_palm(side, at, n, toward=best[1])
 
 
 def grasp(side, mark, part=None, offset=None, start=None):
@@ -377,7 +522,9 @@ def grasp(side, mark, part=None, offset=None, start=None):
         L.snapshot("load", start)                 # the hands as the placement search left them, already settled
     else:
         n = surface_normal(at, mark)
-        short = lay_palm(side, at, n)
+        tw = TOWARD.get(mark)
+        tw = (RA.matrix_world.to_quaternion() @ g(tw)).normalized() if tw else None
+        short = turn_search(side, at, n, tw) if STYLE else lay_palm(side, at, n, toward=tw)
         while short > 0.3 and mark == "support" and slid < 14.0:      # beyond the arm's reach: slide back along the bore
             slid += 2.0
             L.snapshot("load", "before_grasp")
@@ -397,8 +544,10 @@ def grasp(side, mark, part=None, offset=None, start=None):
         report["notes"].append("no hold passed for the %s hand on %s: the palm laid on the surface%s"
                                % (side, mark, (", slid back %.0f cm" % slid) if slid else ""))
     if STYLE and (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark:
-        apply_style(side)                              # the style's fingers on its own contact (no back-off: the
-                                                       # thumb's ball on the grip read as depth and pushed the palm off)
+        apply_style(side, normal=surface_normal(at, mark))   # the style's fingers on its own contact; the thumb's
+                                                       # base backed out of the grip (at most 0.6 cm)
+    elif STYLE:
+        apply_hold(side, mark)                         # a working hold the style names
     H = L._bw(hn).copy()
     rel = bone_world(mark_bone(mark, part)).inverted() @ H
     fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
@@ -484,6 +633,7 @@ for side, gr in (("r", home_r), ("l", home_l)):
         for n, q in gr[1].items():
             L.arm.pose.bones[n].rotation_quaternion = q
 bpy.context.view_layer.update()
+MEND_SIDES = tuple(job.get("mend_sides", ("l",)))
 TRIGGER = {}
 if STYLE and STYLE.get("trigger_clips") and (STYLE["hands"].get("r") or {}).get("trigger"):
     L.snapshot("save", "before_trigger")
@@ -554,6 +704,35 @@ def target_matrix(side, tgt, current):
     return Matrix.Translation(d) @ H, fingers
 
 
+ARC_CM = float(job.get("arc_cm", 5.5))
+
+
+def _face_world(tgt):
+    """The gun surface's facing at a gun-space target's mark (the style's face, else the facts' normal), in the world."""
+    if tgt.get("space") != "gun" or tgt.get("point") is None:
+        return None
+    name = tgt.get("name")
+    mark = name if name in facts["marks"] else ("mag_grab" if name in facts["parts"] and "mag_grab" in facts["marks"] else None)
+    n = FACE.get(mark) or (facts.get("normals") or {}).get(mark)
+    if not n:
+        return None
+    return (RA.matrix_world.to_quaternion() @ g(n)).normalized()
+
+
+def arc(a, b, w):
+    """A hand going from one hold on the gun to another goes round the gun, not through it: lifted off along both
+    surfaces' facing, most at the middle of the way."""
+    if not (0.0 < w < 1.0) or a == b:
+        return None
+    na, nb = _face_world(a), _face_world(b)
+    if na is None or nb is None or (a.get("name") == b.get("name")):
+        return None
+    d = na + nb
+    if d.length < 1e-6:
+        d = na
+    return d.normalized() * (ARC_CM / 100.0) * math.sin(math.pi * w)
+
+
 def blend(Ma, Mb, w):
     loc = Ma.translation.lerp(Mb.translation, w)
     rot = Ma.to_quaternion().slerp(Mb.to_quaternion(), w)
@@ -617,7 +796,17 @@ for cid, clip in job["clips"].items():
             Ma, fa = target_matrix(side, h["a"], cur)
             Mb, fb = target_matrix(side, h["b"], cur)
             H = blend(Ma, Mb, h["w"])
+            lift = arc(h["a"], h["b"], h["w"])
+            if lift is not None:
+                H = Matrix.Translation(lift) @ H
             L._put_hand(side, H)
+            resting = h["w"] >= 1.0 and h["b"].get("space") == "gun" or (h["a"] == h["b"])
+            if side in MEND_SIDES and not resting:
+                # a hand on its way between holds keeps the last hold's turn while the arm moves: the wrist back
+                # inside its range, turned toward the forearm's line (Pose Lab's mend keeps the hand's back out of
+                # the gun)
+                L._mend_hand(side, fingers=True)
+                end_joints_flat(side)
             for n in FINGER_BONES[side]:
                 qa = (fa or {}).get(n)
                 qb = (fb or {}).get(n)
@@ -657,9 +846,39 @@ for cid, clip in job["clips"].items():
     L.record_clip("stop")
     saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root")
     try:
-        cs = L.check_set(name, ignore=["palm*"], sides="both", clearance_max_cm=max(0.0, 0.2 - GLOVE))
+        soft = [c["segment"] + "*" for c in (STYLE or {}).get("soft_contacts", [])]
+        cs = L.check_set(name, ignore=["palm*"] + soft, sides="both", clearance_max_cm=max(0.0, 0.2 - GLOVE))
     except Exception as e:
         cs = {"error": str(e)[:300]}
+    if (STYLE or {}).get("soft_contacts"):
+        # the style's soft contacts, every 0.1 s: each one's deepest press against its own most
+        worst = {c["segment"]: 0.0 for c in STYLE["soft_contacts"]}
+        k = 0.0
+        while k <= clip["seconds"] + 1e-6:
+            L.pose_clip(name, k)
+            for c in L.clearance(parts="both", top=40)["contacts"]:
+                for sc in STYLE["soft_contacts"]:
+                    if c["segment"].startswith(sc["segment"]):
+                        worst[sc["segment"]] = max(worst[sc["segment"]], c["depth_cm"])
+            k += 0.1
+        if isinstance(cs, dict):
+            cs["soft_contacts"] = {sc["segment"]: {"worst_cm": round(worst[sc["segment"]], 2), "max_cm": sc["max_cm"],
+                                                   "ok": worst[sc["segment"]] <= sc["max_cm"]} for sc in STYLE["soft_contacts"]}
+    if cid in job.get("diagnose", []):
+        # which rule breaks when, every 0.1 s: the clip posed, each hand's anatomy and grip rules and the deepest
+        # contact, with what each hand is doing then (its targets)
+        rows = []
+        k = 0.0
+        while k <= clip["seconds"] + 1e-6:
+            L.pose_clip(name, k)
+            fr = min(clip["frames"], key=lambda f: abs(f["t"] - k))
+            an, gr = L.anatomy("both"), L.grip("both", hold=False)
+            cl = L.clearance(parts="both", ignore=["palm*"], top=2)
+            rows.append({"t": round(k, 2), "l_doing": [fr["hands"]["l"]["a"].get("name"), fr["hands"]["l"]["b"].get("name"), round(fr["hands"]["l"]["w"], 2)],
+                         "anatomy": {sd: an.get(sd, {}).get("bad", []) for sd in ("l", "r")},
+                         "grip": {sd: gr.get(sd, {}).get("bad", []) for sd in ("l", "r")}, "clearance": cl["contacts"]})
+            k += 0.1
+        report.setdefault("diagnose", {})[cid] = rows
     expects = []
     for x in clip.get("expect", []):
         if "visible" in x:

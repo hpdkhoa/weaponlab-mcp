@@ -108,6 +108,33 @@
           "minLength": 8
         }
       }
+    },
+    "soft_contacts": {
+      "type": "array",
+      "description": "body parts the style lets press into the gun up to a depth, each with its reason (the web of the hand round a pistol's tang); the hand step reports them apart from the clearance",
+      "items": {
+        "type": "object",
+        "required": [
+          "segment",
+          "max_cm",
+          "why"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "segment": {
+            "type": "string"
+          },
+          "max_cm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5
+          },
+          "why": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      }
     }
   },
   "additionalProperties": false,
@@ -193,6 +220,10 @@
             "why": {
               "type": "string",
               "minLength": 8
+            },
+            "fingers_toward": {
+              "$ref": "#/$defs/vec3",
+              "description": "the way the fingers point from the palm (gun space)"
             }
           }
         },
@@ -220,6 +251,53 @@
         "trigger": {
           "$ref": "#/$defs/finger",
           "description": "the trigger finger in the trigger clips"
+        },
+        "holds": {
+          "type": "object",
+          "description": "the hand's working holds, by mark (the slide's rear for a rack, a magazine's base for a reload): the face its palm meets and how its fingers close",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "face",
+              "fingers",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "face": {
+                "$ref": "#/$defs/vec3"
+              },
+              "fingers": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "index": {
+                    "$ref": "#/$defs/finger"
+                  },
+                  "middle": {
+                    "$ref": "#/$defs/finger"
+                  },
+                  "ring": {
+                    "$ref": "#/$defs/finger"
+                  },
+                  "pinky": {
+                    "$ref": "#/$defs/finger"
+                  },
+                  "thumb": {
+                    "$ref": "#/$defs/finger"
+                  }
+                }
+              },
+              "why": {
+                "type": "string",
+                "minLength": 8
+              },
+              "fingers_toward": {
+                "$ref": "#/$defs/vec3",
+                "description": "the way the fingers point from the palm (gun space), so the hand is not turned at random about the face"
+              }
+            }
+          }
         }
       },
       "additionalProperties": false

@@ -43,6 +43,8 @@ HAND_CLIPS = ("idle", "walk", "run", "fire", "reload", "reload_empty", "check_ma
 # places on the body, in view space (cm from the eye: +Y ahead, +Z up, +X left), for a right-handed shooter
 PLACES = {
     "pouch_l": [9.0, -2.0, -52.0],      # a magazine pouch on the belt, front left
+    "swing_fwd_l": [16.0, 22.0, -46.0], # the free left hand swung forward while running
+    "swing_back_l": [18.0, -6.0, -58.0],  # and back
     "chest_l": [7.0, 8.0, -32.0],       # a chest rig pouch, left of centre
     "dump": [14.0, -6.0, -60.0],        # a dump pouch on the left hip
     "drop": [4.0, 20.0, -140.0],        # the ground below the gun: a magazine let fall
