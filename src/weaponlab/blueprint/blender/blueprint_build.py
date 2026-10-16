@@ -108,6 +108,112 @@ def lathe(name, profile, ax, az, bore_r=None):
     return ob
 
 
+def prism_along(name, outline, axis, lo, hi):
+    """An outline run along y (a front section, its points (x, z)) or along z (a top outline, its points (y, x))."""
+    pts = ccw([p for i, p in enumerate(outline) if i == 0 or p != outline[i - 1]])
+    if axis == "y":
+        put = lambda a, b, t: g(a, t, b)        # noqa: E731
+    else:
+        put = lambda a, b, t: g(b, a, t)        # noqa: E731
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    a = [bm.verts.new(put(u, v, lo)) for u, v in pts]
+    b = [bm.verts.new(put(u, v, hi)) for u, v in pts]
+    n = len(pts)
+    bm.faces.new(list(reversed(a)))
+    bm.faces.new(b)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new([a[i], a[j], b[j], b[i]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+def join(obs, name):
+    """Several cutters as one object (their union, for an intersect)."""
+    for o in bpy.context.scene.objects:
+        o.select_set(False)
+    for o in obs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = obs[0]
+    if len(obs) > 1:
+        bpy.ops.object.join()
+    ob = bpy.context.view_layer.objects.active
+    ob.name = name
+    return ob
+
+
+def bounds_cm(ob):
+    vs = [v.co for v in ob.data.vertices]
+    return {"x": (min(v.x for v in vs) * 100, max(v.x for v in vs) * 100), "y": (min(-v.y for v in vs) * 100, max(-v.y for v in vs) * 100),
+            "z": (min(v.z for v in vs) * 100, max(v.z for v in vs) * 100)}
+
+
+def feature(ob, pid, k, ft, textures):
+    """A surface feature: grooves cut, a screw head added, a texture noted for the finish."""
+    b = bounds_cm(ob)
+    if ft["kind"] == "texture":
+        textures.append({"part": pid, "pattern": ft["pattern"], "face": ft["face"], "pitch_cm": ft.get("pitch_cm"), "text": ft.get("text")})
+        return
+    faces = ["left", "right"] if ft["face"] == "both" else [ft["face"]]
+    for face in faces:
+        if ft["kind"] == "grooves":
+            y0, y1 = ft.get("y") or b["y"]
+            z0, z1 = ft.get("z") or b["z"]
+            n, w, d = ft["count"], ft["width_cm"], ft["depth_cm"]
+            pitch = (y1 - y0) / n
+            slant = math.tan(math.radians(ft.get("slant_deg", 0.0)))
+            zm = (z0 + z1) / 2.0
+            for i in range(n):
+                yc = y0 + pitch * (i + 0.5)
+                if face in ("left", "right"):
+                    out = [[yc - w / 2 + slant * (z0 - zm), z0], [yc + w / 2 + slant * (z0 - zm), z0], [yc + w / 2 + slant * (z1 - zm), z1], [yc - w / 2 + slant * (z1 - zm), z1]]
+                    xa, xb = (b["x"][1] - d, b["x"][1] + 1.0) if face == "left" else (b["x"][0] - 1.0, b["x"][0] + d)
+                    cut = prism("%s_f%d_%d" % (pid, k, i), out, xa, xb)
+                else:                                   # top: across x, cut down from the top
+                    xs = ft.get("x") or b["x"]
+                    out = [[yc - w / 2, b["z"][1] - d], [yc + w / 2, b["z"][1] - d], [yc + w / 2, b["z"][1] + 1.0], [yc - w / 2, b["z"][1] + 1.0]]
+                    cut = prism("%s_f%d_%d" % (pid, k, i), out, xs[0], xs[1])
+                boolean(ob, cut)
+        elif ft["kind"] == "screw":
+            (y, z), r, h = ft["at"], ft["r"], ft["head_cm"]
+            circ = [[y + r * math.cos(2 * math.pi * t / SEG), z + r * math.sin(2 * math.pi * t / SEG)] for t in range(SEG)]
+            xa, xb = (b["x"][1] - 0.05, b["x"][1] + h) if face == "left" else (b["x"][0] - h, b["x"][0] + 0.05)
+            head = prism("%s_screw%d" % (pid, k), circ, xa, xb)
+            if ft.get("slot", True):
+                sx = (xb - 0.6 * h, xb + 1.0) if face == "left" else (xa - 1.0, xa + 0.6 * h)
+                boolean(head, prism("%s_slot%d" % (pid, k), [[y - r, z - r * 0.12], [y + r, z - r * 0.12], [y + r, z + r * 0.12], [y - r, z + r * 0.12]], sx[0], sx[1]))
+            union(ob, head)
+
+
+def union(ob, other):
+    mod = ob.modifiers.new("add", 'BOOLEAN')
+    mod.operation = 'UNION'
+    mod.solver = 'EXACT'
+    mod.object = other
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.data.objects.remove(other)
+
+
+def intersect(ob, other):
+    before = len(ob.data.vertices)
+    mod = ob.modifiers.new("keep", 'BOOLEAN')
+    mod.operation = 'INTERSECT'
+    mod.solver = 'EXACT'
+    mod.object = other
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    print("BLUEPRINT STEP shape %s with %s: %d to %d vertices" % (ob.name, other.name, before, len(ob.data.vertices)))
+    bpy.data.objects.remove(other)
+    if not ob.data.vertices:
+        raise SystemExit("BLUEPRINT BUILD FAILED: %s and its other view share nothing (check the view's outline and its place)" % ob.name)
+
+
 def boolean(ob, cutter):
     before = len(ob.data.vertices)
     mod = ob.modifiers.new("cut", 'BOOLEAN')
@@ -123,12 +229,18 @@ def boolean(ob, cutter):
         raise SystemExit("BLUEPRINT BUILD FAILED: cutting %s with %s left nothing (a cut that covers the part, or a broken outline)" % what)
 
 
-report = {"parts": {}}
+report = {"parts": {}, "textures": []}
 for pid, p in bp["parts"].items():
     sh = p["shape"]
-    if sh["kind"] == "extrude":
+    if sh["kind"] in ("extrude", "views"):
         x0, x1 = sh["x"]
-        ob = prism(pid, sh["outline"], x0, x1)
+        ob = prism(pid, sh["outline"] if sh["kind"] == "extrude" else sh["side"], x0, x1)
+        if sh["kind"] == "views":
+            zs = [q[1] for q in sh["side"]]
+            if sh.get("front"):
+                intersect(ob, join([prism_along("%s_front%d" % (pid, k), f["outline"], "y", f["y"][0], f["y"][1]) for k, f in enumerate(sh["front"])], pid + "_front"))
+            if sh.get("top"):
+                intersect(ob, prism_along(pid + "_top", sh["top"], "z", min(zs) - 1.0, max(zs) + 1.0))
         print("BLUEPRINT STEP %s: %d vertices, %d faces" % (pid, len(ob.data.vertices), len(ob.data.polygons)))
         for k, h in enumerate(p.get("holes", [])):
             hx = h.get("x") or [x0 - 1.0, x1 + 1.0]
@@ -142,6 +254,8 @@ for pid, p in bp["parts"].items():
             boolean(ob, cut)
     else:
         ob = lathe(pid, sh["profile"], sh["axis"][0], sh["axis"][1], sh.get("bore_r"))
+    for k, ft in enumerate(p.get("features", [])):
+        feature(ob, pid, k, ft, report["textures"])
     if p.get("bevel_cm"):
         mod = ob.modifiers.new("bevel", 'BEVEL')
         mod.width = p["bevel_cm"] / 100.0
@@ -149,7 +263,10 @@ for pid, p in bp["parts"].items():
         mod.limit_method = 'ANGLE'
         bpy.context.view_layer.objects.active = ob
         bpy.ops.object.modifier_apply(modifier=mod.name)
+    ob.data.materials.clear()                     # the cuts bring their cutters' empty slots: one finish a part
     ob.data.materials.append(material(p["finish"]))
+    for poly in ob.data.polygons:
+        poly.material_index = 0
     ob["role"] = p["role"]
     ob["finish"] = p["finish"]
     ob.data.validate()

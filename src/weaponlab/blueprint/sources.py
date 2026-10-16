@@ -185,3 +185,15 @@ def sheet(gun, source_id, pages, dpi=40, cols=6):
     out = store.folder(gun, "pages") / ("%s_sheet_%d-%d.png" % (source_id, pages[0], pages[-1]))
     cv2.imwrite(str(out), np.ascontiguousarray(np.vstack(rows)[:, :, ::-1]))   # RGB to the BGR cv2 writes
     return str(out)
+
+
+def parts_list(gun, entries, replace=False):
+    """The gun's parts as its sources name them: [{"name", "number"?, "page", "figure"?, "visible", "why"?,
+    "source"}]. Added to the list (an entry with the same name and number is replaced), or replacing it."""
+    doc = store.load(gun, "sources")
+    have = [] if replace else doc.get("parts_list", [])
+    key = lambda e: (e["name"], e.get("number"))   # noqa: E731
+    new = {key(e) for e in entries}
+    doc["parts_list"] = [e for e in have if key(e) not in new] + list(entries)
+    store.save(gun, "sources", doc)
+    return {"listed": len(doc["parts_list"]), "visible": sum(1 for e in doc["parts_list"] if e["visible"])}

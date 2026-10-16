@@ -160,13 +160,13 @@ def save(gun, name, result):
     return str(p)
 
 
-def ticks(gun, fig_id, region, min_share=0.5, threshold=None):
+def ticks(gun, fig_id, region, min_share=0.5, threshold=None, invert=False):
     """The tick marks of a printed scale bar in region [x0, y0, x1, y1] px (ticks square to a level bar): the
     centre column of each run of columns whose ink fills at least min_share of the region's height. For a bar
     that stands upright, give a region that is taller than wide: rows are read instead."""
     cv2, np = _cv()
     f = Fg.figure(gun, fig_id)
-    m = ink(gun, f, threshold) > 0
+    m = ink(gun, f, threshold, invert) > 0           # invert: light marks on a dark ground (serrations in a photo)
     x0, y0, x1, y1 = [int(v) for v in region]
     sub = m[y0:y1, x0:x1]
     upright = (y1 - y0) > (x1 - x0)
@@ -213,3 +213,56 @@ def span(gun, fig_id, a, b, threshold=None, gap_px=0):
         step = float(np.hypot(b[0] - a[0], b[1] - a[1])) / max(1, n - 1)
         out["cm"] = round((last - first) * step * f["scale"]["cm_per_px"], 4)
     return out
+
+
+def peaks(gun, fig_id, region, light=True, min_gap_px=3, k=0.5):
+    """Evenly spaced marks too faint or dotted for ink runs (serrations in a halftone photo): the columns of region
+    [x0, y0, x1, y1] px whose mean brightness (light marks) or darkness peaks above the profile's mean plus k times
+    its spread, at least min_gap_px apart. Gives their columns, their mean pitch in px and in cm."""
+    cv2, np = _cv()
+    f = Fg.figure(gun, fig_id)
+    g = Fg.image(gun, f, gray=True).astype(float)
+    x0, y0, x1, y1 = [int(v) for v in region]
+    prof = g[y0:y1, x0:x1].mean(axis=0)
+    if not light:
+        prof = 255.0 - prof
+    prof = np.convolve(prof, np.ones(3) / 3.0, mode="same")
+    cut = prof.mean() + k * prof.std()
+    at = []
+    for i in range(1, len(prof) - 1):
+        if prof[i] >= cut and prof[i] >= prof[i - 1] and prof[i] >= prof[i + 1]:
+            if at and i - at[-1] < min_gap_px:
+                if prof[i] > prof[at[-1]]:
+                    at[-1] = i
+                continue
+            at.append(i)
+    cols = [x0 + i for i in at]
+    gaps = [b - a for a, b in zip(cols, cols[1:])]
+    out = {"figure": fig_id, "columns_px": cols, "count": len(cols), "gaps_px": gaps,
+           "pitch_px": round(float(np.median(gaps)), 2) if gaps else None}
+    if gaps and "scale" in f:
+        out["pitch_cm"] = round(out["pitch_px"] * f["scale"]["cm_per_px"], 4)
+        out["span_cm"] = round((cols[-1] - cols[0]) * f["scale"]["cm_per_px"], 3)
+    return out
+
+
+def blob(gun, fig_id, box, seed, light=True, blur_px=5, eps_px=1.0, name=None):
+    """A light (or dark) patch round a seed in a halftone picture, where single dots break a region's lines: the
+    box [x0, y0, x1, y1] px blurred, cut at its own Otsu threshold, and the connected patch holding the seed."""
+    cv2, np = _cv()
+    f = Fg.figure(gun, fig_id)
+    g = Fg.image(gun, f, gray=True)
+    x0, y0, x1, y1 = [int(v) for v in box]
+    sub = cv2.GaussianBlur(g[y0:y1, x0:x1], (2 * blur_px + 1, 2 * blur_px + 1), 0)
+    _, m = cv2.threshold(sub, 0, 255, (cv2.THRESH_BINARY if light else cv2.THRESH_BINARY_INV) + cv2.THRESH_OTSU)
+    n, lab = cv2.connectedComponents(m)
+    sx, sy = int(seed[0]) - x0, int(seed[1]) - y0
+    if not lab[sy, sx]:
+        raise ValueError("the seed (%d, %d) is not on a %s patch" % (seed[0], seed[1], "light" if light else "dark"))
+    patch = (lab == lab[sy, sx]).astype(np.uint8) * 255
+    if patch[0, :].any() or patch[-1, :].any() or patch[:, 0].any() or patch[:, -1].any():
+        raise ValueError("the patch runs to the box's edge: give a larger box")
+    full = np.zeros_like(g)
+    full[y0:y1, x0:x1] = patch
+    poly, a = _outline(full, eps_px)
+    return _result(gun, f, poly, a, "blob", name)

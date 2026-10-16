@@ -141,3 +141,30 @@ def test_polygon_helpers():
     assert miss < 0.05
     fit, turned = P.fit_along(tilted, [[0, -5], [2, 0]], 0.3, -6.0)
     assert min(p[1] for p in fit) == pytest.approx(-6.0)
+
+
+def test_views_features_and_the_parts_list(gun):
+    test_plan_check_and_parts_map(gun)
+    P.views(G, "slide", front=[{"y": [-20.0, 20.0], "outline": P.rounded(-1.2, 1.2, -3.0, 3.0, 0.4)}],
+            front_source={"guess": "a rounded slide top, 0.4 cm corners"})
+    P.feature(G, "slide", {"kind": "grooves", "face": "both", "count": 10, "width_cm": 0.08, "depth_cm": 0.05,
+                           "source": {"guess": "ten rear serrations"}})
+    P.feature(G, "frame", {"kind": "texture", "pattern": "checkering", "face": "both", "source": {"guess": "a checkered grip"}})
+    with pytest.raises(ValueError):
+        P.feature(G, "frame", {"kind": "texture", "pattern": "checkering", "face": "both"})
+    doc = P.store.load(G, "sources")
+    doc["parts_list"] = [{"name": "Slide", "number": "S1", "visible": True, "source": "tm-test", "page": 2},
+                         {"name": "Spring", "number": "S2", "visible": False, "why": "inside", "source": "tm-test", "page": 2},
+                         {"name": "Slide stop", "visible": True, "source": "tm-test", "page": 1}]
+    P.store.save(G, "sources", doc)
+    r = K.run(G, reference="outline")
+    assert r["contract"] == []
+    assert [m["name"] for m in r["detail"]["missing"]] == ["Slide", "Slide stop"]
+    assert r["detail"]["features"] == {"grooves": 1, "texture": 1} and "slide" in r["detail"]["shapes"]["shaped"]
+    P.numbers(G, "slide", ["S1"])
+    bp = P.store.load(G, "blueprint")
+    bp["parts"]["frame"]["name"] = "Slide stop"
+    P.store.save(G, "blueprint", bp, strict=False)
+    r = K.run(G, reference="outline")
+    assert r["detail"]["missing"] == [] and r["detail"]["ok"]
+    assert C.check_blueprint(P.store.load(G, "blueprint"), sources=P.store.load(G, "sources")) == []

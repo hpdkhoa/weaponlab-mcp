@@ -4,107 +4,634 @@
   "title": "weaponlab-blueprint/1",
   "description": "A gun's visual copy as data: each part's shape, holes, role in the action, motion and finish, with the source of every number. Gun space: cm, +Y to the muzzle, +Z up, +X the gun's left, origin the bolt face. A side outline is in (y, z); its width runs across x. A lathe profile is (y, r) round a line parallel to the bore.",
   "type": "object",
-  "required": ["contract", "name", "action", "sources", "parts", "marks"],
+  "required": [
+    "contract",
+    "name",
+    "action",
+    "sources",
+    "parts",
+    "marks"
+  ],
   "properties": {
-    "contract": {"const": "weaponlab-blueprint/1"},
-    "name": {"type": "string", "pattern": "^[A-Za-z0-9_]+$"},
-    "title": {"type": "string"},
-    "action": {"type": "string", "description": "the action family's id (gunkit/actions)"},
-    "sources": {"type": "string", "description": "the gun's weaponlab-sources/1 file"},
-    "parts": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/part"}},
-    "marks": {"type": "object", "additionalProperties": {"$ref": "#/$defs/mark"}},
-    "mark_parts": {"type": "object", "additionalProperties": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}, "minItems": 1}]}, "description": "mark -> the part id it rides, or the chain of part ids from the nearest outward"},
-    "magazine_lips": {"$ref": "#/$defs/mark"},
-    "checks": {"type": "object", "description": "the check step's last results (written by check)"}
+    "contract": {
+      "const": "weaponlab-blueprint/1"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_]+$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "description": "the action family's id (gunkit/actions)"
+    },
+    "sources": {
+      "type": "string",
+      "description": "the gun's weaponlab-sources/1 file"
+    },
+    "parts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/part"
+      }
+    },
+    "marks": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/mark"
+      }
+    },
+    "mark_parts": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        ]
+      },
+      "description": "mark -> the part id it rides, or the chain of part ids from the nearest outward"
+    },
+    "magazine_lips": {
+      "$ref": "#/$defs/mark"
+    },
+    "checks": {
+      "type": "object",
+      "description": "the check step's last results (written by check)"
+    }
   },
   "additionalProperties": false,
   "$defs": {
-    "vec2": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
-    "vec3": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "vec2": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "vec3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
     "ref": {
       "description": "where a number comes from: a figure it was traced or read on, a fact, a reason it is a guess, or how it was worked out from others",
       "type": "object",
       "oneOf": [
-        {"required": ["figure"], "properties": {"figure": {"type": "string"}, "method": {"enum": ["traced", "snapped", "read"]}, "note": {"type": "string"}}, "additionalProperties": false},
-        {"required": ["fact"], "properties": {"fact": {"type": "string"}, "note": {"type": "string"}}, "additionalProperties": false},
-        {"required": ["guess"], "properties": {"guess": {"type": "string", "minLength": 8}}, "additionalProperties": false},
-        {"required": ["derived"], "properties": {"derived": {"type": "string", "minLength": 8}}, "additionalProperties": false}
+        {
+          "required": [
+            "figure"
+          ],
+          "properties": {
+            "figure": {
+              "type": "string"
+            },
+            "method": {
+              "enum": [
+                "traced",
+                "snapped",
+                "read"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": [
+            "fact"
+          ],
+          "properties": {
+            "fact": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": [
+            "guess"
+          ],
+          "properties": {
+            "guess": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": [
+            "derived"
+          ],
+          "properties": {
+            "derived": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          "additionalProperties": false
+        }
       ]
     },
-    "outline": {"type": "array", "items": {"$ref": "#/$defs/vec2"}, "minItems": 3},
+    "outline": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/vec2"
+      },
+      "minItems": 3
+    },
     "shape": {
       "type": "object",
       "oneOf": [
         {
           "properties": {
-            "kind": {"const": "extrude"},
-            "outline": {"$ref": "#/$defs/outline"},
-            "x": {"$ref": "#/$defs/vec2", "description": "from the gun's right to its left: x0 < x1"}
+            "kind": {
+              "const": "extrude"
+            },
+            "outline": {
+              "$ref": "#/$defs/outline"
+            },
+            "x": {
+              "$ref": "#/$defs/vec2",
+              "description": "from the gun's right to its left: x0 < x1"
+            }
           },
-          "required": ["kind", "outline", "x"], "additionalProperties": false
+          "required": [
+            "kind",
+            "outline",
+            "x"
+          ],
+          "additionalProperties": false
         },
         {
           "properties": {
-            "kind": {"const": "lathe"},
-            "profile": {"type": "array", "items": {"$ref": "#/$defs/vec2"}, "minItems": 2, "description": "(y, r) along the axis, r >= 0"},
-            "axis": {"$ref": "#/$defs/vec2", "description": "(x, z) of the line the profile turns round"},
-            "bore_r": {"type": "number", "minimum": 0, "description": "a hole along the axis (a barrel's bore)"}
+            "kind": {
+              "const": "lathe"
+            },
+            "profile": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/vec2"
+              },
+              "minItems": 2,
+              "description": "(y, r) along the axis, r >= 0"
+            },
+            "axis": {
+              "$ref": "#/$defs/vec2",
+              "description": "(x, z) of the line the profile turns round"
+            },
+            "bore_r": {
+              "type": "number",
+              "minimum": 0,
+              "description": "a hole along the axis (a barrel's bore)"
+            }
           },
-          "required": ["kind", "profile", "axis"], "additionalProperties": false
+          "required": [
+            "kind",
+            "profile",
+            "axis"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "views"
+            },
+            "side": {
+              "$ref": "#/$defs/outline",
+              "description": "the side outline (y, z)"
+            },
+            "x": {
+              "$ref": "#/$defs/vec2",
+              "description": "the part's full width, x0 < x1 (the gun's right to its left)"
+            },
+            "front": {
+              "type": "array",
+              "minItems": 1,
+              "description": "front sections, each over a run of y: the shape across the part (x, z)",
+              "items": {
+                "type": "object",
+                "required": [
+                  "y",
+                  "outline"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "y": {
+                    "$ref": "#/$defs/vec2"
+                  },
+                  "outline": {
+                    "$ref": "#/$defs/outline"
+                  }
+                }
+              }
+            },
+            "top": {
+              "$ref": "#/$defs/outline",
+              "description": "the top outline (y, x): its width along its length"
+            }
+          },
+          "required": [
+            "kind",
+            "side",
+            "x"
+          ],
+          "additionalProperties": false,
+          "description": "the shape the side outline, the front sections and the top outline share (three views intersected)"
         }
       ]
     },
     "hole": {
       "type": "object",
       "oneOf": [
-        {"properties": {"kind": {"const": "circle"}, "at": {"$ref": "#/$defs/vec2"}, "r": {"type": "number", "exclusiveMinimum": 0}, "x": {"$ref": "#/$defs/vec2"}, "source": {"$ref": "#/$defs/ref"}},
-         "required": ["kind", "at", "r", "source"], "additionalProperties": false},
-        {"properties": {"kind": {"const": "polygon"}, "outline": {"$ref": "#/$defs/outline"}, "x": {"$ref": "#/$defs/vec2"}, "source": {"$ref": "#/$defs/ref"}},
-         "required": ["kind", "outline", "source"], "additionalProperties": false},
-        {"properties": {"kind": {"const": "bore"}, "at": {"$ref": "#/$defs/vec2", "description": "(x, z) of its axis"}, "r": {"type": "number", "exclusiveMinimum": 0}, "y": {"$ref": "#/$defs/vec2"}, "source": {"$ref": "#/$defs/ref"}},
-         "required": ["kind", "at", "r", "y", "source"], "additionalProperties": false}
+        {
+          "properties": {
+            "kind": {
+              "const": "circle"
+            },
+            "at": {
+              "$ref": "#/$defs/vec2"
+            },
+            "r": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "x": {
+              "$ref": "#/$defs/vec2"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "at",
+            "r",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "polygon"
+            },
+            "outline": {
+              "$ref": "#/$defs/outline"
+            },
+            "x": {
+              "$ref": "#/$defs/vec2"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "outline",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "bore"
+            },
+            "at": {
+              "$ref": "#/$defs/vec2",
+              "description": "(x, z) of its axis"
+            },
+            "r": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "y": {
+              "$ref": "#/$defs/vec2"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "at",
+            "r",
+            "y",
+            "source"
+          ],
+          "additionalProperties": false
+        }
       ],
       "description": "a circle or polygon cut across x (all the way through unless x limits it), in the side view's (y, z); or a bore, a round cut along y from y[0] to y[1]"
     },
     "motion": {
       "type": "object",
       "oneOf": [
-        {"properties": {"kind": {"const": "slide"}, "axis": {"$ref": "#/$defs/vec3"}, "travel_cm": {"type": "number", "exclusiveMinimum": 0}},
-         "required": ["kind", "axis", "travel_cm"], "additionalProperties": false},
-        {"properties": {"kind": {"const": "turn"}, "axis": {"$ref": "#/$defs/vec3"}, "turn_deg": {"type": "number"}, "pivot": {"$ref": "#/$defs/vec3"}},
-         "required": ["kind", "axis", "turn_deg", "pivot"], "additionalProperties": false},
-        {"properties": {"kind": {"const": "free"}}, "required": ["kind"], "additionalProperties": false}
+        {
+          "properties": {
+            "kind": {
+              "const": "slide"
+            },
+            "axis": {
+              "$ref": "#/$defs/vec3"
+            },
+            "travel_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "kind",
+            "axis",
+            "travel_cm"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "turn"
+            },
+            "axis": {
+              "$ref": "#/$defs/vec3"
+            },
+            "turn_deg": {
+              "type": "number"
+            },
+            "pivot": {
+              "$ref": "#/$defs/vec3"
+            }
+          },
+          "required": [
+            "kind",
+            "axis",
+            "turn_deg",
+            "pivot"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "free"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
       ]
     },
     "part": {
       "type": "object",
-      "required": ["role", "shape", "finish", "sources"],
+      "required": [
+        "role",
+        "shape",
+        "finish",
+        "sources"
+      ],
       "properties": {
-        "role": {"type": "string", "description": "body, or the action's part role this moves as (slide, magazine, trigger...)"},
-        "name": {"type": "string", "description": "the part's name in its source (Slide, Receiver, Stock)"},
-        "shape": {"$ref": "#/$defs/shape"},
-        "bevel_cm": {"type": "number", "minimum": 0},
-        "holes": {"type": "array", "items": {"$ref": "#/$defs/hole"}},
-        "motion": {"$ref": "#/$defs/motion"},
-        "parent": {"type": "string", "description": "the part id this rides"},
-        "finish": {"type": "string", "description": "a finish name (blued, parkerized, walnut, rubber...)"},
+        "role": {
+          "type": "string",
+          "description": "body, or the action's part role this moves as (slide, magazine, trigger...)"
+        },
+        "name": {
+          "type": "string",
+          "description": "the part's name in its source (Slide, Receiver, Stock)"
+        },
+        "shape": {
+          "$ref": "#/$defs/shape"
+        },
+        "bevel_cm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "holes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hole"
+          }
+        },
+        "motion": {
+          "$ref": "#/$defs/motion"
+        },
+        "parent": {
+          "type": "string",
+          "description": "the part id this rides"
+        },
+        "finish": {
+          "type": "string",
+          "description": "a finish name (blued, parkerized, walnut, rubber...)"
+        },
         "sources": {
           "type": "object",
           "description": "the source of each number: outline (or profile), x, axis, travel_cm, turn_deg, pivot, bevel_cm; a missing key fails the check",
-          "additionalProperties": {"$ref": "#/$defs/ref"}
+          "additionalProperties": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/feature"
+          }
+        },
+        "numbers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "the source's drawing or part numbers this part stands for"
         }
       },
       "additionalProperties": false
     },
     "mark": {
       "type": "object",
-      "required": ["at", "source"],
+      "required": [
+        "at",
+        "source"
+      ],
       "properties": {
-        "at": {"$ref": "#/$defs/vec3"},
-        "normal": {"$ref": "#/$defs/vec3", "description": "the way the surface faces there (hand marks)"},
-        "source": {"$ref": "#/$defs/ref"}
+        "at": {
+          "$ref": "#/$defs/vec3"
+        },
+        "normal": {
+          "$ref": "#/$defs/vec3",
+          "description": "the way the surface faces there (hand marks)"
+        },
+        "source": {
+          "$ref": "#/$defs/ref"
+        }
       },
       "additionalProperties": false
+    },
+    "feature": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "grooves"
+            },
+            "face": {
+              "enum": [
+                "left",
+                "right",
+                "both",
+                "top",
+                "front",
+                "rear"
+              ]
+            },
+            "y": {
+              "$ref": "#/$defs/vec2"
+            },
+            "z": {
+              "$ref": "#/$defs/vec2"
+            },
+            "x": {
+              "$ref": "#/$defs/vec2"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "width_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "depth_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "slant_deg": {
+              "type": "number"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "face",
+            "count",
+            "width_cm",
+            "depth_cm",
+            "source"
+          ],
+          "additionalProperties": false,
+          "description": "straight grooves cut into a face (serrations): count of them, evenly over y (or over z on a front or rear face)"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "screw"
+            },
+            "face": {
+              "enum": [
+                "left",
+                "right",
+                "both"
+              ]
+            },
+            "at": {
+              "$ref": "#/$defs/vec2"
+            },
+            "r": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "head_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "slot": {
+              "type": "boolean"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "face",
+            "at",
+            "r",
+            "head_cm",
+            "source"
+          ],
+          "additionalProperties": false,
+          "description": "a screw head standing on a face at (y, z)"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "texture"
+            },
+            "pattern": {
+              "enum": [
+                "checkering",
+                "knurling",
+                "stippling",
+                "marking"
+              ]
+            },
+            "face": {
+              "enum": [
+                "left",
+                "right",
+                "both",
+                "top",
+                "front",
+                "rear",
+                "all"
+              ]
+            },
+            "pitch_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "text": {
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "pattern",
+            "face",
+            "source"
+          ],
+          "additionalProperties": false,
+          "description": "a surface pattern too fine for the mesh: it goes to the finish (Coating Lab) as a texture"
+        }
+      ]
     }
   }
 }

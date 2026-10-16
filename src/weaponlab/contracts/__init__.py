@@ -70,7 +70,7 @@ def check_sources(doc):
 
 
 # the numbers each shape and motion kind holds, and so the keys its part's sources must have
-NEEDS = {"extrude": ("outline", "x"), "lathe": ("profile", "axis"),
+NEEDS = {"extrude": ("outline", "x"), "lathe": ("profile", "axis"), "views": ("side", "x"),
          "slide": ("axis", "travel_cm"), "turn": ("axis", "turn_deg", "pivot"), "free": ()}
 
 
@@ -104,14 +104,17 @@ def check_blueprint(doc, sources=None, action=None):
     roles = set((action or {}).get("parts", {}))
     for pid, p in doc["parts"].items():
         sh, mo = p["shape"], p.get("motion")
-        for key in NEEDS[sh["kind"]] + (NEEDS[mo["kind"]] if mo else ()) + (("bevel_cm",) if p.get("bevel_cm") else ()):
+        extra = tuple(k for k in ("front", "top") if sh["kind"] == "views" and k in sh)
+        for key in NEEDS[sh["kind"]] + extra + (NEEDS[mo["kind"]] if mo else ()) + (("bevel_cm",) if p.get("bevel_cm") else ()):
             if key not in p["sources"]:
                 bad.append("part %s: no source for its %s" % (pid, key))
         for key, r in p["sources"].items():
             ref_ok("part %s %s" % (pid, key), r)
         for n, h in enumerate(p.get("holes", [])):
             ref_ok("part %s hole %d" % (pid, n), h["source"])
-        if sh["kind"] == "extrude" and sh["x"][0] >= sh["x"][1]:
+        for n, ft in enumerate(p.get("features", [])):
+            ref_ok("part %s feature %d" % (pid, n), ft["source"])
+        if sh["kind"] in ("extrude", "views") and sh["x"][0] >= sh["x"][1]:
             bad.append("part %s: its x runs from the right (x0) to the left (x1); x0 < x1" % pid)
         if sh["kind"] == "lathe" and any(r < 0 for _, r in sh["profile"]):
             bad.append("part %s: a lathe profile's radius is never below 0" % pid)

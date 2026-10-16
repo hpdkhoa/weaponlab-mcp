@@ -431,11 +431,13 @@ def blueprint_align(gun: str, figure_id: str, reference_figure: str, trace_here:
 
 
 @mcp.tool()
-def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(description="silhouette, region or snap")],
+def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(description="silhouette, region, snap or blob")],
                     keep_as: Annotated[str, Field(description="the name the trace is kept under, for the plan")],
                     region: Annotated[list[float] | None, Field(description="silhouette: [x0, y0, x1, y1] px to look in")] = None,
                     seed: Annotated[list[float] | None, Field(description="region: a px point inside the area")] = None,
                     rough: Annotated[list[list[float]] | None, Field(description="snap: a rough outline in px")] = None,
+                    box: Annotated[list[float] | None, Field(description="blob: [x0, y0, x1, y1] px round the patch (with seed inside)")] = None,
+                    light: bool = True,
                     close_px: int = 7, gap_px: int = 2, radius_px: int = 10, eps_px: float = 1.5) -> dict:
     """An outline from a figure, kept for the plan: the whole silhouette, a closed area round a seed, or a rough
     outline snapped onto the ink. Look at the picture it writes."""
@@ -446,17 +448,23 @@ def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(descr
         r = _err(BR.region, gun, figure_id, seed, gap_px, eps_px, None, keep_as)
     elif method == "snap":
         r = _err(BR.snap, gun, figure_id, rough, radius_px, 4, eps_px, None, keep_as)
+    elif method == "blob":
+        r = _err(BR.blob, gun, figure_id, box, seed, light, 3, eps_px, keep_as)
     else:
-        raise ToolError("method: silhouette, region or snap")
+        raise ToolError("method: silhouette, region, snap or blob")
     BR.save(gun, keep_as, r)
     return {k: v for k, v in r.items() if k not in ("outline_px", "outline_cm")} | {"kept": keep_as}
 
 
 @mcp.tool()
 def blueprint_measure(gun: str, figure_id: str, a: list[float], b: list[float],
-                      how: Annotated[str, Field(description="distance (a to b in cm), span (where the ink starts and ends on the line a to b) or ticks (a scale bar's ticks in the box a, b)")] = "distance") -> dict:
-    """Readings off a figure by the tools, not by eye: a distance, the ink's span along a line, a scale bar's ticks."""
+                      how: Annotated[str, Field(description="distance (a to b in cm), span (where the ink starts and ends on the line a to b), ticks (a scale bar's ticks in the box a, b) or peaks (faint evenly spaced marks, serrations, in the box a, b)")] = "distance",
+                      light: bool = True) -> dict:
+    """Readings off a figure by the tools, not by eye: a distance, the ink's span along a line, a scale bar's ticks,
+    the count and pitch of faint marks."""
     BS, BX, BF, BR, *_ = _bp()
+    if how == "peaks":
+        return _err(BR.peaks, gun, figure_id, [a[0], a[1], b[0], b[1]], light)
     if how == "span":
         return _err(BR.span, gun, figure_id, a, b)
     if how == "ticks":
@@ -507,6 +515,38 @@ def blueprint_mark(gun: str, name: str, at: list[float], source: dict, normal: l
     if magazine_lips:
         return _err(BP.lips, gun, at, source)
     return _err(BP.mark, gun, name, at, source, normal, rides)
+
+
+@mcp.tool()
+def blueprint_views(gun: str, part_id: str,
+                    front: Annotated[list[dict] | None, Field(description="front sections: [{y: [y0, y1], outline: [[x, z], ...]}]")] = None,
+                    front_source: dict | None = None,
+                    top: Annotated[list[list[float]] | None, Field(description="the top outline [[y, x], ...]")] = None,
+                    top_source: dict | None = None) -> dict:
+    """The detail pass: a part shaped by three views (its side outline, front sections, a top outline), each with
+    its source."""
+    return _err(_bp()[4].views, gun, part_id, front, front_source, top, top_source)
+
+
+@mcp.tool()
+def blueprint_feature(gun: str, part_id: str,
+                      feature: Annotated[dict, Field(description="{kind: grooves, face, count, width_cm, depth_cm, y?, z?, slant_deg?, source} | {kind: screw, face, at, r, head_cm, slot?, source} | {kind: texture, pattern (checkering, knurling, stippling, marking), face, source}")]) -> dict:
+    """The detail pass: a surface feature on a part (grooves and screws in the mesh, patterns as the finish's texture)."""
+    return _err(_bp()[4].feature, gun, part_id, feature)
+
+
+@mcp.tool()
+def blueprint_parts_list(gun: str, entries: Annotated[list[dict], Field(description="[{name, number?, page, figure?, visible, why?, source}]: the parts as the source names them")],
+                         replace: bool = False) -> dict:
+    """The detail pass: the source's parts list, each part visible or hidden; the check holds every visible one to a
+    blueprint part (by number, or by name when the source gives none)."""
+    return _err(_bp()[0].parts_list, gun, entries, replace)
+
+
+@mcp.tool()
+def blueprint_numbers(gun: str, part_id: str, numbers: list[str]) -> dict:
+    """The source's part numbers a blueprint part stands for."""
+    return _err(_bp()[4].numbers, gun, part_id, numbers)
 
 
 @mcp.tool()

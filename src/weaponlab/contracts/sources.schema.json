@@ -4,118 +4,422 @@
   "title": "weaponlab-sources/1",
   "description": "One gun's sources and what was taken from them: the files with their licenses, the pages, the figures with their scale and frame, and the facts read from data tables. Every number a blueprint uses points back here. Pages are counted from 1. Pixel positions are in the figure's own image, after its rotation.",
   "type": "object",
-  "required": ["contract", "gun", "sources"],
+  "required": [
+    "contract",
+    "gun",
+    "sources"
+  ],
   "properties": {
-    "contract": {"const": "weaponlab-sources/1"},
-    "gun": {"type": "string", "pattern": "^[A-Za-z0-9_]+$", "description": "the gun's name in file names"},
-    "title": {"type": "string", "description": "the gun's full name"},
-    "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}, "minItems": 1},
-    "pages": {"type": "array", "items": {"$ref": "#/$defs/page"}},
-    "figures": {"type": "array", "items": {"$ref": "#/$defs/figure"}},
-    "facts": {"type": "array", "items": {"$ref": "#/$defs/fact"}}
+    "contract": {
+      "const": "weaponlab-sources/1"
+    },
+    "gun": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_]+$",
+      "description": "the gun's name in file names"
+    },
+    "title": {
+      "type": "string",
+      "description": "the gun's full name"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      },
+      "minItems": 1
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/page"
+      }
+    },
+    "figures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/figure"
+      }
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "parts_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/listed_part"
+      },
+      "description": "the gun's parts as the source names them (a section's labels), each visible or hidden"
+    }
   },
   "additionalProperties": false,
   "$defs": {
-    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"},
-    "px": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "px": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
     "source": {
       "type": "object",
-      "required": ["id", "kind", "title", "file", "license"],
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "file",
+        "license"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "kind": {"enum": ["manual", "patent", "photo", "drawing", "book", "web"]},
-        "title": {"type": "string"},
-        "publisher": {"type": "string"},
-        "year": {"type": "integer"},
-        "file": {"type": "string", "description": "the local file (PDF or image)"},
-        "url": {"type": "string"},
-        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "pages": {"type": "integer", "minimum": 1},
-        "text_layer": {"type": "boolean", "description": "the PDF holds text (false: a scan that needs OCR or reading)"},
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "manual",
+            "patent",
+            "photo",
+            "drawing",
+            "book",
+            "web"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer"
+        },
+        "file": {
+          "type": "string",
+          "description": "the local file (PDF or image)"
+        },
+        "url": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "pages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "text_layer": {
+          "type": "boolean",
+          "description": "the PDF holds text (false: a scan that needs OCR or reading)"
+        },
         "license": {
           "type": "object",
-          "required": ["basis"],
+          "required": [
+            "basis"
+          ],
           "properties": {
-            "basis": {"enum": ["us-government-work", "public-domain-age", "public-domain-mark", "us-patent", "cc0", "cc-by", "cc-by-sa", "permission"]},
-            "credit": {"type": "string", "description": "the credit line a license asks for"},
-            "note": {"type": "string"}
+            "basis": {
+              "enum": [
+                "us-government-work",
+                "public-domain-age",
+                "public-domain-mark",
+                "us-patent",
+                "cc0",
+                "cc-by",
+                "cc-by-sa",
+                "permission"
+              ]
+            },
+            "credit": {
+              "type": "string",
+              "description": "the credit line a license asks for"
+            },
+            "note": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         },
-        "distribution": {"type": "string", "description": "a distribution marking printed on the source, quoted"}
+        "distribution": {
+          "type": "string",
+          "description": "a distribution marking printed on the source, quoted"
+        }
       },
       "additionalProperties": false
     },
     "page": {
       "type": "object",
-      "required": ["source", "page", "kind"],
+      "required": [
+        "source",
+        "page",
+        "kind"
+      ],
       "properties": {
-        "source": {"$ref": "#/$defs/id"},
-        "page": {"type": "integer", "minimum": 1},
-        "kind": {"enum": ["text", "table", "figure", "mixed", "blank"]},
-        "text_chars": {"type": "integer", "minimum": 0},
-        "images": {"type": "integer", "minimum": 0},
-        "drawn": {"type": "number", "minimum": 0, "maximum": 1, "description": "the share of the page that is ink outside text"},
-        "captions": {"type": "array", "items": {"type": "string"}},
-        "render": {"type": "string"}
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "table",
+            "figure",
+            "mixed",
+            "blank"
+          ]
+        },
+        "text_chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "images": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "drawn": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "the share of the page that is ink outside text"
+        },
+        "captions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "render": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
     "figure": {
       "type": "object",
-      "required": ["id", "source", "page", "kind", "image"],
+      "required": [
+        "id",
+        "source",
+        "page",
+        "kind",
+        "image"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "source": {"$ref": "#/$defs/id"},
-        "page": {"type": "integer", "minimum": 1},
-        "kind": {"enum": ["side", "section", "top", "front", "rear", "exploded", "detail", "photo"]},
-        "shows": {"enum": ["right", "left"], "description": "the gun's side the view shows (side and section views)"},
-        "to_scale": {"type": "boolean", "description": "false for exploded views and sketches: they name parts only"},
-        "caption": {"type": "string"},
-        "rotate_deg": {"enum": [0, 90, 180, 270]},
-        "crop": {"type": "array", "items": {"type": "number", "minimum": 0, "maximum": 1}, "minItems": 4, "maxItems": 4, "description": "x0, y0, x1, y1 as shares of the page, before rotation"},
-        "dpi": {"type": "integer", "minimum": 50},
-        "image": {"type": "string", "description": "the figure rendered, rotated and cropped"},
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "side",
+            "section",
+            "top",
+            "front",
+            "rear",
+            "exploded",
+            "detail",
+            "photo"
+          ]
+        },
+        "shows": {
+          "enum": [
+            "right",
+            "left"
+          ],
+          "description": "the gun's side the view shows (side and section views)"
+        },
+        "to_scale": {
+          "type": "boolean",
+          "description": "false for exploded views and sketches: they name parts only"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "rotate_deg": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ]
+        },
+        "crop": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "x0, y0, x1, y1 as shares of the page, before rotation"
+        },
+        "dpi": {
+          "type": "integer",
+          "minimum": 50
+        },
+        "image": {
+          "type": "string",
+          "description": "the figure rendered, rotated and cropped"
+        },
         "scale": {
           "type": "object",
-          "required": ["cm_per_px", "a", "b", "cm"],
+          "required": [
+            "cm_per_px",
+            "a",
+            "b",
+            "cm"
+          ],
           "properties": {
-            "cm_per_px": {"type": "number", "exclusiveMinimum": 0},
-            "a": {"$ref": "#/$defs/px"},
-            "b": {"$ref": "#/$defs/px"},
-            "cm": {"type": "number", "exclusiveMinimum": 0},
-            "fact": {"$ref": "#/$defs/id", "description": "the fact the length a to b comes from"}
+            "cm_per_px": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "a": {
+              "$ref": "#/$defs/px"
+            },
+            "b": {
+              "$ref": "#/$defs/px"
+            },
+            "cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "fact": {
+              "$ref": "#/$defs/id",
+              "description": "the fact the length a to b comes from"
+            }
           },
           "additionalProperties": false
         },
         "frame": {
           "type": "object",
-          "required": ["bore", "origin"],
+          "required": [
+            "bore",
+            "origin"
+          ],
           "description": "how the figure lies in gun space: the bore line runs from bore[0] toward the muzzle at bore[1]; origin is the bolt face",
           "properties": {
-            "bore": {"type": "array", "items": {"$ref": "#/$defs/px"}, "minItems": 2, "maxItems": 2},
-            "origin": {"$ref": "#/$defs/px"}
+            "bore": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/px"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "origin": {
+              "$ref": "#/$defs/px"
+            }
           },
           "additionalProperties": false
         },
-        "note": {"type": "string"}
+        "note": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
     "fact": {
       "type": "object",
-      "required": ["id", "value", "unit", "source", "page", "quote"],
+      "required": [
+        "id",
+        "value",
+        "unit",
+        "source",
+        "page",
+        "quote"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "value": {"type": "number"},
-        "unit": {"enum": ["cm", "kg", "deg", "count", "rpm", "m_s"]},
-        "raw": {"type": "string", "description": "the value as printed, with its unit"},
-        "source": {"$ref": "#/$defs/id"},
-        "page": {"type": "integer", "minimum": 1},
-        "quote": {"type": "string", "description": "the line it was read from"},
-        "about": {"type": "string"}
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "cm",
+            "kg",
+            "deg",
+            "count",
+            "rpm",
+            "m_s"
+          ]
+        },
+        "raw": {
+          "type": "string",
+          "description": "the value as printed, with its unit"
+        },
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "quote": {
+          "type": "string",
+          "description": "the line it was read from"
+        },
+        "about": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
+    },
+    "listed_part": {
+      "type": "object",
+      "required": [
+        "name",
+        "visible",
+        "source",
+        "page"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string",
+          "description": "its drawing or part number"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "seen from outside, or when the action works (the bolt through the port)"
+        },
+        "why": {
+          "type": "string",
+          "description": "why it is hidden, or where it shows"
+        },
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "figure": {
+          "$ref": "#/$defs/id"
+        }
+      }
     }
   }
 }

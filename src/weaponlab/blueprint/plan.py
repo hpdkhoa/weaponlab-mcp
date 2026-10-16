@@ -5,6 +5,7 @@ number's source as they go; a number given by hand needs its source given with i
 
 Polygon helpers work in the side view's (y, z), cm."""
 import json
+import math
 
 from ..gunkit import actions as A
 from . import store
@@ -277,3 +278,57 @@ def trace_px(gun, name):
     if not p.exists():
         raise FileNotFoundError("no kept trace %s" % name)
     return json.loads(p.read_text(encoding="utf-8"))["outline_px"]
+
+
+def views(gun, part_id, front=None, front_source=None, top=None, top_source=None):
+    """Turns a part into three views: its side outline (kept) shared with front sections [{"y": [y0, y1],
+    "outline": [[x, z], ...]}] and a top outline [[y, x], ...]. Each view given needs its source."""
+    bp = store.load(gun, "blueprint")
+    p = bp["parts"].get(part_id)
+    if not p:
+        raise ValueError("no part %s" % part_id)
+    sh = p["shape"]
+    if sh["kind"] == "lathe":
+        raise ValueError("part %s is round (a lathe); it has its shape" % part_id)
+    if sh["kind"] == "extrude":
+        p["shape"] = sh = {"kind": "views", "side": sh["outline"], "x": sh["x"]}
+        p["sources"]["side"] = p["sources"].pop("outline")
+    if front is not None:
+        if not front_source:
+            raise ValueError("a front section needs its source")
+        sh["front"] = front
+        p["sources"]["front"] = front_source
+    if top is not None:
+        if not top_source:
+            raise ValueError("a top outline needs its source")
+        sh["top"] = top
+        p["sources"]["top"] = top_source
+    return _save(gun, bp)["parts"][part_id]
+
+
+def feature(gun, part_id, ft):
+    """Adds a surface feature (grooves, screw, texture) with its source to a part."""
+    bp = store.load(gun, "blueprint")
+    if part_id not in bp["parts"]:
+        raise ValueError("no part %s" % part_id)
+    if "source" not in ft:
+        raise ValueError("a feature needs its source")
+    bp["parts"][part_id].setdefault("features", []).append(ft)
+    return _save(gun, bp)["parts"][part_id]["features"][-1]
+
+
+def numbers(gun, part_id, nums):
+    """The source's drawing or part numbers a blueprint part stands for (the detail check matches them)."""
+    bp = store.load(gun, "blueprint")
+    bp["parts"][part_id]["numbers"] = sorted(set(bp["parts"][part_id].get("numbers", [])) | set(nums))
+    return _save(gun, bp)["parts"][part_id]
+
+
+def rounded(x0, x1, z0, z1, r, steps=4):
+    """A front section (x, z): a box from x0 to x1 and z0 to z1 with its top corners rounded by r."""
+    out = [[x0, z0], [x1, z0]]
+    for cx, a0 in ((x1 - r, 0.0), (x0 + r, 90.0)):
+        for k in range(steps + 1):
+            a = math.radians(a0 + 90.0 * k / steps)
+            out.append([round(cx + r * math.cos(a), 4), round(z1 - r + r * math.sin(a), 4)])
+    return out

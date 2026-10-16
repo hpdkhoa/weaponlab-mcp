@@ -34,6 +34,8 @@ def silhouette(bp, include=None):
         sh = p["shape"]
         if sh["kind"] == "extrude":
             polys.append(sh["outline"])
+        elif sh["kind"] == "views":
+            polys.append(sh["side"])
         else:
             z0 = sh["axis"][1]
             top = [[y, z0 + r] for y, r in sh["profile"]]
@@ -88,10 +90,32 @@ def outline(bp, ref_outline, res=0.01, ref_holes=()):
             "gap_p95_cm": round(float(np.percentile(gaps, 95)), 3)}
 
 
+def detail(bp, src):
+    """The detail check: every visible part of the source's parts list has a blueprint part (by its number), and
+    the shapes the parts take (a slab is a side outline alone; a shaped part has front or top views too)."""
+    have = {n for p in bp["parts"].values() for n in p.get("numbers", [])}
+    names = {p.get("name", "").strip().lower() for p in bp["parts"].values()}
+    listed = src.get("parts_list", [])
+    visible = [lp for lp in listed if lp["visible"]]
+    # a listed part with a number matches by its number; one the text names without one, by its name
+    found = lambda lp: lp["number"] in have if lp.get("number") else lp["name"].strip().lower() in names   # noqa: E731
+    missing = [{"name": lp["name"], "number": lp.get("number"), "page": lp["page"]} for lp in visible if not found(lp)]
+    kinds = {}
+    for pid, p in bp["parts"].items():
+        sh = p["shape"]
+        k = "lathe" if sh["kind"] == "lathe" else ("shaped" if sh["kind"] == "views" and ("front" in sh or "top" in sh) else "slab")
+        kinds.setdefault(k, []).append(pid)
+    feats = [f["kind"] for p in bp["parts"].values() for f in p.get("features", [])]
+    return {"listed": len(listed), "visible": len(visible), "missing": missing,
+            "covered_share": round(1 - len(missing) / len(visible), 3) if visible else None,
+            "shapes": kinds, "features": {k: feats.count(k) for k in sorted(set(feats))},
+            "ok": bool(listed) and not missing}
+
+
 def volume_cm3(p):
     sh = p["shape"]
-    if sh["kind"] == "extrude":
-        v = Pl.area(sh["outline"]) * (sh["x"][1] - sh["x"][0])
+    if sh["kind"] in ("extrude", "views"):          # a shaped part is no larger than its side times its width
+        v = Pl.area(sh["outline"] if sh["kind"] == "extrude" else sh["side"]) * (sh["x"][1] - sh["x"][0])
         for h in p.get("holes", []):
             if h["kind"] == "bore":
                 v -= math.pi * h["r"] ** 2 * abs(h["y"][1] - h["y"][0])
@@ -163,13 +187,14 @@ def run(gun, reference=None, reference_holes=(), length_fact="overall_length", w
         o["reference"] = reference
         o["ok"] = o["iou"] >= PASS["iou"] and o["gap_mean_cm"] <= PASS["gap_mean_cm"]
         out["outline"] = o
+    out["detail"] = detail(bp, src)
     kg = sum(volume_cm3(p) * density(p["finish"]) for p in bp["parts"].values()) / 1000.0
     out["weight"] = {"kg": round(kg, 3)}
     if weight_fact in facts:
         out["weight"].update({"fact_kg": facts[weight_fact]["value"], "ratio": round(kg / facts[weight_fact]["value"], 3),
                               "note": "warning only: the copy is solid where the gun is hollow"})
     out["overlays"] = [overlay(gun, bp, f) for f in src.get("figures", []) if "scale" in f and "frame" in f]
-    out["ok"] = not out["contract"] and all(out[k].get("ok", True) for k in ("length", "outline") if k in out)
+    out["ok"] = not out["contract"] and all(out[k].get("ok", True) for k in ("length", "outline", "detail") if k in out)
     bp["checks"] = {k: v for k, v in out.items() if k != "overlays"}
     store.save(gun, "blueprint", bp, strict=False)
     (store.folder(gun, "check") / "check.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
