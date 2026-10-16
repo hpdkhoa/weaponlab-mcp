@@ -1,4 +1,5 @@
-"""Weapon Lab over MCP: one server, six groups of tools (spec_, gate_, probe_, rig_, motion_, gunkit_) and the contract checks.
+"""Weapon Lab over MCP: one server, seven groups of tools (spec_, gate_, probe_, rig_, motion_, gunkit_, blueprint_) and the
+contract checks.
 Run: weaponlab-mcp (or python -m weaponlab serve)."""
 from typing import Annotated
 
@@ -323,6 +324,223 @@ def gunkit_cases(weapon: str, action: str, add: bool = False) -> list:
         for c in cs:
             _err(G.add_case, c)
     return cs
+
+
+# ------------------------------------------------------------------ Blueprint Lab: a real gun's visual copy from its sources
+def _bp():
+    from .blueprint import build as BB, check as BK, figures as BF, plan as BP, sources as BS, specs as BX, store as BT, trace as BR
+    return BS, BX, BF, BR, BP, BK, BB, BT
+
+
+@mcp.tool()
+def blueprint_source_add(gun: str, file: str, source_id: str, kind: Annotated[str, Field(description="manual, patent, photo, drawing, book or web")],
+                         title: str, license_basis: Annotated[str, Field(description="us-government-work, public-domain-age, public-domain-mark, us-patent, cc0, cc-by, cc-by-sa or permission")],
+                         publisher: str | None = None, year: int | None = None, url: str | None = None, credit: str | None = None,
+                         distribution: Annotated[str | None, Field(description="a distribution marking printed on the source, quoted")] = None,
+                         gun_title: str | None = None) -> dict:
+    """Step 1: registers a file (PDF or picture) as one of a gun's sources, with its license. Opens it as data only."""
+    BS = _bp()[0]
+    return _err(BS.add, gun, file, source_id, kind, title, license_basis, publisher, year, url, credit, distribution, None, gun_title)
+
+
+@mcp.tool()
+def blueprint_scan(gun: str, source_id: str) -> dict:
+    """Every page of a source sorted into text, table, figure, mixed or blank, with the figure pages' captions."""
+    return _err(_bp()[0].scan, gun, source_id)
+
+
+@mcp.tool()
+def blueprint_page(gun: str, source_id: str, pages: list[int], dpi: int = 110) -> dict:
+    """Pages as pictures to read: one page at dpi, or several side by side (a contact sheet) to find the figures."""
+    BS = _bp()[0]
+    if len(pages) == 1:
+        return {"picture": _err(BS.render, gun, source_id, pages[0], dpi)}
+    return {"picture": _err(BS.sheet, gun, source_id, pages)}
+
+
+@mcp.tool()
+def blueprint_text(gun: str, source_id: str | None = None, page: int | None = None,
+                   pattern: Annotated[str | None, Field(description="a regular expression: the lines that match, across the sources")] = None) -> dict:
+    """A page's text, or the lines matching a pattern across the sources (where a part or a number is named)."""
+    BS = _bp()[0]
+    if pattern:
+        return {"lines": _err(BS.find, gun, pattern, source_id)}
+    return {"text": _err(BS.text, gun, source_id, page)}
+
+
+@mcp.tool()
+def blueprint_specs(gun: str, source_id: str | None = None) -> dict:
+    """Step 2: candidates for each data table quantity (overall length, barrel length, weights...): the line, the
+    numbers near it. Check a candidate on the page picture before adding it."""
+    return _err(_bp()[1].find, gun, source_id)
+
+
+@mcp.tool()
+def blueprint_fact_add(gun: str, fact_id: str, value: float, unit: Annotated[str, Field(description="as printed: in, mm, cm, lb, oz, kg, count...")],
+                       source_id: str, page: int, quote: Annotated[str, Field(description="the line the value was read from")]) -> dict:
+    """Records a fact (kept in cm, kg, deg or count) with its page and quote."""
+    return _err(_bp()[1].add, gun, fact_id, value, unit, source_id, page, quote)
+
+
+@mcp.tool()
+def blueprint_figure_add(gun: str, figure_id: str, source_id: str, page: int,
+                         kind: Annotated[str, Field(description="side, section, top, front, rear, exploded, detail or photo")],
+                         shows: Annotated[str | None, Field(description="right or left: the gun's side a side view shows")] = None,
+                         crop: Annotated[list[float] | None, Field(description="[x0, y0, x1, y1] as shares of the page")] = None,
+                         rotate_deg: Annotated[int, Field(description="0, 90, 180 or 270 clockwise, to stand the gun upright")] = 0,
+                         dpi: int = 300, caption: str | None = None) -> dict:
+    """Step 3: cuts a figure from a page and stands it upright."""
+    return _err(_bp()[2].add, gun, figure_id, source_id, page, kind, shows, crop, rotate_deg, dpi, None, caption)
+
+
+@mcp.tool()
+def blueprint_grid(gun: str, figure_id: str, step_px: int = 100, region: list[float] | None = None, zoom: float = 1.0) -> dict:
+    """The figure with a labelled pixel grid (and, once framed, its bore line, origin and cm grid) to read points off."""
+    return {"picture": _err(_bp()[2].grid, gun, figure_id, step_px, region, zoom)}
+
+
+@mcp.tool()
+def blueprint_calibrate(gun: str, figure_id: str,
+                        a: Annotated[list[float] | None, Field(description="px: one end of a known length")] = None,
+                        b: Annotated[list[float] | None, Field(description="px: its other end")] = None,
+                        fact: Annotated[str | None, Field(description="the fact the length is (an overall length)")] = None,
+                        cm: float | None = None,
+                        extent_of: Annotated[str | None, Field(description="a kept trace whose full length along the bore is the fact (in place of a and b)")] = None) -> dict:
+    """A figure's scale: two points a known length apart (a printed scale bar's ticks, or a fact), or a kept
+    outline's length along the bore against a length fact."""
+    BS, BX, BF, BR, BP, *_ = _bp()
+    if extent_of:
+        t = _err(BP.trace_px, gun, extent_of)
+        return _err(BF.calibrate_extent, gun, figure_id, t, fact)
+    return _err(BF.calibrate, gun, figure_id, a, b, fact, cm)
+
+
+@mcp.tool()
+def blueprint_frame(gun: str, figure_id: str, bore_rear: list[float], bore_front: list[float], origin: Annotated[list[float], Field(description="px: the bolt face")]) -> dict:
+    """How a figure lies in gun space: the bore line (from the rear toward the muzzle) and the bolt face."""
+    return _err(_bp()[2].frame, gun, figure_id, bore_rear, bore_front, origin)
+
+
+@mcp.tool()
+def blueprint_align(gun: str, figure_id: str, reference_figure: str, trace_here: Annotated[str, Field(description="a kept trace of a shared part in this figure")],
+                    trace_there: Annotated[str, Field(description="the same part's kept trace in the framed reference figure")],
+                    muzzle: Annotated[str, Field(description="left or right: where the muzzle points in this figure")] = "left", note: str | None = None) -> dict:
+    """A figure's scale and frame matched to a framed figure on a part both show (a trigger guard's opening)."""
+    BS, BX, BF, BR, BP, *_ = _bp()
+    return _err(BF.align, gun, figure_id, reference_figure, BP.trace_px(gun, trace_here), BP.trace(gun, trace_there)["outline_cm"], muzzle, note)
+
+
+@mcp.tool()
+def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(description="silhouette, region or snap")],
+                    keep_as: Annotated[str, Field(description="the name the trace is kept under, for the plan")],
+                    region: Annotated[list[float] | None, Field(description="silhouette: [x0, y0, x1, y1] px to look in")] = None,
+                    seed: Annotated[list[float] | None, Field(description="region: a px point inside the area")] = None,
+                    rough: Annotated[list[list[float]] | None, Field(description="snap: a rough outline in px")] = None,
+                    close_px: int = 7, gap_px: int = 2, radius_px: int = 10, eps_px: float = 1.5) -> dict:
+    """An outline from a figure, kept for the plan: the whole silhouette, a closed area round a seed, or a rough
+    outline snapped onto the ink. Look at the picture it writes."""
+    BR = _bp()[3]
+    if method == "silhouette":
+        r = _err(BR.silhouette, gun, figure_id, region, close_px, eps_px)
+    elif method == "region":
+        r = _err(BR.region, gun, figure_id, seed, gap_px, eps_px, None, keep_as)
+    elif method == "snap":
+        r = _err(BR.snap, gun, figure_id, rough, radius_px, 4, eps_px, None, keep_as)
+    else:
+        raise ToolError("method: silhouette, region or snap")
+    BR.save(gun, keep_as, r)
+    return {k: v for k, v in r.items() if k not in ("outline_px", "outline_cm")} | {"kept": keep_as}
+
+
+@mcp.tool()
+def blueprint_measure(gun: str, figure_id: str, a: list[float], b: list[float],
+                      how: Annotated[str, Field(description="distance (a to b in cm), span (where the ink starts and ends on the line a to b) or ticks (a scale bar's ticks in the box a, b)")] = "distance") -> dict:
+    """Readings off a figure by the tools, not by eye: a distance, the ink's span along a line, a scale bar's ticks."""
+    BS, BX, BF, BR, *_ = _bp()
+    if how == "span":
+        return _err(BR.span, gun, figure_id, a, b)
+    if how == "ticks":
+        return _err(BR.ticks, gun, figure_id, [a[0], a[1], b[0], b[1]])
+    return _err(BF.measure, gun, figure_id, a, b)
+
+
+@mcp.tool()
+def blueprint_new(gun: str, action: str, title: str | None = None) -> dict:
+    """Step 4: starts the gun's blueprint for its action family."""
+    return _err(_bp()[4].new, gun, action, title)
+
+
+@mcp.tool()
+def blueprint_part(gun: str, part_id: str, role: Annotated[str, Field(description="body, or the action's part role (slide, magazine...)")], finish: str,
+                   kind: Annotated[str, Field(description="extrude (a side outline run across x) or lathe (a round part)")],
+                   x: Annotated[list[float] | None, Field(description="extrude: [x0, x1], the gun's right to its left, cm")] = None,
+                   x_source: Annotated[dict | None, Field(description="where x comes from: {figure}, {fact}, {derived: how} or {guess: why}")] = None,
+                   trace: Annotated[str | None, Field(description="extrude: the kept trace its outline comes from")] = None,
+                   clips: Annotated[list[list] | None, Field(description="extrude: [axis (y, z or line), value (or [[y, z], [y, z]]), keep (above, below, left, right), why]")] = None,
+                   profile: Annotated[list[list[float]] | None, Field(description="lathe: [[y, r], ...]")] = None, axis: list[float] | None = None,
+                   profile_source: dict | None = None, axis_source: dict | None = None, bore_r: float | None = None,
+                   motion: Annotated[dict | None, Field(description="{kind: slide, axis, travel_cm} | {kind: turn, axis, turn_deg, pivot} | {kind: free}")] = None,
+                   motion_sources: Annotated[dict | None, Field(description="the source of each motion number (axis, travel_cm, turn_deg, pivot)")] = None,
+                   name: str | None = None, bevel_cm: float | None = None, parent: str | None = None) -> dict:
+    """Sets one part of the blueprint. Every number needs its source; the check fails a part without one."""
+    BP = _bp()[4]
+    if kind == "extrude":
+        return _err(BP.extrude, gun, part_id, role, finish, trace, x, x_source, [tuple(c) for c in (clips or [])], name, motion, motion_sources, bevel_cm, parent)
+    if kind == "lathe":
+        return _err(BP.lathe, gun, part_id, role, finish, profile, axis, profile_source, axis_source, bore_r, name, motion, motion_sources, parent)
+    raise ToolError("kind: extrude or lathe")
+
+
+@mcp.tool()
+def blueprint_hole(gun: str, part_id: str, trace: str | None = None, circle: dict | None = None, bore: dict | None = None,
+                   source: dict | None = None, x: list[float] | None = None) -> dict:
+    """A cut in a part: a kept trace's outline or a circle across x (limited to x when given), or a bore along y."""
+    return _err(_bp()[4].hole, gun, part_id, trace, circle, source, x, bore)
+
+
+@mcp.tool()
+def blueprint_mark(gun: str, name: str, at: list[float], source: dict, normal: list[float] | None = None,
+                   rides: Annotated[str | list[str] | None, Field(description="the part id (or chain) the mark moves with")] = None,
+                   magazine_lips: bool = False) -> dict:
+    """A mark in gun space (cm) with its source: a hand's place (with the way its surface faces) or a point a check needs."""
+    BP = _bp()[4]
+    if magazine_lips:
+        return _err(BP.lips, gun, at, source)
+    return _err(BP.mark, gun, name, at, source, normal, rides)
+
+
+@mcp.tool()
+def blueprint_read(gun: str, what: Annotated[str, Field(description="blueprint or sources")] = "blueprint") -> dict:
+    """The gun's blueprint or sources document as it stands."""
+    return _err(_bp()[7].load, gun, what)
+
+
+@mcp.tool()
+def blueprint_check(gun: str, reference: Annotated[str | None, Field(description="a kept silhouette trace the side outline is held to")] = None,
+                    reference_holes: list[str] | None = None) -> dict:
+    """Step 5: the blueprint against its contract, its reference outline (overlap, edge gaps), its length and
+    weight facts; and overlay pictures on every framed figure. Look at the overlays."""
+    return _err(_bp()[5].run, gun, reference, tuple(reference_holes or ()))
+
+
+@mcp.tool()
+def blueprint_build(gun: str, render: bool = True) -> dict:
+    """Step 6 in Blender: the model (one object a part) and its parts map for Gun Kit; with render, labelled
+    pictures of it from both sides and three quarters."""
+    BB = _bp()[6]
+    out = _err(BB.build, gun)
+    if render:
+        out["views"] = _err(BB.render, gun)
+    return out
+
+
+@mcp.tool()
+def blueprint_to_gunkit(gun: str, grip_steps: int = 3) -> dict:
+    """Step 7: the built model through Gun Kit (several minutes in Blender): rig, hand clips, gun clips, read-back."""
+    r = _err(_bp()[6].to_gunkit, gun, grip_steps)
+    if "built" in r:
+        r["built"] = {"hands": r["built"]["hands"], "holds": r["built"]["holds"]}
+    return r
 
 
 def main():

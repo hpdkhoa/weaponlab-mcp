@@ -60,9 +60,11 @@
         {"properties": {"kind": {"const": "circle"}, "at": {"$ref": "#/$defs/vec2"}, "r": {"type": "number", "exclusiveMinimum": 0}, "x": {"$ref": "#/$defs/vec2"}, "source": {"$ref": "#/$defs/ref"}},
          "required": ["kind", "at", "r", "source"], "additionalProperties": false},
         {"properties": {"kind": {"const": "polygon"}, "outline": {"$ref": "#/$defs/outline"}, "x": {"$ref": "#/$defs/vec2"}, "source": {"$ref": "#/$defs/ref"}},
-         "required": ["kind", "outline", "source"], "additionalProperties": false}
+         "required": ["kind", "outline", "source"], "additionalProperties": false},
+        {"properties": {"kind": {"const": "bore"}, "at": {"$ref": "#/$defs/vec2", "description": "(x, z) of its axis"}, "r": {"type": "number", "exclusiveMinimum": 0}, "y": {"$ref": "#/$defs/vec2"}, "source": {"$ref": "#/$defs/ref"}},
+         "required": ["kind", "at", "r", "y", "source"], "additionalProperties": false}
       ],
-      "description": "a cut across x (all the way through unless x limits it), in the side view's (y, z)"
+      "description": "a circle or polygon cut across x (all the way through unless x limits it), in the side view's (y, z); or a bore, a round cut along y from y[0] to y[1]"
     },
     "motion": {
       "type": "object",
