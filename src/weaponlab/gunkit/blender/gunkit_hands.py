@@ -38,6 +38,9 @@ rigs = {"gunkit": {"title": "Gun Kit: %s on the shared arms" % facts["name"], "f
                    "styled": bool(job.get("character")),
                    # the clearance capsules fitted to the arms' own skin (Pose Lab measures it on the rest pose)
                    "fit_capsules": bool(job.get("fit_capsules", True))}}            # the character's colours and the gun's finishes
+_be = os.path.join(A["folder"] if os.path.isabs(A["folder"]) else os.path.join(OUT, A["folder"]), "bone_edits.json")
+if os.path.exists(_be):
+    rigs["gunkit"]["bone_edits"] = "bone_edits.json"          # the arms copy's bone edits (Tools/blender/slim_arms.py)
 rigs_file = os.path.join(OUT, "gunkit_rigs.json")
 json.dump(rigs, open(rigs_file, "w", encoding="utf-8"), indent=1)
 L = PL.Lab(rigs_file, OUT)
