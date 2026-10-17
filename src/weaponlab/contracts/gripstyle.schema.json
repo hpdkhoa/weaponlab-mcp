@@ -159,9 +159,10 @@
             "straight",
             "wrap",
             "rest",
-            "to"
+            "to",
+            "posture"
           ],
-          "description": "straight: held at the curls given; wrap: closed until it meets the gun (or its most curl); rest: left as the hold leaves it; to: the thumb's tip brought to a rest point, every joint within its range"
+          "description": "straight: held at the curls given; wrap: closed until it meets the gun (or its most curl); rest: left as the hold leaves it; to: the thumb's tip brought to a rest point, every joint within its range; posture: measured joint angles (curl, a person's grasp), adjusted up to tol degrees to meet the digit's contact rule"
         },
         "curl": {
           "type": "array",
@@ -192,6 +193,14 @@
         "via": {
           "$ref": "#/$defs/vec3",
           "description": "to: a waypoint for the thumb's knuckle (its MCP), gun space cm: the path a thumb takes round a backstrap"
+        },
+        "tol": {
+          "type": "number",
+          "description": "posture: how far (degrees) a finger may open or close from its measured angles"
+        },
+        "source": {
+          "type": "string",
+          "description": "where measured joint angles come from"
         }
       },
       "additionalProperties": false
@@ -276,6 +285,10 @@
                   }
                 }
               }
+            },
+            "fit_source": {
+              "type": "string",
+              "description": "where the anchors come from (a manual's figures, read onto this gun's faces)"
             }
           }
         },
@@ -393,6 +406,10 @@
             },
             "min": {
               "type": "number"
+            },
+            "both_hands": {
+              "type": "boolean",
+              "description": "the share is of both hands together (a two-hand grip leaves no part of the grip bare)"
             }
           },
           "description": "a band of the held part the hand must cover, as a share of its surface"

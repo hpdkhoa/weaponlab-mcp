@@ -23,168 +23,84 @@
      -0.32
     ],
     "anchors": {
-     "wrist": [
-      -5.3,
-      -11.5,
-      -5.5
+     "palm": [
+      -3.7,
+      -4.5,
+      -6.0
      ],
-     "knuckle": [
-      -3.2,
-      -2.7,
-      -6.6
+     "middle_base": [
+      -0.5,
+      -0.4,
+      -5.9
      ],
-     "web": [
-      -2.6,
-      -7.2,
-      -3.0
-     ],
-     "thumb_cmc": [
-      -0.6,
-      -9.6,
-      -2.6
+     "index_pip": [
+      -2.9,
+      -1.0,
+      -3.6
      ]
     },
     "across": "grip_axis",
-    "starts": [
-     {
-      "face": [
-       -0.7,
-       -0.7,
-       0.0
-      ],
-      "anchors": {
-       "wrist": [
-        -3.5,
-        -13.5,
-        -5.0
-       ],
-       "knuckle": [
-        -3.4,
-        -5.0,
-        -6.0
-       ],
-       "web": [
-        -0.3,
-        -8.4,
-        -2.6
-       ],
-       "thumb_cmc": [
-        -0.6,
-        -9.6,
-        -2.6
-       ]
-      }
-     },
-     {
-      "face": [
-       -0.6,
-       -0.8,
-       0.0
-      ],
-      "anchors": {
-       "wrist": [
-        -4.0,
-        -12.5,
-        -5.5
-       ],
-       "knuckle": [
-        -3.4,
-        -2.6,
-        -6.6
-       ],
-       "web": [
-        -1.2,
-        -8.0,
-        -2.8
-       ],
-       "thumb_cmc": [
-        -0.6,
-        -9.6,
-        -2.6
-       ]
-      }
-     },
-     {
-      "face": [
-       -0.45,
-       -0.9,
-       0.0
-      ],
-      "anchors": {
-       "wrist": [
-        -2.5,
-        -13.0,
-        -5.0
-       ],
-       "knuckle": [
-        -3.6,
-        -3.0,
-        -6.4
-       ],
-       "web": [
-        -0.3,
-        -8.4,
-        -2.6
-       ],
-       "thumb_cmc": [
-        -0.6,
-        -9.6,
-        -2.6
-       ]
-      }
-     }
-    ]
+    "fit_source": "FM 3-23.35 (2003) figures 2-1 and 2-2: the palm on the grip's firing side, the middle finger's first segment across the front strap just under the trigger guard, the trigger finger along the frame above the guard; placed on this gun's own faces (panel x -1.67, front strap y -1.3 to -2.1, frame side x 1.75 at the guard)"
    },
    "fingers": {
     "index": {
-     "pose": "straight",
+     "pose": "posture",
      "curl": [
-      8.0,
-      6.0,
-      4.0
+      0.0,
+      0.0,
+      3.0
      ],
-     "why": "the trigger finger straight along the frame, off the trigger until the shot"
+     "tol": 5.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 4, index finger extension grasp",
+     "why": "the trigger finger straight along the frame, off the trigger until the shot (FM 3-23.35 2-1)"
     },
     "middle": {
-     "pose": "wrap",
-     "max_curl": [
-      80.0,
-      95.0,
-      60.0
+     "pose": "posture",
+     "curl": [
+      84.0,
+      40.0,
+      27.0
      ],
-     "why": "wraps the front strap under the trigger guard"
+     "tol": 15.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 4",
+     "why": "the middle finger wrapped round the front strap, pressing to the rear (FM 3-23.35 2-1)"
     },
     "ring": {
-     "pose": "wrap",
-     "max_curl": [
-      80.0,
-      95.0,
-      60.0
+     "pose": "posture",
+     "curl": [
+      86.0,
+      31.0,
+      20.0
      ],
-     "why": "wraps the front strap"
+     "tol": 15.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 4",
+     "why": "the ring finger wrapped round the front strap, pressing to the rear (FM 3-23.35 2-1)"
     },
     "pinky": {
-     "pose": "wrap",
-     "max_curl": [
-      80.0,
-      95.0,
-      60.0
+     "pose": "posture",
+     "curl": [
+      87.0,
+      21.0,
+      14.0
      ],
-     "why": "wraps the front strap at the grip's bottom"
+     "tol": 15.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 4",
+     "why": "the little finger wrapped round the front strap, pressing to the rear (FM 3-23.35 2-1)"
     },
     "thumb": {
-     "pose": "to",
+     "pose": "posture",
+     "curl": [
+      0.0,
+      7.0,
+      15.0
+     ],
      "point": [
       2.6,
-      -2.9,
-      -0.9
+      -0.6,
+      -1.2
      ],
-     "why": "the firing thumb round the backstrap under the tang (its knuckle at the support-side rear corner) and forward along the frame's support side, resting on the safety (FM 3-23.35 2-3)",
-     "via": [
-      2.6,
-      -6.9,
-      -2.8
-     ]
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 4",
+     "why": "the firing thumb rests alongside the weapon without pressure, along the frame's support side above the trigger guard (FM 3-23.35 2-1, figure 2-1)"
     }
    },
    "trigger": {
@@ -245,6 +161,32 @@
      "need": "required",
      "why": "the web of the hand high on the backstrap, under the tang (FM 3-23.35 (2003) 2-3: the two-hand grip)",
      "min_share": 0.3
+    },
+    {
+     "id": "index_along_frame",
+     "patch": "index:base",
+     "region": {
+      "part": "frame",
+      "facing": "firing_side",
+      "window": {
+       "y": [
+        "trigger-4",
+        "trigger+1"
+       ],
+       "z": [
+        "trigger-0.8",
+        "trigger+1.4"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.05,
+      0.35
+     ],
+     "facing_max_deg": 60,
+     "min_share": 0.3,
+     "need": "required",
+     "why": "the trigger finger straight along the frame's firing side above the trigger guard, off the trigger until the shot (FM 3-23.35 2-1): it sets the hand's height, and with it the thumb's"
     },
     {
      "id": "palm_on_grip",
@@ -373,64 +315,79 @@
     ],
     "why": "the support palm on the grip's left side, filling what the firing hand leaves open (FM 3-23.35 2-3)",
     "anchors": {
-     "web": [
-      5.5,
-      -4.0,
-      -5.5
+     "palm": [
+      3.8,
+      -4.2,
+      -7.2
      ],
      "knuckle": [
-      6.0,
-      1.5,
-      -8.5
+      4.6,
+      1.2,
+      -7.8
      ]
     },
-    "across": "grip_axis"
+    "across": "grip_axis",
+    "fit_source": "FM 3-23.35 (2003) 2-2, the fist grip: the support fingers over the firing fingers, the support palm's heel on the bare support-side panel; on this gun's faces (panel x 1.67, the palm's fitted half thickness 1.84 cm and the glove)"
    },
    "fingers": {
     "index": {
-     "pose": "wrap",
-     "max_curl": [
-      75.0,
-      90.0,
-      55.0
+     "pose": "posture",
+     "curl": [
+      26.0,
+      60.0,
+      40.0
      ],
-     "why": "the support fingers wrap over the firing hand's fingers, under the trigger guard"
+     "tol": 15.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 5, medium wrap",
+     "why": "the support index finger between the firing middle finger and the trigger guard (FM 3-23.35 2-2)"
     },
     "middle": {
-     "pose": "wrap",
-     "max_curl": [
-      75.0,
-      90.0,
-      55.0
+     "pose": "posture",
+     "curl": [
+      51.0,
+      16.0,
+      11.0
      ],
-     "why": "wraps over the firing fingers"
+     "tol": 20.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 5",
+     "why": "the support fingers closed over the firing fingers (FM 3-23.35 2-2)"
     },
     "ring": {
-     "pose": "wrap",
-     "max_curl": [
-      75.0,
-      90.0,
-      55.0
+     "pose": "posture",
+     "curl": [
+      51.0,
+      19.0,
+      13.0
      ],
-     "why": "wraps over the firing fingers"
+     "tol": 20.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 5",
+     "why": "the support fingers closed over the firing fingers (FM 3-23.35 2-2)"
     },
     "pinky": {
-     "pose": "wrap",
-     "max_curl": [
-      75.0,
-      90.0,
-      55.0
+     "pose": "posture",
+     "curl": [
+      52.0,
+      22.0,
+      15.0
      ],
-     "why": "wraps over the firing fingers"
+     "tol": 20.0,
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 5",
+     "why": "the support fingers closed over the firing fingers (FM 3-23.35 2-2)"
     },
     "thumb": {
-     "pose": "to",
+     "pose": "posture",
+     "curl": [
+      0.0,
+      0.0,
+      48.0
+     ],
      "point": [
-      3.2,
+      2.6,
       2.4,
       -2.8
      ],
-     "why": "the support thumb forward along the frame's left side under the firing thumb, clear of the slide stop"
+     "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 5",
+     "why": "the support thumb alongside the firing thumb, forward along the frame (FM 3-23.35 2-2)"
     }
    },
    "holds": {
@@ -651,13 +608,13 @@
       }
      },
      "gap_cm": [
-      -0.1,
-      0.6
+      -0.15,
+      0.4
      ],
      "facing_max_deg": 60,
-     "need": "optional",
-     "why": "the support palm's heel on the grip's open support-side panel, where the firing hand leaves it bare (FM 3-23.35 (2003) 2-3: the two-hand grip)",
-     "min_share": 0.3
+     "need": "required",
+     "why": "the support palm's heel fills the grip's support-side panel the firing hand leaves bare: no space left on the grip, the gun held in a closed ring of both hands against recoil (FM 3-23.35 2-2, the fist grip)",
+     "min_share": 0.4
     }
    ],
    "closure": {
@@ -666,6 +623,20 @@
      "r",
      "l"
     ]
+   },
+   "wrap": {
+    "region": {
+     "part": "frame",
+     "facing": "any",
+     "window": {
+      "z": [
+       "grip-2",
+       "grip+1.5"
+      ]
+     }
+    },
+    "min": 0.8,
+    "both_hands": true
    }
   }
  },

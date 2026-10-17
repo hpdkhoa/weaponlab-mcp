@@ -722,7 +722,8 @@ def hand_rules(side):
         rules.append(x)
     wrap = None
     if h.get("wrap"):
-        wrap = {"polys": resolve_region(h["wrap"]["region"]), "min": h["wrap"]["min"]}
+        wrap = {"polys": resolve_region(h["wrap"]["region"]), "min": h["wrap"]["min"],
+                "sides": ["r", "l"] if h["wrap"].get("both_hands") else [side]}
     RULES[side] = (rules, wrap, h.get("closure"))
     report.setdefault("contact_regions", {})[side] = {r_["id"]: len(r_["polys"]) for r_ in rules}
     return RULES[side]
@@ -792,7 +793,7 @@ def style_plan(side, mark):
         return None
     plan = {k: dict(v) for k, v in plan.items()}
     for v in plan.values():
-        if v.get("pose") == "to":
+        if v.get("point") is not None:
             v["to_world"] = list(RA.matrix_world @ g(v["point"]))
             if v.get("via"):
                 v["via_world"] = list(RA.matrix_world @ g(v["via"]))
@@ -845,11 +846,14 @@ def grasp(side, mark, part=None, offset=None, start=None):
                 r["chain"] = L.hold_chain(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
                                           other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
                                           soft=SOFT, thumb_point=th.get("to_world") if th.get("pose") == "to" else None)
-            if th.get("pose") == "to" and hasattr(L, "thumb_search") and not th.get("via"):
+            if th.get("pose") in ("to", "posture") and th.get("to_world") and hasattr(L, "thumb_search") and not th.get("via"):
                 trule = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
                 r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE,
                                             other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
-                                            rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)))
+                                            rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)),
+                                            samples=int(job.get("thumb_samples", 220)), press_w=float(job.get("thumb_press_w", 6.0)))
+                if trule:
+                    r["thumb"]["rule_after"] = {k: L._rule_eval(side, trule, GLOVE).get(k) for k in ("error", "gap_cm", "facing_deg", "share")}
             if job.get("thumb_probe") and th.get("pose") == "to":
                 # a probe: the thumb driven straight to its point (every joint, no guard), then measured
                 L.snapshot("save", "_probe")
@@ -904,7 +908,9 @@ def grasp(side, mark, part=None, offset=None, start=None):
                          # no finger direction given: the whole turn about the face is open (swept), tilts to 25
                          turn_deg=(180.0 if tw is None else float(job.get("solver_turn_deg", 25.0)) * (1.0 if (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark else 3.0)),
                          tilt_deg=25.0 if tw is None else None,
-                         other=job.get("solver_other", True) and not (side == "r" and mark == "grip"))
+                         other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
+                         contact_rules=(hand_rules(side)[0] or None) if (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark else None,
+                         contact_w=float(job.get("contact_weight", 8.0)))
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         H = L._bw(hn).copy()
         rel = bone_world(mark_bone(mark, part)).inverted() @ H
