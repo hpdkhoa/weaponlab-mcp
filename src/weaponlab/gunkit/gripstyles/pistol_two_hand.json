@@ -37,6 +37,11 @@
       -2.9,
       -1.0,
       -3.6
+     ],
+     "thumb_cmc": [
+      -1.5,
+      -9.0,
+      -4.5
      ]
     },
     "across": "grip_axis",
@@ -88,19 +93,19 @@
      "why": "the little finger wrapped round the front strap, pressing to the rear (FM 3-23.35 2-1)"
     },
     "thumb": {
-     "pose": "posture",
-     "curl": [
-      0.0,
-      7.0,
-      15.0
-     ],
+     "pose": "to",
      "point": [
+      2.7,
+      -1.5,
+      -2.4
+     ],
+     "via": [
       2.6,
-      -0.6,
-      -1.2
+      -7.8,
+      -3.5
      ],
      "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 4",
-     "why": "the firing thumb rests alongside the weapon without pressure, along the frame's support side above the trigger guard (FM 3-23.35 2-1, figure 2-1)"
+     "why": "the firing thumb round the backstrap's support-side rear corner and forward along the support side over the bare top of the grip panel, nearly straight (FM 3-23.35 2-1; Ninapro movement 4: MCP 7, IP 15)"
     }
    },
    "trigger": {
@@ -125,8 +130,8 @@
         "stop+0.5"
        ],
        "z": [
-        "stop-1.2",
-        "stop+1.5"
+        "stop-2.6",
+        "stop+0.6"
        ]
       }
      },
@@ -136,7 +141,7 @@
      ],
      "facing_max_deg": 50,
      "need": "required",
-     "why": "the firing thumb lies forward along the frame's support side, over the safety, its pad on the frame (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "why": "the firing thumb lies forward along the support side, over the frame and the top of the grip panel the fingers leave bare, so no part of the grip is left open (FM 3-23.35 2-1: the thumb rests alongside the weapon)",
      "min_share": 0.6
     },
     {
@@ -315,19 +320,18 @@
     ],
     "why": "the support palm on the grip's left side, filling what the firing hand leaves open (FM 3-23.35 2-3)",
     "anchors": {
-     "palm": [
-      3.8,
-      -4.2,
-      -7.2
+     "web": [
+      5.5,
+      -4.0,
+      -5.5
      ],
      "knuckle": [
-      4.6,
-      1.2,
-      -7.8
+      6.0,
+      1.5,
+      -8.5
      ]
     },
-    "across": "grip_axis",
-    "fit_source": "FM 3-23.35 (2003) 2-2, the fist grip: the support fingers over the firing fingers, the support palm's heel on the bare support-side panel; on this gun's faces (panel x 1.67, the palm's fitted half thickness 1.84 cm and the glove)"
+    "across": "grip_axis"
    },
    "fingers": {
     "index": {
@@ -608,13 +612,13 @@
       }
      },
      "gap_cm": [
-      -0.15,
-      0.4
+      -0.1,
+      0.6
      ],
      "facing_max_deg": 60,
-     "need": "required",
+     "need": "optional",
      "why": "the support palm's heel fills the grip's support-side panel the firing hand leaves bare: no space left on the grip, the gun held in a closed ring of both hands against recoil (FM 3-23.35 2-2, the fist grip)",
-     "min_share": 0.4
+     "min_share": 0.3
     }
    ],
    "closure": {
@@ -623,20 +627,6 @@
      "r",
      "l"
     ]
-   },
-   "wrap": {
-    "region": {
-     "part": "frame",
-     "facing": "any",
-     "window": {
-      "z": [
-       "grip-2",
-       "grip+1.5"
-      ]
-     }
-    },
-    "min": 0.8,
-    "both_hands": true
    }
   }
  },

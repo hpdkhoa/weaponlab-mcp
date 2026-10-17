@@ -37,7 +37,9 @@ rigs = {"gunkit": {"title": "Gun Kit: %s on the shared arms" % facts["name"], "f
                    "idle": A["idle"], "gun": job["gun_fbx"], "gun_offset": [0.0, 0.0, 0.0], "eye": A["eye"],
                    "styled": bool(job.get("character")),
                    # the clearance capsules fitted to the arms' own skin (Pose Lab measures it on the rest pose)
-                   "fit_capsules": bool(job.get("fit_capsules", True))}}            # the character's colours and the gun's finishes
+                   "fit_capsules": bool(job.get("fit_capsules", True)),
+                   # the thumb's hinges fixed in its own ray (they roll with the metacarpal, as an opposed thumb's do)
+                   "thumb_hinge": job.get("thumb_hinge", "ray")}}            # the character's colours and the gun's finishes
 _be = os.path.join(A["folder"] if os.path.isabs(A["folder"]) else os.path.join(OUT, A["folder"]), "bone_edits.json")
 if os.path.exists(_be):
     rigs["gunkit"]["bone_edits"] = "bone_edits.json"          # the arms copy's bone edits (Tools/blender/slim_arms.py)
@@ -841,7 +843,7 @@ def grasp(side, mark, part=None, offset=None, start=None):
                              from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 4.0)),
                              contact_rules=hand_rules(side)[0] or None, contact_w=float(job.get("contact_weight", 8.0)))
             th = plan.get("thumb") or {}
-            if job.get("hold_chain", True) and hasattr(L, "hold_chain") and hand_rules(side)[0]:
+            if job.get("hold_chain", True) and side in job.get("hold_chain_sides", ("r", "l")) and hasattr(L, "hold_chain") and hand_rules(side)[0]:
                 # a digit still short of its rule (at its limit): the wrist, the forearm and the shoulder help it
                 r["chain"] = L.hold_chain(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
                                           other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
