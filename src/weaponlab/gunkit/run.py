@@ -170,6 +170,15 @@ def arms():
     return a
 
 
+def _body_ranges(ch):
+    """The human size ranges for the character's sex (Pose Lab's human_sizes), or None when Pose Lab has none."""
+    try:
+        from poselab_mcp.sizes import ranges
+    except ImportError:
+        return None
+    return ranges((ch or {}).get("sex", "male"))
+
+
 def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, character=None, diagnose=()):
     """The hand clips on the shared arms (Pose Lab's Lab in Blender): each written as FBX and bone data, with Pose
     Lab's clipping, anatomy and grip checks, the expected sights (a port in view) and the carried parts' tracks.
@@ -189,7 +198,9 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
     job = {"poselab": str(Path(poselab_mcp.__file__).resolve().parent / "blender"), "arms": arms(),
            "gun_fbx": facts["model"]["file"], "facts": facts, "clips": tl, "tracks": tracks,
            "prefix": "A_%s_Hands_" % facts["name"], "out": str(out), "grip_steps": grip_steps, "render": render,
-           "style": st, "character": ch, "glove_cm": SU.glove_cm(ch), "diagnose": list(diagnose)}
+           "style": st, "character": ch, "glove_cm": SU.glove_cm(ch), "diagnose": list(diagnose),
+           # no bone and no part of the skin of a size no adult has (Pose Lab's body_size, ANSUR II ranges)
+           "body_ranges": _body_ranges(ch)}
     _blender("gunkit_hands.py", job, out, timeout=7200)
     return json.loads((out / "hands.json").read_text(encoding="utf-8"))
 

@@ -16,7 +16,12 @@
      0.0,
      0.0
     ],
-    "why": "the firing palm on the grip's right side, the web of the hand high under the tang (FM 3-23.35 2-3)"
+    "why": "the firing palm on the grip's right side, the web of the hand high under the tang (FM 3-23.35 2-3); the fingers forward across the front strap, square to the grip's 18.7 degree slant",
+    "fingers_toward": [
+     0.0,
+     0.95,
+     -0.32
+    ]
    },
    "fingers": {
     "index": {
@@ -56,13 +61,13 @@
      "why": "wraps the front strap at the grip's bottom"
     },
     "thumb": {
-     "pose": "straight",
-     "curl": [
-      0.0,
-      8.0,
-      4.0
+     "pose": "to",
+     "point": [
+      2.2,
+      -1.0,
+      -1.3
      ],
-     "why": "the firing thumb forward along the frame's left side, over the safety, clear of the slide"
+     "why": "the firing thumb across to the frame's left side, resting on the safety and pointing forward (FM 3-23.35 2-3)"
     }
    },
    "trigger": {
@@ -124,13 +129,13 @@
      "why": "wraps over the firing fingers"
     },
     "thumb": {
-     "pose": "straight",
-     "curl": [
-      0.0,
-      8.0,
-      4.0
+     "pose": "to",
+     "point": [
+      2.2,
+      1.8,
+      -2.6
      ],
-     "why": "the support thumb forward along the frame under the firing thumb, clear of the slide's path"
+     "why": "the support thumb forward along the frame's left side under the firing thumb, clear of the slide stop"
     }
    },
    "holds": {

@@ -4,25 +4,86 @@
   "title": "weaponlab-character/1",
   "description": "Who holds the gun: the arms on the shared skeleton, the hands' size, their covering and its finish. Set before any hand clip is made, because a glove's thickness changes the clearance and the fingers' closure, and a hand's size changes its reach.",
   "type": "object",
-  "required": ["contract", "id", "name", "handed", "hands", "covering", "finish"],
+  "required": [
+    "contract",
+    "id",
+    "name",
+    "handed",
+    "hands",
+    "covering",
+    "finish"
+  ],
   "properties": {
-    "contract": {"const": "weaponlab-character/1"},
-    "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
-    "name": {"type": "string"},
-    "arms": {"type": "string", "description": "the arms model on the shared skeleton (default: the project's gunkit arms)"},
-    "handed": {"enum": ["right", "left"]},
-    "hands": {"type": "object", "required": ["scale"], "additionalProperties": false,
-              "properties": {"scale": {"type": "number", "minimum": 0.8, "maximum": 1.2, "description": "the hands' size against the arms model's (1: as modelled)"},
-                             "why": {"type": "string"}}},
+    "contract": {
+      "const": "weaponlab-character/1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "arms": {
+      "type": "string",
+      "description": "the arms model on the shared skeleton (default: the project's gunkit arms)"
+    },
+    "handed": {
+      "enum": [
+        "right",
+        "left"
+      ]
+    },
+    "hands": {
+      "type": "object",
+      "required": [
+        "scale"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scale": {
+          "type": "number",
+          "minimum": 0.8,
+          "maximum": 1.2,
+          "description": "the hands' size against the arms model's (1: as modelled)"
+        },
+        "why": {
+          "type": "string"
+        }
+      }
+    },
     "covering": {
       "type": "object",
-      "required": ["kind", "thickness_cm", "why"],
+      "required": [
+        "kind",
+        "thickness_cm",
+        "why"
+      ],
       "properties": {
-        "kind": {"enum": ["bare", "fingerless_gloves", "full_gloves"]},
-        "material": {"type": "string"},
-        "thickness_cm": {"type": "number", "minimum": 0, "maximum": 0.6, "description": "added to every finger and the palm (the glove's wall)"},
-        "palm": {"type": "string", "description": "a palm of another material (a flyer's glove's leather palm)"},
-        "why": {"type": "string", "minLength": 8}
+        "kind": {
+          "enum": [
+            "bare",
+            "fingerless_gloves",
+            "full_gloves"
+          ]
+        },
+        "material": {
+          "type": "string"
+        },
+        "thickness_cm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.6,
+          "description": "added to every finger and the palm (the glove's wall)"
+        },
+        "palm": {
+          "type": "string",
+          "description": "a palm of another material (a flyer's glove's leather palm)"
+        },
+        "why": {
+          "type": "string",
+          "minLength": 8
+        }
       },
       "additionalProperties": false
     },
@@ -30,10 +91,47 @@
       "type": "object",
       "description": "Coating Lab finish names (or plain colours) for each surface",
       "additionalProperties": false,
-      "properties": {"skin": {"type": "string"}, "glove": {"type": "string"}, "glove_palm": {"type": "string"}, "sleeve": {"type": "string"},
-                     "colors": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "number", "minimum": 0, "maximum": 1}, "minItems": 3, "maxItems": 3}}}
+      "properties": {
+        "skin": {
+          "type": "string"
+        },
+        "glove": {
+          "type": "string"
+        },
+        "glove_palm": {
+          "type": "string"
+        },
+        "sleeve": {
+          "type": "string"
+        },
+        "colors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
     },
-    "sources": {"type": "array", "items": {"type": "string"}}
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sex": {
+      "enum": [
+        "male",
+        "female"
+      ],
+      "description": "the body the arms are sized against: Pose Lab's body_size checks every bone and skin size against this sex's 1st to 99th percentile (ANSUR II)"
+    }
   },
   "additionalProperties": false
 }

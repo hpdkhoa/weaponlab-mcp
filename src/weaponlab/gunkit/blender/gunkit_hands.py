@@ -171,6 +171,13 @@ shift = palm_r() - mark_world("grip")
 L.rifle_rest = Matrix.Translation(shift) @ L.rifle_rest
 L._place_rifle()
 FINGER_BONES = {s: [pb.name for pb in L.arm.pose.bones if any(pb.name.startswith(f + "_") and pb.name.endswith("_" + s) for f in PL.FINGERS)] for s in ("l", "r")}
+if job.get("body_ranges") and hasattr(L, "body_size"):
+    # the bare arms against human sizes before anything is posed on them: a bone or a part of the skin no adult has
+    # fails the run (the gloves come after: a glove is not the body)
+    report["body_size"] = L.body_size("both", ranges=job["body_ranges"])
+    if not report["body_size"]["ok"]:
+        report["notes"].append("the arms are not of human size: " + "; ".join(
+            report["body_size"][sd]["bad"][0] for sd in ("l", "r") if report["body_size"].get(sd, {}).get("bad")))
 report["gloves"] = put_gloves()
 GRASPS = {}
 
@@ -417,13 +424,15 @@ def pose_digits(side, h, trigger, tree, fingers=None):
             continue
         if f["pose"] == "straight":
             set_finger(side, fi, f["curl"])
-        else:
+        elif f["pose"] == "wrap":
             wrap(side, fi, f["max_curl"], tree)
     t = fingers.get("thumb")
     if t and t["pose"] == "straight":
         set_thumb(side, t["curl"][1], t["curl"][2])
     elif t and t["pose"] == "wrap":
         thumb_wrap(side, t["max_curl"], tree)
+    elif t and t["pose"] == "to":
+        thumb_to(side, RA.matrix_world @ g(t["point"]), tree)
     L._mend_hand(side)                                  # the joints back in range and in their fingers' planes
     end_joints_flat(side)
     thumb_clear(side, tree)
@@ -619,12 +628,21 @@ def contact_search(side, mark, at, n, tw):
 
 
 def style_plan(side, mark):
-    """The style's finger plan for a hand on a mark: its contact's fingers, or a working hold's."""
+    """The style's finger plan for a hand on a mark: its contact's fingers, or a working hold's. A digit brought to
+    a rest point gets the point in the world too (as the gun is posed now)."""
     h = (STYLE or {}).get("hands", {}).get(side) or {}
     if h.get("contact", {}).get("mark") == mark:
-        return h["fingers"]
-    x = (h.get("holds") or {}).get(mark)
-    return x["fingers"] if x else None
+        plan = h["fingers"]
+    else:
+        x = (h.get("holds") or {}).get(mark)
+        plan = x["fingers"] if x else None
+    if plan is None:
+        return None
+    plan = {k: dict(v) for k, v in plan.items()}
+    for v in plan.values():
+        if v.get("pose") == "to":
+            v["to_world"] = list(RA.matrix_world @ g(v["point"]))
+    return plan
 
 
 def grasp(side, mark, part=None, offset=None, start=None):
@@ -639,7 +657,7 @@ def grasp(side, mark, part=None, offset=None, start=None):
     hn = L._n("hand", side)
     at = mark_world(mark, part, offset)
     plan = style_plan(side, mark) if STYLE and job.get("solver", True) else None
-    if plan is not None:
+    if plan is not None and job.get("solver_from_scratch", True):
         # the grasp solver (Pose Lab): the whole hand placed on the hold, its digits closed by the style's plan,
         # nothing pressing into the gun or the other hand past what is allowed, the glove counted
         if start:
@@ -647,10 +665,12 @@ def grasp(side, mark, part=None, offset=None, start=None):
         tw = TOWARD.get(mark)
         tw = (RA.matrix_world.to_quaternion() @ g(tw)).normalized() if tw else None
         r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=tw, glove_cm=GLOVE, frame="world",
-                         soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 24)),
-                         span_cm=float(job.get("solver_span_cm", 2.0)),
-                         turn_deg=float(job.get("solver_turn_deg", 25.0)) * (1.0 if (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark else 3.0),
-                         other=job.get("solver_other", True))
+                         soft=SOFT, samples=int(job.get("solver_samples", 120)), refine=int(job.get("solver_refine", 40)),
+                         span_cm=float(job.get("solver_span_cm", 3.0)),
+                         # no finger direction given: the whole turn about the face is open (swept), tilts to 25
+                         turn_deg=(180.0 if tw is None else float(job.get("solver_turn_deg", 25.0)) * (1.0 if (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark else 3.0)),
+                         tilt_deg=25.0 if tw is None else None,
+                         other=job.get("solver_other", True) and not (side == "r" and mark == "grip"))
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         H = L._bw(hn).copy()
         rel = bone_world(mark_bone(mark, part)).inverted() @ H
@@ -660,7 +680,9 @@ def grasp(side, mark, part=None, offset=None, start=None):
         return GRASPS[key]
     back = (RA.matrix_world.to_quaternion() @ g((0.0, -1.0, 0.0))).normalized()
     slid = 0.0
-    if start:
+    if start == "at_use":
+        L.snapshot("load", start)                 # the gun as the clip has it where the hold is used; laid below
+    if start and start != "at_use":
         L.snapshot("load", start)                 # the hands as the placement search left them, already settled
         if STYLE and side == "r" and (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark:
             tw0 = TOWARD.get(mark)
@@ -695,6 +717,18 @@ def grasp(side, mark, part=None, offset=None, start=None):
                                                        # base backed out of the grip (at most 0.6 cm)
     elif STYLE:
         apply_hold(side, mark)                         # a working hold the style names
+    if plan is not None and job.get("solver_refine_placed", True):
+        # the grasp solver (Pose Lab) refines the hold placed above: small moves and turns of the whole hand about
+        # its palm, its digits closed again by the style's plan for each, the place that presses least into the gun
+        # and the other hand (the glove counted), keeps the palm on and the fingers round the gun, and the arm in
+        # its limits wins
+        own = (STYLE["hands"].get(side) or {}).get("contact", {}).get("mark") == mark
+        r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=None, glove_cm=GLOVE, frame="world",
+                         soft=SOFT, samples=int(job.get("solver_samples", 80)), refine=int(job.get("solver_refine", 30)),
+                         span_cm=float(job.get("solver_span_cm", 1.0)),
+                         turn_deg=float(job.get("solver_turn_deg", 10.0)) * (1.0 if own else 2.0),
+                         other=job.get("solver_other", True), from_current=True)
+        report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
     H = L._bw(hn).copy()
     rel = bone_world(mark_bone(mark, part)).inverted() @ H
     fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
@@ -773,8 +807,15 @@ L._place_rifle()
 _BVH.clear()                                       # the gun's surface, in the world, as it now sits
 start = "place_best" if "placement_search" in report else None
 home_r = grasp("r", "grip", start=start)
+if home_r and STYLE and "support" in facts["marks"]:
+    # the firing hand closes on the gun first; the support hand then wraps over it, against the gun and the
+    # firing hand where it now is (a real two-hand grip is built in that order)
+    L._put_hand("r", bone_world("Root") @ home_r[0])
+    for _n, _q in home_r[1].items():
+        L.arm.pose.bones[_n].rotation_quaternion = _q
+    bpy.context.view_layer.update()
 home_l = grasp("l", facts.get("home_l", "support"), start=start) if "support" in facts["marks"] else None
-if STYLE and home_l and style_plan("r", "grip") is not None and job.get("solver", True):
+if home_l and job.get("solver_two_pass", False) and STYLE and style_plan("r", "grip") is not None:
     # the firing hand solved again with the support hand on: the two hands meet (thumbs stacked, fingers wrapped)
     L._put_hand("l", bone_world("Root") @ home_l[0])
     for _n, _q in home_l[1].items():
@@ -1267,7 +1308,10 @@ for cid, clip in job["clips"].items():
     saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root")
     try:
         soft = [c["segment"] + "*" for c in (STYLE or {}).get("soft_contacts", [])]
-        cs = L.check_set(name, ignore=["palm*"] + soft, sides="both", clearance_max_cm=max(0.0, 0.2 - GLOVE))
+        # the firing hand holds the gun on every frame of every clip: its palm on the grip, its thumb opposing its fingers
+        firing = ("r" if (CHAR or {}).get("handed", "right") == "right" else "l",) if STYLE else ()
+        cs = L.check_set(name, ignore=["palm*"] + soft, sides="both", clearance_max_cm=max(0.0, 0.2 - GLOVE),
+                         hold_sides=firing)
     except Exception as e:
         cs = {"error": str(e)[:300]}
     if (STYLE or {}).get("soft_contacts"):

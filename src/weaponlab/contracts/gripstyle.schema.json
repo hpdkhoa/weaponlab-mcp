@@ -158,9 +158,10 @@
           "enum": [
             "straight",
             "wrap",
-            "rest"
+            "rest",
+            "to"
           ],
-          "description": "straight: held at the curls given; wrap: closed until it meets the gun (or its most curl); rest: left as the hold leaves it"
+          "description": "straight: held at the curls given; wrap: closed until it meets the gun (or its most curl); rest: left as the hold leaves it; to: the thumb's tip brought to a rest point, every joint within its range"
         },
         "curl": {
           "type": "array",
@@ -183,6 +184,10 @@
         "why": {
           "type": "string",
           "minLength": 8
+        },
+        "point": {
+          "$ref": "#/$defs/vec3",
+          "description": "to: the rest point for the tip, gun space cm (the firing thumb on the safety)"
         }
       },
       "additionalProperties": false

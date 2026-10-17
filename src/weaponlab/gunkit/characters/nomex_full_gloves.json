@@ -3,6 +3,7 @@
  "id": "nomex_full_gloves",
  "name": "Soldier, Nomex full gloves",
  "handed": "right",
+ "sex": "male",
  "hands": {
   "scale": 1.0,
   "why": "the arms model's own hands (an average adult hand)"
