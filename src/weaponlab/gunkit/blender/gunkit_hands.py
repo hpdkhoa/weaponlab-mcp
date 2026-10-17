@@ -35,7 +35,9 @@ facts = job["facts"]
 A = job["arms"]
 rigs = {"gunkit": {"title": "Gun Kit: %s on the shared arms" % facts["name"], "folder": A["folder"], "arms": A["arms"],
                    "idle": A["idle"], "gun": job["gun_fbx"], "gun_offset": [0.0, 0.0, 0.0], "eye": A["eye"],
-                   "styled": bool(job.get("character"))}}            # the character's colours and the gun's finishes
+                   "styled": bool(job.get("character")),
+                   # the clearance capsules fitted to the arms' own skin (Pose Lab measures it on the rest pose)
+                   "fit_capsules": bool(job.get("fit_capsules", True))}}            # the character's colours and the gun's finishes
 rigs_file = os.path.join(OUT, "gunkit_rigs.json")
 json.dump(rigs, open(rigs_file, "w", encoding="utf-8"), indent=1)
 L = PL.Lab(rigs_file, OUT)
