@@ -12,16 +12,33 @@
    "contact": {
     "mark": "grip",
     "face": [
-     -1.0,
-     0.0,
+     -0.8,
+     -0.6,
      0.0
     ],
-    "why": "the firing palm on the grip's right side, the web of the hand high under the tang (FM 3-23.35 2-3); the fingers forward across the front strap, square to the grip's 18.7 degree slant",
+    "why": "the firing palm wraps the grip's right side and its backstrap, the web of the hand high under the tang on the backstrap's middle, so the thumb lies along the left side (FM 3-23.35 2-3); the fingers forward across the front strap, square to the grip's 18.7 degree slant",
     "fingers_toward": [
      0.0,
      0.95,
      -0.32
-    ]
+    ],
+    "anchors": {
+     "wrist": [
+      -5.3,
+      -11.5,
+      -5.5
+     ],
+     "knuckle": [
+      -3.2,
+      -2.7,
+      -6.6
+     ],
+     "web": [
+      -2.6,
+      -7.2,
+      -3.0
+     ]
+    }
    },
    "fingers": {
     "index": {
@@ -63,9 +80,9 @@
     "thumb": {
      "pose": "to",
      "point": [
-      2.2,
-      -1.0,
-      -1.3
+      2.8,
+      -3.5,
+      -0.9
      ],
      "why": "the firing thumb across to the frame's left side, resting on the safety and pointing forward (FM 3-23.35 2-3)"
     }
@@ -89,7 +106,19 @@
      0.0,
      0.0
     ],
-    "why": "the support palm on the grip's left side, filling what the firing hand leaves open (FM 3-23.35 2-3)"
+    "why": "the support palm on the grip's left side, filling what the firing hand leaves open (FM 3-23.35 2-3)",
+    "anchors": {
+     "web": [
+      5.5,
+      -4.0,
+      -5.5
+     ],
+     "knuckle": [
+      6.0,
+      1.5,
+      -8.5
+     ]
+    }
    },
    "fingers": {
     "index": {
@@ -131,9 +160,9 @@
     "thumb": {
      "pose": "to",
      "point": [
-      2.2,
-      1.8,
-      -2.6
+      3.2,
+      2.4,
+      -2.8
      ],
      "why": "the support thumb forward along the frame's left side under the firing thumb, clear of the slide stop"
     }

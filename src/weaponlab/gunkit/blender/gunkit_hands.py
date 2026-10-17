@@ -663,6 +663,35 @@ def grasp(side, mark, part=None, offset=None, start=None):
     hn = L._n("hand", side)
     at = mark_world(mark, part, offset)
     plan = style_plan(side, mark) if STYLE and job.get("solver", True) else None
+    con = ((STYLE or {}).get("hands", {}).get(side) or {}).get("contact", {})
+    if plan is not None and con.get("mark") == mark and con.get("anchors"):
+        # the hold as real technique sets it: the hand fitted to its anchor points on the gun (the web under the
+        # tang, the middle knuckle under the guard ...), its palm facing the panel; then its digits closed by the
+        # plan, and the solver refining round the anchors so nothing presses into the gun or the other hand
+        if start:
+            L.snapshot("load", start)
+        Q = RA.matrix_world
+        anc = {k: list(Q @ g(v)) for k, v in con["anchors"].items()}
+        face_w = (Q.to_quaternion() @ g([-x for x in con["face"]])).normalized()
+        placed = L.place_hand(side, anc, facing=list(face_w), frame="world")
+        r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=None, glove_cm=GLOVE, frame="world",
+                         soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 30)),
+                         span_cm=float(job.get("anchor_span_cm", 0.8)), turn_deg=float(job.get("anchor_turn_deg", 10.0)),
+                         other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
+                         from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 10.0)))
+        r["placed"] = placed
+        th = plan.get("thumb") or {}
+        if th.get("pose") == "to" and hasattr(L, "thumb_search"):
+            # the thumb on its rest point by its own search, the hand where the solver left it
+            r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE,
+                                        other=job.get("solver_other", True) and not (side == "r" and mark == "grip"))
+        report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
+        H = L._bw(hn).copy()
+        rel = bone_world(mark_bone(mark, part)).inverted() @ H
+        fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
+        L.snapshot("load", "before_grasp")
+        GRASPS[key] = (rel, fingers, r["press"] <= 0.01 and r["rules"] == 0)
+        return GRASPS[key]
     if plan is not None and job.get("solver_from_scratch", True):
         # the grasp solver (Pose Lab): the whole hand placed on the hold, its digits closed by the style's plan,
         # nothing pressing into the gun or the other hand past what is allowed, the glove counted
@@ -875,13 +904,15 @@ def hold_geometry():
         gp = lambda v: [round(x, 1) for x in fk(v)]      # noqa: E731
         d = fk(k) - fk(w)
         out[sd] = {"wrist": gp(w), "knuckle": gp(k), "web": gp(web), "middle_tip": gp(L._finger_tip("middle", sd)),
-                   "thumb_tip": gp(L._finger_tip("thumb", sd)), "fingers_point": [round(x, 2) for x in d.normalized()]}
+                   "thumb_tip": gp(L._finger_tip("thumb", sd)), "fingers_point": [round(x, 2) for x in d.normalized()],
+                   "thumb_rules": L._thumb_report(sd, L._thumb_limits())[1]}
     return out
 
 
 report["hold_geometry"] = hold_geometry()
 if job.get("render"):
-    report["hold_pictures"] = L.render(views=("eye", "right", "left", "top"), size=(640, 360))
+    report["hold_pictures"] = L.render(views=("eye", "right", "left", "top"), size=(640, 360),
+                                       ortho_cm=job.get("render_ortho_cm", 34.0))
     report["hold_grip"] = L.grip("both", hold=True)
     report["hold_clearance"] = L.clearance(parts="both", top=4)
     report["hold_anatomy"] = L.anatomy("both")

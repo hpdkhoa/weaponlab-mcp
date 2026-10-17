@@ -229,6 +229,13 @@
             "fingers_toward": {
               "$ref": "#/$defs/vec3",
               "description": "the way the fingers point from the palm (gun space)"
+            },
+            "anchors": {
+              "type": "object",
+              "description": "the hold as technique sets it: named points of the hand (web, knuckle, index_knuckle, pinky_knuckle, wrist, palm) and where each goes on the gun (gun space cm); the hand is fitted to them and the solver refines round them",
+              "additionalProperties": {
+                "$ref": "#/$defs/vec3"
+              }
             }
           }
         },
