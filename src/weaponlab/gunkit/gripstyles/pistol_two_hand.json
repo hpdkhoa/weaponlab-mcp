@@ -38,7 +38,82 @@
       -7.2,
       -3.0
      ]
-    }
+    },
+    "across": "grip_axis",
+    "starts": [
+     {
+      "face": [
+       -0.7,
+       -0.7,
+       0.0
+      ],
+      "anchors": {
+       "wrist": [
+        -3.5,
+        -13.5,
+        -5.0
+       ],
+       "knuckle": [
+        -3.4,
+        -5.0,
+        -6.0
+       ],
+       "web": [
+        -0.3,
+        -8.4,
+        -2.6
+       ]
+      }
+     },
+     {
+      "face": [
+       -0.6,
+       -0.8,
+       0.0
+      ],
+      "anchors": {
+       "wrist": [
+        -4.0,
+        -12.5,
+        -5.5
+       ],
+       "knuckle": [
+        -3.4,
+        -2.6,
+        -6.6
+       ],
+       "web": [
+        -1.2,
+        -8.0,
+        -2.8
+       ]
+      }
+     },
+     {
+      "face": [
+       -0.45,
+       -0.9,
+       0.0
+      ],
+      "anchors": {
+       "wrist": [
+        -2.5,
+        -13.0,
+        -5.0
+       ],
+       "knuckle": [
+        -3.6,
+        -3.0,
+        -6.4
+       ],
+       "web": [
+        -0.3,
+        -8.4,
+        -2.6
+       ]
+      }
+     }
+    ]
    },
    "fingers": {
     "index": {
@@ -80,11 +155,16 @@
     "thumb": {
      "pose": "to",
      "point": [
-      2.8,
-      -3.5,
+      2.6,
+      -2.9,
       -0.9
      ],
-     "why": "the firing thumb across to the frame's left side, resting on the safety and pointing forward (FM 3-23.35 2-3)"
+     "why": "the firing thumb round the backstrap under the tang (its knuckle at the support-side rear corner) and forward along the frame's support side, resting on the safety (FM 3-23.35 2-3)",
+     "via": [
+      2.4,
+      -8.3,
+      -3.0
+     ]
     }
    },
    "trigger": {
@@ -179,7 +259,7 @@
      "region": {
       "part": "frame",
       "facing": "front",
-      "facing_tol_deg": 65,
+      "facing_tol_deg": 80,
       "window": {
        "z": [
         "trigger-4.5",
@@ -194,7 +274,7 @@
      "facing_max_deg": 60,
      "need": "required",
      "why": "the middle finger round the front strap just under the trigger guard (FM 3-23.35 (2003) 2-3: the two-hand grip)",
-     "min_share": 0.4
+     "min_share": 0.3
     },
     {
      "id": "ring_round_front",
@@ -202,7 +282,7 @@
      "region": {
       "part": "frame",
       "facing": "front",
-      "facing_tol_deg": 65,
+      "facing_tol_deg": 80,
       "window": {
        "z": [
         "trigger-6.8",
@@ -217,7 +297,7 @@
      "facing_max_deg": 60,
      "need": "required",
      "why": "the ring finger round the front strap under the middle finger (FM 3-23.35 (2003) 2-3: the two-hand grip)",
-     "min_share": 0.4
+     "min_share": 0.3
     },
     {
      "id": "middle_tip_on_far_panel",
@@ -283,7 +363,8 @@
       1.5,
       -8.5
      ]
-    }
+    },
+    "across": "grip_axis"
    },
    "fingers": {
     "index": {

@@ -791,6 +791,8 @@ def style_plan(side, mark):
     for v in plan.values():
         if v.get("pose") == "to":
             v["to_world"] = list(RA.matrix_world @ g(v["point"]))
+            if v.get("via"):
+                v["via_world"] = list(RA.matrix_world @ g(v["via"]))
     return plan
 
 
@@ -814,23 +816,70 @@ def grasp(side, mark, part=None, offset=None, start=None):
         if start:
             L.snapshot("load", start)
         Q = RA.matrix_world
-        anc = {k: list(Q @ g(v)) for k, v in con["anchors"].items()}
-        face_w = (Q.to_quaternion() @ g([-x for x in con["face"]])).normalized()
-        placed = L.place_hand(side, anc, facing=list(face_w), frame="world")
-        r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=None, glove_cm=GLOVE, frame="world",
-                         soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 30)),
-                         span_cm=float(job.get("anchor_span_cm", 0.8)), turn_deg=float(job.get("anchor_turn_deg", 10.0)),
-                         other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
-                         from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 4.0)),
-                         contact_rules=hand_rules(side)[0] or None, contact_w=float(job.get("contact_weight", 8.0)))
+        L.snapshot("save", "_multi")
+        tries = [{"face": con["face"], "anchors": con["anchors"]}] + list(con.get("starts", []))
+        best_try = None
+        for ti, tr_ in enumerate(tries):
+            L.snapshot("load", "_multi")
+            anc = {k: list(Q @ g(v)) for k, v in tr_["anchors"].items()}
+            face_w = (Q.to_quaternion() @ g([-x for x in tr_["face"]])).normalized()
+            acr = None
+            if con.get("across") == "grip_axis" and (facts.get("magazine") or {}).get("axis"):
+                ax_ = [-x for x in facts["magazine"]["axis"]]        # the magazine well's line, upward: the grip's axis
+                acr = list((Q.to_quaternion() @ g(ax_)).normalized())
+            elif isinstance(con.get("across"), list):
+                acr = list((Q.to_quaternion() @ g(con["across"])).normalized())
+            placed = L.place_hand(side, anc, facing=list(face_w), frame="world", across=acr)
+            r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=None, glove_cm=GLOVE, frame="world",
+                             soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 30)),
+                             span_cm=float(job.get("anchor_span_cm", 0.8)), turn_deg=float(job.get("anchor_turn_deg", 10.0)),
+                             other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
+                             from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 4.0)),
+                             contact_rules=hand_rules(side)[0] or None, contact_w=float(job.get("contact_weight", 8.0)))
+            th = plan.get("thumb") or {}
+            if job.get("hold_chain", True) and hasattr(L, "hold_chain") and hand_rules(side)[0]:
+                # a digit still short of its rule (at its limit): the wrist, the forearm and the shoulder help it
+                r["chain"] = L.hold_chain(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
+                                          other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
+                                          soft=SOFT, thumb_point=th.get("to_world") if th.get("pose") == "to" else None)
+            if th.get("pose") == "to" and hasattr(L, "thumb_search") and not th.get("via"):
+                trule = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
+                r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE,
+                                            other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
+                                            rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)))
+            if job.get("thumb_probe") and th.get("pose") == "to":
+                # a probe: the thumb driven straight to its point (every joint, no guard), then measured
+                L.snapshot("save", "_probe")
+                tgt_ = Vector(th["to_world"])
+                L._thumb_to(side, tgt_, L._tree(), GLOVE, False, guard=False, rounds=40)
+                trule_ = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
+                ev_ = L._rule_eval(side, trule_, GLOVE) if trule_ else {}
+                Ri_ = RA.matrix_world.inverted()
+                tp_ = Ri_ @ L._finger_tip("thumb", side)
+                report.setdefault("thumb_probe", []).append({
+                    "start": ti, "tip": [round(tp_.x * 100, 1), round(-tp_.y * 100, 1), round(tp_.z * 100, 1)],
+                    "left_cm": round((L._finger_tip("thumb", side) - tgt_).length * 100, 2),
+                    "gap_cm": round(L._digit_gap(side, "thumb", L._tree(), GLOVE, False), 2),
+                    "rule": {k: ev_.get(k) for k in ("error", "gap_cm", "facing_deg", "share")},
+                    "thumb_rules": L._thumb_report(side, L._thumb_limits())[1]})
+                L.snapshot("load", "_probe")
+            cn_ = contacts_now(side)
+            # the start whose hold best meets the rules: each required rule's error, the wrap and the closure
+            sc_ = sum(x["error"] for x in cn_["rules"] if x.get("need") == "required") if cn_ else r["score"]
+            if cn_ and cn_.get("wrap") and not cn_["wrap"]["met"]:
+                sc_ += 2.0 * (cn_["wrap"]["min"] - cn_["wrap"]["share"])
+            if cn_ and not cn_["closure"]["closed"]:
+                sc_ += 5.0
+            sc_ += 0.05 * r["score"]
+            r["start"] = ti
+            r["start_score"] = round(sc_, 3)
+            report.setdefault("starts", {}).setdefault("%s:%s" % (side, mark), []).append(round(sc_, 3))
+            if best_try is None or sc_ < best_try[0]:
+                L.snapshot("save", "_multi_best")
+                best_try = (sc_, r, placed)
+        L.snapshot("load", "_multi_best")
+        r, placed = best_try[1], best_try[2]
         r["placed"] = placed
-        th = plan.get("thumb") or {}
-        if th.get("pose") == "to" and hasattr(L, "thumb_search"):
-            # the thumb on its rest point by its own search, the hand where the solver left it
-            trule = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
-            r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE,
-                                        other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
-                                        rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)))
         r["contacts"] = contacts_now(side)
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         H = L._bw(hn).copy()

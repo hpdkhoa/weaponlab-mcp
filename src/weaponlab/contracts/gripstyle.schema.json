@@ -188,6 +188,10 @@
         "point": {
           "$ref": "#/$defs/vec3",
           "description": "to: the rest point for the tip, gun space cm (the firing thumb on the safety)"
+        },
+        "via": {
+          "$ref": "#/$defs/vec3",
+          "description": "to: a waypoint for the thumb's knuckle (its MCP), gun space cm: the path a thumb takes round a backstrap"
         }
       },
       "additionalProperties": false
@@ -235,6 +239,42 @@
               "description": "the hold as technique sets it: named points of the hand (web, knuckle, index_knuckle, pinky_knuckle, wrist, palm) and where each goes on the gun (gun space cm); the hand is fitted to them and the solver refines round them",
               "additionalProperties": {
                 "$ref": "#/$defs/vec3"
+              }
+            },
+            "across": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "grip_axis"
+                  ]
+                },
+                {
+                  "$ref": "#/$defs/vec3"
+                }
+              ],
+              "description": "the way the line across the knuckles (little finger to index) runs: grip_axis (the magazine well's line, upward) so the fingers curl round the grip, or a gun-space direction"
+            },
+            "starts": {
+              "type": "array",
+              "description": "more places the solver starts from (each a face and anchors); the one whose hold best meets the contact rules is kept",
+              "items": {
+                "type": "object",
+                "required": [
+                  "face",
+                  "anchors"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "face": {
+                    "$ref": "#/$defs/vec3"
+                  },
+                  "anchors": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/$defs/vec3"
+                    }
+                  }
+                }
               }
             }
           }
