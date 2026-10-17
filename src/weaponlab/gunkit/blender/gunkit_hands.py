@@ -1161,7 +1161,10 @@ def hold_geometry():
         d = fk(k) - fk(w)
         out[sd] = {"wrist": gp(w), "knuckle": gp(k), "web": gp(web), "middle_tip": gp(L._finger_tip("middle", sd)),
                    "thumb_tip": gp(L._finger_tip("thumb", sd)), "fingers_point": [round(x, 2) for x in d.normalized()],
-                   "thumb_rules": L._thumb_report(sd, L._thumb_limits())[1]}
+                   "thumb_rules": L._thumb_report(sd, L._thumb_limits())[1],
+                   "thumb_joints": {j: gp(L._bw(L._n("finger", sd, "thumb", j)).translation) for j in ("01", "02", "03")},
+                   "thumb_via": getattr(L, "_last_via", None),
+                   "thumb_clearance": [(c_["segment"], c_["depth_cm"]) for c_ in L.clearance(parts={"r": "right", "l": "left"}[sd], top=6)["contacts"] if c_["segment"].startswith("thumb")]}
     return out
 
 

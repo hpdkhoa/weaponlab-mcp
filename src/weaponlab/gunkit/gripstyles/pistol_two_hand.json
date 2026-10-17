@@ -37,6 +37,11 @@
       -2.6,
       -7.2,
       -3.0
+     ],
+     "thumb_cmc": [
+      -0.6,
+      -9.6,
+      -2.6
      ]
     },
     "across": "grip_axis",
@@ -62,6 +67,11 @@
         -0.3,
         -8.4,
         -2.6
+       ],
+       "thumb_cmc": [
+        -0.6,
+        -9.6,
+        -2.6
        ]
       }
      },
@@ -86,6 +96,11 @@
         -1.2,
         -8.0,
         -2.8
+       ],
+       "thumb_cmc": [
+        -0.6,
+        -9.6,
+        -2.6
        ]
       }
      },
@@ -109,6 +124,11 @@
        "web": [
         -0.3,
         -8.4,
+        -2.6
+       ],
+       "thumb_cmc": [
+        -0.6,
+        -9.6,
         -2.6
        ]
       }
@@ -161,9 +181,9 @@
      ],
      "why": "the firing thumb round the backstrap under the tang (its knuckle at the support-side rear corner) and forward along the frame's support side, resting on the safety (FM 3-23.35 2-3)",
      "via": [
-      2.4,
-      -8.3,
-      -3.0
+      2.6,
+      -6.9,
+      -2.8
      ]
     }
    },
