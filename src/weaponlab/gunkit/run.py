@@ -179,7 +179,7 @@ def _body_ranges(ch):
     return ranges((ch or {}).get("sex", "male"))
 
 
-def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, character=None, diagnose=()):
+def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, character=None, diagnose=(), options=None):
     """The hand clips on the shared arms (Pose Lab's Lab in Blender): each written as FBX and bone data, with Pose
     Lab's clipping, anatomy and grip checks, the expected sights (a port in view) and the carried parts' tracks.
     style: a grip style id (default the action family's); character: a character id (default the project's). The
@@ -201,6 +201,7 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
            "style": st, "character": ch, "glove_cm": SU.glove_cm(ch), "diagnose": list(diagnose),
            # no bone and no part of the skin of a size no adult has (Pose Lab's body_size, ANSUR II ranges)
            "body_ranges": _body_ranges(ch)}
+    job.update(options or {})          # the hand step's own switches (solver_*, regrip, arc_cm ...), for trials
     _blender("gunkit_hands.py", job, out, timeout=7200)
     return json.loads((out / "hands.json").read_text(encoding="utf-8"))
 

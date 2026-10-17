@@ -44,10 +44,14 @@ L = PL.Lab(rigs_file, OUT)
 L.load_rig("gunkit")
 RA = L.rifle_arm
 report = {"gun": facts["name"], "clips": {}, "notes": []}
+if hasattr(L, "_fitted_radii") and L._fitted_radii():
+    report["capsules_cm"] = {k: round(v * 100.0, 2) for k, v in L._fitted_radii().items()}
 STYLE = job.get("style")
 CHAR = job.get("character")
 GLOVE = float(job.get("glove_cm", 0.0))
-PALM_CM = 1.5 + GLOVE
+# the palm's half thickness: the capsule fitted to the arms' skin when Pose Lab fits them, else 1.5 cm; the glove on it
+_FIT = L._fitted_radii() if hasattr(L, "_fitted_radii") else None
+PALM_CM = ((_FIT or {}).get("palm", 0.015) * 100.0) + GLOVE
 FACE = {h["contact"]["mark"]: h["contact"]["face"] for h in (STYLE or {}).get("hands", {}).values()}
 TOWARD = {h["contact"]["mark"]: h["contact"].get("fingers_toward") for h in (STYLE or {}).get("hands", {}).values()}
 for _h in (STYLE or {}).get("hands", {}).values():
@@ -857,6 +861,25 @@ report["hold"] = {"right": "found" if home_r[2] else "laid", "left": ("found" if
 # (the game's ArmsGunOffset: the gun mesh is attached to the gun bone at that offset)
 report["placement"] = {"bolt_face_in_gun_bone_cm": [round(x, 3) for x in lab_gun(RA.matrix_world @ g((0.0, 0.0, 0.0)))],
                        "gun_bone": GUN_BONE}
+def hold_geometry():
+    """Each hand's hold in gun space (cm; +x the gun's left, +y forward, +z up): where its wrist, middle knuckle,
+    web (between the thumb's base and the index knuckle), middle fingertip and thumb tip are, and which way its
+    fingers point (wrist to middle knuckle, a unit vector)."""
+    out = {}
+    for sd in ("r", "l"):
+        w = L._bw(L._n("hand", sd)).translation
+        k = L._bw(L._n("finger", sd, "middle", "01")).translation
+        web = L._bw(L._n("finger", sd, "thumb", "01")).translation.lerp(L._bw(L._n("finger", sd, "index", "01")).translation, 0.5)
+        Ri = RA.matrix_world.inverted()
+        fk = lambda v: Vector(((Ri @ v)[0] * 100.0, -(Ri @ v)[1] * 100.0, (Ri @ v)[2] * 100.0))   # noqa: E731  the facts' frame
+        gp = lambda v: [round(x, 1) for x in fk(v)]      # noqa: E731
+        d = fk(k) - fk(w)
+        out[sd] = {"wrist": gp(w), "knuckle": gp(k), "web": gp(web), "middle_tip": gp(L._finger_tip("middle", sd)),
+                   "thumb_tip": gp(L._finger_tip("thumb", sd)), "fingers_point": [round(x, 2) for x in d.normalized()]}
+    return out
+
+
+report["hold_geometry"] = hold_geometry()
 if job.get("render"):
     report["hold_pictures"] = L.render(views=("eye", "right", "left", "top"), size=(640, 360))
     report["hold_grip"] = L.grip("both", hold=True)
