@@ -332,9 +332,195 @@
               "minLength": 8
             }
           }
+        },
+        "contact_rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contact_rule"
+          },
+          "description": "what touches what while the hand is on its contact: checked on every frame of that hold, the solver aims at them"
+        },
+        "wrap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "region",
+            "min"
+          ],
+          "properties": {
+            "region": {
+              "$ref": "#/$defs/region"
+            },
+            "min": {
+              "type": "number"
+            }
+          },
+          "description": "a band of the held part the hand must cover, as a share of its surface"
+        },
+        "closure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "friction": {
+              "type": "number"
+            },
+            "sides": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "l",
+                  "r"
+                ]
+              }
+            }
+          },
+          "description": "force closure: the touches (of these hands) hold the gun against any slip or twist"
         }
       },
       "additionalProperties": false
+    },
+    "region": {
+      "type": "object",
+      "required": [
+        "part",
+        "facing"
+      ],
+      "additionalProperties": false,
+      "description": "a region of the gun's surface, found on whichever mesh is loaded: the part's polygons facing a way, inside a window",
+      "properties": {
+        "part": {
+          "type": "string",
+          "description": "frame (the gun's body) or a part of the gun's facts (slide, magazine ...)"
+        },
+        "facing": {
+          "oneOf": [
+            {
+              "enum": [
+                "left",
+                "right",
+                "front",
+                "back",
+                "up",
+                "down",
+                "support_side",
+                "firing_side",
+                "any"
+              ]
+            },
+            {
+              "$ref": "#/$defs/vec3"
+            }
+          ],
+          "description": "the way the surface faces (gun space; support_side and firing_side follow the character's hand)"
+        },
+        "facing_tol_deg": {
+          "type": "number",
+          "description": "how far a polygon's normal may lie off facing (default 60)"
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^([A-Za-z_]+([+-][0-9.]+)?|frac:[0-9.]+)$"
+                  }
+                ]
+              }
+            },
+            "y": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^([A-Za-z_]+([+-][0-9.]+)?|frac:[0-9.]+)$"
+                  }
+                ]
+              }
+            },
+            "z": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^([A-Za-z_]+([+-][0-9.]+)?|frac:[0-9.]+)$"
+                  }
+                ]
+              }
+            }
+          },
+          "description": "per axis [low, high]: gun cm, a mark's coordinate with an offset (stop+0.5), or a fraction of the part's extent (frac:0.3)"
+        }
+      }
+    },
+    "contact_rule": {
+      "type": "object",
+      "required": [
+        "id",
+        "patch",
+        "region",
+        "why"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "patch": {
+          "type": "string",
+          "description": "the hand's skin: thumb|index|middle|ring|pinky with :pad, :tip, :base, :back or :whole; palm; heel; web"
+        },
+        "region": {
+          "$ref": "#/$defs/region"
+        },
+        "gap_cm": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          },
+          "description": "skin to surface, glove counted, [low, high]"
+        },
+        "facing_max_deg": {
+          "type": "number"
+        },
+        "need": {
+          "enum": [
+            "required",
+            "optional"
+          ]
+        },
+        "why": {
+          "type": "string",
+          "minLength": 8
+        },
+        "min_share": {
+          "type": "number",
+          "description": "the share of the patch's points that must meet the rule (a pad laid along a surface, not one point touching)"
+        }
+      }
     }
   }
 }

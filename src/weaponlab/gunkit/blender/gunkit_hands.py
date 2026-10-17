@@ -633,6 +633,149 @@ def contact_search(side, mark, at, n, tw):
     return short
 
 
+# --- contact rules: regions found on the gun's mesh, whichever mesh it is ------------------------------------------
+_DIRS = {"left": (1, 0, 0), "right": (-1, 0, 0), "front": (0, 1, 0), "back": (0, -1, 0), "up": (0, 0, 1), "down": (0, 0, -1)}
+
+
+def _facing_vec(f):
+    if isinstance(f, list):
+        return Vector(f).normalized()
+    handed = (CHAR or {}).get("handed", "right")
+    if f == "support_side":
+        f = "left" if handed == "right" else "right"
+    elif f == "firing_side":
+        f = "right" if handed == "right" else "left"
+    return None if f == "any" else Vector(_DIRS[f])
+
+
+def _gun_polys():
+    """Each polygon of the gun's mesh at rest in the facts' gun frame (cm): its centre, its normal and the bone that
+    carries it (its vertices' heaviest group)."""
+    me = L.rifle_mesh
+    Ri = RA.matrix_world.inverted() @ me.matrix_world
+    Rq = Ri.to_quaternion()
+    names = {g.index: g.name for g in me.vertex_groups}
+    vb = []
+    for v in me.data.vertices:
+        gm = max(v.groups, key=lambda x: x.weight) if v.groups else None
+        vb.append(names.get(gm.group, "Root") if gm else "Root")
+    out = []
+    for p in me.data.polygons:
+        c_ = Ri @ p.center
+        n_ = Rq @ p.normal
+        bones = [vb[i] for i in p.vertices]
+        out.append((Vector((c_.x * 100, -c_.y * 100, c_.z * 100)), Vector((n_.x, -n_.y, n_.z)).normalized(),
+                    max(set(bones), key=bones.count)))
+    return out
+
+
+_GP = []
+
+
+def _bound(b, axis, part_ext):
+    if isinstance(b, (int, float)):
+        return float(b)
+    if b.startswith("frac:"):
+        lo, hi = part_ext
+        return lo + (hi - lo) * float(b[5:])
+    import re as _re
+    m = _re.match(r"^([A-Za-z_]+)([+-][0-9.]+)?$", b)
+    return facts["marks"][m.group(1)]["xyz".index(axis)] + float(m.group(2) or 0.0)
+
+
+def resolve_region(spec):
+    """The polygons of a region: the part's (frame: the gun's body), facing the way asked within its tolerance,
+    their centres inside the window."""
+    if not _GP:
+        _GP.extend(_gun_polys())
+    bone = "Root" if spec["part"] == "frame" else (facts["parts"][spec["part"]]["bone"])
+    mine = [(i, c_, n_) for i, (c_, n_, b_) in enumerate(_GP) if b_ == bone]
+    ext = {ax: (min(c_["xyz".index(ax)] for _i, c_, _n in mine), max(c_["xyz".index(ax)] for _i, c_, _n in mine)) for ax in "xyz"} if mine else {}
+    fv = _facing_vec(spec["facing"])
+    cos_t = math.cos(math.radians(spec.get("facing_tol_deg", 60.0)))
+    win = {ax: (_bound(v[0], ax, ext.get(ax, (0, 0))), _bound(v[1], ax, ext.get(ax, (0, 0)))) for ax, v in (spec.get("window") or {}).items()}
+    out = []
+    for i, c_, n_ in mine:
+        if fv is not None and n_.dot(fv) < cos_t:
+            continue
+        if any(not (min(lohi) <= c_["xyz".index(ax)] <= max(lohi)) for ax, lohi in win.items()):
+            continue
+        out.append(i)
+    return out
+
+
+RULES = {}
+
+
+def hand_rules(side):
+    """A hand's contact rules with their regions on this mesh (polygon indices), its wrap band and closure."""
+    if side in RULES:
+        return RULES[side]
+    h = ((STYLE or {}).get("hands") or {}).get(side) or {}
+    rules = []
+    for r_ in h.get("contact_rules", []):
+        x = dict(r_)
+        x["polys"] = resolve_region(r_["region"])
+        rules.append(x)
+    wrap = None
+    if h.get("wrap"):
+        wrap = {"polys": resolve_region(h["wrap"]["region"]), "min": h["wrap"]["min"]}
+    RULES[side] = (rules, wrap, h.get("closure"))
+    report.setdefault("contact_regions", {})[side] = {r_["id"]: len(r_["polys"]) for r_ in rules}
+    return RULES[side]
+
+
+def contacts_now(side):
+    rules, wrap, closure = hand_rules(side)
+    if not rules and not wrap and not closure:
+        return None
+    cn = L.contacts(side, rules, glove_cm=GLOVE, friction=(closure or {}).get("friction", 0.5), wrap=wrap,
+                    closure_sides=(closure or {}).get("sides", [side]), frame="world")
+    Ri = RA.matrix_world.inverted()
+    for r_ in cn["rules"]:
+        if r_.get("touch") is not None:
+            q = Ri @ Vector(r_["touch"])
+            r_["touch"] = [round(q.x * 100, 2), round(-q.y * 100, 2), round(q.z * 100, 2)]
+            nv = Ri.to_quaternion() @ Vector(r_["normal"])
+            r_["normal"] = [round(nv.x, 2), round(-nv.y, 2), round(nv.z, 2)]
+    return cn
+
+
+def summarise_contacts(rows):
+    """A clip's contact checks: for each hand and rule, the frames it fails, its worst error and gap; the frames
+    the wrap or the force closure fails; and the frames any required rule fails."""
+    out = {}
+    for t, side, cn in rows:
+        o = out.setdefault(side, {"frames": 0, "fail_frames": 0, "rules": {}, "wrap_fail_frames": 0, "closure_fail_frames": 0,
+                                  "closure_margin_min": None})
+        o["frames"] += 1
+        o["fail_frames"] += 0 if cn["ok"] else 1
+        for r_ in cn["rules"]:
+            x = o["rules"].setdefault(r_["id"], {"need": r_.get("need"), "fail_frames": 0, "worst_error": 0.0, "gap_cm": [], "facing_deg": []})
+            if not r_["met"]:
+                x["fail_frames"] += 1
+            x["worst_error"] = max(x["worst_error"], r_.get("error", 0.0))
+            if "gap_cm" in r_:
+                x["gap_cm"].append(r_["gap_cm"])
+                x["facing_deg"].append(r_["facing_deg"])
+            if r_.get("touch") is not None and "first_touch" not in x:
+                x["first_touch"] = r_["touch"]
+        if cn.get("wrap") and not cn["wrap"]["met"]:
+            o["wrap_fail_frames"] += 1
+        cl = cn.get("closure") or {}
+        if not cl.get("closed", True):
+            o["closure_fail_frames"] += 1
+        m = cl.get("margin")
+        o["closure_margin_min"] = m if o["closure_margin_min"] is None else min(o["closure_margin_min"], m)
+    for o in out.values():
+        for x in o["rules"].values():
+            g_, f_ = x.pop("gap_cm"), x.pop("facing_deg")
+            if g_:
+                x["gap_cm"] = [round(min(g_), 2), round(max(g_), 2)]
+                x["facing_deg"] = [min(f_), max(f_)]
+    return out
+
+
 def style_plan(side, mark):
     """The style's finger plan for a hand on a mark: its contact's fingers, or a working hold's. A digit brought to
     a rest point gets the point in the world too (as the gun is posed now)."""
@@ -678,13 +821,17 @@ def grasp(side, mark, part=None, offset=None, start=None):
                          soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 30)),
                          span_cm=float(job.get("anchor_span_cm", 0.8)), turn_deg=float(job.get("anchor_turn_deg", 10.0)),
                          other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
-                         from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 10.0)))
+                         from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 4.0)),
+                         contact_rules=hand_rules(side)[0] or None, contact_w=float(job.get("contact_weight", 8.0)))
         r["placed"] = placed
         th = plan.get("thumb") or {}
         if th.get("pose") == "to" and hasattr(L, "thumb_search"):
             # the thumb on its rest point by its own search, the hand where the solver left it
+            trule = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
             r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE,
-                                        other=job.get("solver_other", True) and not (side == "r" and mark == "grip"))
+                                        other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
+                                        rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)))
+        r["contacts"] = contacts_now(side)
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         H = L._bw(hn).copy()
         rel = bone_world(mark_bone(mark, part)).inverted() @ H
@@ -841,6 +988,66 @@ rest_parts()
 L._place_rifle()
 _BVH.clear()                                       # the gun's surface, in the world, as it now sits
 start = "place_best" if "placement_search" in report else None
+if job.get("skin_check"):
+    # the hand clips as made, replayed on this skin (the gun's mesh in gun_fbx): no hand is moved; each frame's
+    # clearance, the firing hand's hold and each hand's contact rules on its own contact are measured, so a skin
+    # thicker than the one the clips were made on shows as presses, a thinner one as gaps
+    sk = job["skin_check"]
+    soft = [c_["segment"] + "*" for c_ in (STYLE or {}).get("soft_contacts", [])]
+    allow = max(0.0, 0.2 - GLOVE)
+
+    def _mark(tg):
+        if tg["space"] != "gun" or tg["point"] is None:
+            return None
+        n_ = tg["name"]
+        return n_ if n_ in facts["marks"] else ("mag_grab" if n_ in facts["parts"] and "mag_grab" in facts["marks"] else None)
+
+    res = {"skin": sk.get("name"), "gun_fbx": job["gun_fbx"], "clips": {}}
+    for cid, clip in job["clips"].items():
+        path = os.path.join(sk["clips_dir"], job.get("prefix", "A_%s_Hands_" % facts["name"]) + cid + ".pose.json")
+        if not os.path.exists(path):
+            res["clips"][cid] = {"missing": path}
+            continue
+        nm = "skin_" + cid
+        L.load_clip(nm, path)
+        frames, fps = L._frames(nm)
+        tr = job["tracks"].get(cid)
+        tframes = {round(f["t"], 5): f["bones"] for f in (tr["frames"] if tr else [])}
+        tl = {round(f["t"], 3): f for f in clip["frames"]}
+        rows = []
+        over, worst, not_hold = 0, 0.0, 0
+        crow = []
+        for i, fr in enumerate(frames):
+            t = round(i / fps, 5)
+            L._apply(fr)
+            rest_parts()
+            if t in tframes:
+                pose_parts(tframes[t])
+            cl = L.clearance(parts="both", ignore=["palm*"] + soft, top=1)
+            w_ = cl["worst_cm"]
+            worst = max(worst, w_)
+            over += 1 if w_ > allow else 0
+            g_ = L.grip("both", hold=False)
+            held = g_["r"]["holding"] and (g_["r"]["grasping"] or len([d for d in g_["r"].get("digits_touching", []) if d != "thumb"]) >= 2)
+            not_hold += 0 if held else 1
+            tf = tl.get(round(t, 3))
+            if tf is not None:
+                for side in ("r", "l"):
+                    h = tf["hands"][side]
+                    on = _mark(h["b"]) if h["w"] >= 0.999 or h["a"] == h["b"] else (_mark(h["a"]) if h["w"] <= 0.001 else None)
+                    cm_ = (((STYLE.get("hands") or {}).get(side) or {}).get("contact") or {}).get("mark")
+                    if on and on == cm_:
+                        cn = contacts_now(side)
+                        if cn:
+                            crow.append((t, side, cn))
+            rows.append({"t": round(t, 3), "clearance_cm": w_, "holding_r": held,
+                         "deepest": (cl.get("contacts") or [{}])[0].get("segment") if w_ > allow else None})
+        res["clips"][cid] = {"frames": len(frames), "clearance_worst_cm": round(worst, 2), "clearance_over_frames": over,
+                             "not_holding_r_frames": not_hold, "contacts": summarise_contacts(crow) if crow else None,
+                             "per_frame": rows}
+    json.dump(res, open(os.path.join(OUT, "skin_check.json"), "w", encoding="utf-8"), indent=1, default=str)
+    print("GUNKIT skin check done")
+    sys.exit(0)
 home_r = grasp("r", "grip", start=start)
 if home_r and STYLE and "support" in facts["marks"]:
     # the firing hand closes on the gun first; the support hand then wraps over it, against the gun and the
@@ -1256,6 +1463,7 @@ for cid, clip in job["clips"].items():
     L.snapshot("load", "hold")
     L.record_clip("start", name, fps=clip["fps"])
     carrying = {}            # part -> (hand, the part's bone against the hand)
+    clip_contacts = []       # (t, side, contacts) on frames a hand is on its own contact
     resolved = []
     for fr in clip["frames"]:
         t = round(fr["t"], 5)
@@ -1359,6 +1567,16 @@ for cid, clip in job["clips"].items():
                 carrying.pop(role, None)
                 frame_parts[role] = v
         resolved.append({"t": fr["t"], "parts": frame_parts})
+        # the contact rules of each hand on its own contact hold, measured on this frame
+        if STYLE and job.get("contact_checks", True):
+            for side in ("r", "l"):
+                h = fr["hands"][side]
+                on = mark_of(h["b"]) if h["w"] >= 0.999 or h["a"] == h["b"] else (mark_of(h["a"]) if h["w"] <= 0.001 else None)
+                cm_ = (((STYLE.get("hands") or {}).get(side) or {}).get("contact") or {}).get("mark")
+                if on and on == cm_:
+                    cn = contacts_now(side)
+                    if cn:
+                        clip_contacts.append((fr["t"], side, cn))
         L.record_clip("key", seconds=fr["t"])
     L.record_clip("stop")
     saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root")
@@ -1384,6 +1602,8 @@ for cid, clip in job["clips"].items():
         if isinstance(cs, dict):
             cs["soft_contacts"] = {sc["segment"]: {"worst_cm": round(worst[sc["segment"]], 2), "max_cm": sc["max_cm"],
                                                    "ok": worst[sc["segment"]] <= sc["max_cm"]} for sc in STYLE["soft_contacts"]}
+    if clip_contacts and isinstance(cs, dict):
+        cs["contacts"] = summarise_contacts(clip_contacts)
     if cid in job.get("diagnose", []):
         # which rule breaks when, every 0.1 s: the clip posed, each hand's anatomy and grip rules and the deepest
         # contact, with what each hand is doing then (its targets)

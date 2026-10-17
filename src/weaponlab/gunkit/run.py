@@ -206,6 +206,45 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
     return json.loads((out / "hands.json").read_text(encoding="utf-8"))
 
 
+def skin_variant(facts_path, name, offset_cm, below_z_cm=None):
+    """A test skin of the gun: its grip (the body below below_z_cm, default 1.5 cm under the trigger) moved out by
+    offset_cm along its normals (thicker; negative thinner), the rig kept. Returns the variant's FBX path."""
+    facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))
+    out = Path(facts_path).parent / "skins"
+    out.mkdir(exist_ok=True)
+    fbx = out / ("SK_%s_Rig_%s.fbx" % (facts["name"], name))
+    bz = below_z_cm if below_z_cm is not None else facts["marks"]["trigger"][2] - 1.5
+    job = {"gun_fbx": facts["model"]["file"], "out_fbx": str(fbx), "offset_cm": offset_cm, "below_z_cm": bz}
+    _blender("gunkit_skin.py", job, out)
+    return str(fbx)
+
+
+def skin_check(facts_path, gun_fbx, name=None, style=None, character=None):
+    """The hand clips as made, replayed on another skin of the same gun (gun_fbx, the same rig): every frame's
+    clearance, the firing hand's hold and each hand's contact rules, measured; no hand is moved. A thicker skin
+    shows as presses, a thinner one as gaps. Writes hands/skin_<name>/skin_check.json and returns it."""
+    import poselab_mcp
+    from . import setup as SU
+    facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))
+    a = A.load(facts["action"])
+    st = SU.style(style) if style else SU.style_for(facts["action"])
+    ch = SU.character(character)
+    hands_dir = Path(facts_path).parent / "hands"
+    name = name or Path(gun_fbx).stem
+    out = hands_dir / ("skin_" + name)
+    out.mkdir(parents=True, exist_ok=True)
+    want = list(a["hand_clips"])
+    tl = {cid: T.hand_clip(a, facts, cid) for cid in want}
+    tracks = {cid: R.tracks(facts, cc) for cid, cc in tl.items()}
+    job = {"poselab": str(Path(poselab_mcp.__file__).resolve().parent / "blender"), "arms": arms(),
+           "gun_fbx": str(gun_fbx), "facts": facts, "clips": tl, "tracks": tracks,
+           "prefix": "A_%s_Hands_" % facts["name"], "out": str(out), "grip_steps": 3, "render": False,
+           "style": st, "character": ch, "glove_cm": SU.glove_cm(ch), "body_ranges": None,
+           "skin_check": {"name": name, "clips_dir": str(hands_dir / "clips")}}
+    _blender("gunkit_hands.py", job, out, timeout=7200)
+    return json.loads((out / "skin_check.json").read_text(encoding="utf-8"))
+
+
 def build_all(facts_path, grip_steps=3, style=None, character=None):
     """Every clip of one gun: the hand clips first (they settle where a carried part goes), then the gun's own clips
     with those parts' tracks. Returns both reports."""

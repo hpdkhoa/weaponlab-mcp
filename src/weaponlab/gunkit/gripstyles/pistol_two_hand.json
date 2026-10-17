@@ -95,6 +95,171 @@
      30.0
     ],
     "why": "the trigger finger's pad on the trigger for the shot"
+   },
+   "contact_rules": [
+    {
+     "id": "thumb_on_frame",
+     "patch": "thumb:pad",
+     "region": {
+      "part": "frame",
+      "facing": "support_side",
+      "window": {
+       "y": [
+        "slide_rear+0.5",
+        "stop+0.5"
+       ],
+       "z": [
+        "stop-1.2",
+        "stop+1.5"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.05,
+      0.25
+     ],
+     "facing_max_deg": 50,
+     "need": "required",
+     "why": "the firing thumb lies forward along the frame's support side, over the safety, its pad on the frame (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "min_share": 0.6
+    },
+    {
+     "id": "web_under_tang",
+     "patch": "web",
+     "region": {
+      "part": "frame",
+      "facing": "back",
+      "facing_tol_deg": 70,
+      "window": {
+       "z": [
+        "slide_rear-5.0",
+        "slide_rear-2.6"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.1,
+      0.4
+     ],
+     "facing_max_deg": 75,
+     "need": "required",
+     "why": "the web of the hand high on the backstrap, under the tang (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "min_share": 0.3
+    },
+    {
+     "id": "palm_on_grip",
+     "patch": "palm",
+     "region": {
+      "part": "frame",
+      "facing": [
+       -0.8,
+       -0.6,
+       0.0
+      ],
+      "facing_tol_deg": 70,
+      "window": {
+       "z": [
+        "grip-4",
+        "grip+3"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.1,
+      0.5
+     ],
+     "facing_max_deg": 55,
+     "need": "required",
+     "why": "the palm on the grip's firing side and backstrap (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "min_share": 0.3
+    },
+    {
+     "id": "middle_round_front",
+     "patch": "middle:base",
+     "region": {
+      "part": "frame",
+      "facing": "front",
+      "facing_tol_deg": 65,
+      "window": {
+       "z": [
+        "trigger-4.5",
+        "trigger-1.6"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.05,
+      0.3
+     ],
+     "facing_max_deg": 60,
+     "need": "required",
+     "why": "the middle finger round the front strap just under the trigger guard (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "min_share": 0.4
+    },
+    {
+     "id": "ring_round_front",
+     "patch": "ring:base",
+     "region": {
+      "part": "frame",
+      "facing": "front",
+      "facing_tol_deg": 65,
+      "window": {
+       "z": [
+        "trigger-6.8",
+        "trigger-3.0"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.05,
+      0.3
+     ],
+     "facing_max_deg": 60,
+     "need": "required",
+     "why": "the ring finger round the front strap under the middle finger (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "min_share": 0.4
+    },
+    {
+     "id": "middle_tip_on_far_panel",
+     "patch": "middle:tip",
+     "region": {
+      "part": "frame",
+      "facing": "support_side",
+      "window": {
+       "z": [
+        "trigger-5.5",
+        "trigger-1.2"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.05,
+      0.35
+     ],
+     "facing_max_deg": 60,
+     "need": "optional",
+     "why": "the middle fingertip reaches round onto the grip's support side (a smaller hand on a wide grip may stop on the front strap)",
+     "min_share": 0.4
+    }
+   ],
+   "wrap": {
+    "region": {
+     "part": "frame",
+     "facing": "any",
+     "window": {
+      "z": [
+       "grip-1",
+       "grip+1"
+      ]
+     }
+    },
+    "min": 0.5
+   },
+   "closure": {
+    "friction": 0.5,
+    "sides": [
+     "r"
+    ]
    }
   },
   "l": {
@@ -343,6 +508,63 @@
       0.3
      ]
     }
+   },
+   "contact_rules": [
+    {
+     "id": "support_thumb_forward",
+     "patch": "thumb:pad",
+     "region": {
+      "part": "frame",
+      "facing": "support_side",
+      "window": {
+       "y": [
+        "stop-2.5",
+        "stop+3.0"
+       ],
+       "z": [
+        "stop-2.5",
+        "stop+0.6"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.05,
+      0.35
+     ],
+     "facing_max_deg": 60,
+     "need": "required",
+     "why": "the support thumb forward along the frame's support side under the firing thumb, clear of the slide (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "min_share": 0.5
+    },
+    {
+     "id": "support_heel_on_panel",
+     "patch": "heel",
+     "region": {
+      "part": "frame",
+      "facing": "support_side",
+      "window": {
+       "z": [
+        "grip-4",
+        "grip+2"
+       ]
+      }
+     },
+     "gap_cm": [
+      -0.1,
+      0.6
+     ],
+     "facing_max_deg": 60,
+     "need": "optional",
+     "why": "the support palm's heel on the grip's open support-side panel, where the firing hand leaves it bare (FM 3-23.35 (2003) 2-3: the two-hand grip)",
+     "min_share": 0.3
+    }
+   ],
+   "closure": {
+    "friction": 0.5,
+    "sides": [
+     "r",
+     "l"
+    ]
    }
   }
  },
