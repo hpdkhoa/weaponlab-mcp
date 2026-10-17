@@ -206,6 +206,31 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
     return json.loads((out / "hands.json").read_text(encoding="utf-8"))
 
 
+def reference_scene(facts_path, style=None, character=None, options=None):
+    """A Blender scene for a person to pose a gun's home hold in: the arms (at the character's size and gloves) and
+    the gun at the ready hold, the hands where the solver leaves them, a note on what to do. Returns its path
+    (hands/reference/<gun>_hold.blend)."""
+    facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))
+    ref = Path(facts_path).parent / "hands" / "reference"
+    ref.mkdir(parents=True, exist_ok=True)
+    blend = ref / ("%s_hold.blend" % facts["name"])
+    opts = dict(options or {})
+    opts["reference_scene"] = str(blend)
+    hands(facts_path, clips=["idle"], style=style, character=character, options=opts)
+    return str(blend)
+
+
+def read_reference(facts_path, blend=None):
+    """The hold posed in the reference scene, read out as JSON (hands/reference/<gun>_hold.json): each hand against
+    the gun's body bone, every finger joint. Returns the JSON path."""
+    facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))
+    ref = Path(facts_path).parent / "hands" / "reference"
+    blend = Path(blend or ref / ("%s_hold.blend" % facts["name"]))
+    out = ref / ("%s_hold.json" % facts["name"])
+    _blender("gunkit_pose_read.py", {"blend": str(blend), "out": str(out)}, ref)
+    return str(out)
+
+
 def skin_variant(facts_path, name, offset_cm, below_z_cm=None):
     """A test skin of the gun: its grip (the body below below_z_cm, default 1.5 cm under the trigger) moved out by
     offset_cm along its normals (thicker; negative thinner), the rig kept. Returns the variant's FBX path."""

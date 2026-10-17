@@ -1100,6 +1100,19 @@ if job.get("skin_check"):
     json.dump(res, open(os.path.join(OUT, "skin_check.json"), "w", encoding="utf-8"), indent=1, default=str)
     print("GUNKIT skin check done")
     sys.exit(0)
+REF = None
+if job.get("reference_pose"):
+    # a hold a person posed (gunkit_pose_read.py's output): each hand against the gun's body bone, every finger
+    # joint's turn; taken as the home holds instead of solving them
+    REF = json.load(open(job["reference_pose"], encoding="utf-8"))
+    for sd, mk in (("r", "grip"), ("l", facts.get("home_l", "support"))):
+        h_ = REF["hands"].get(sd)
+        if not h_:
+            continue
+        rel_ = Matrix([h_["rel_to_root"][i * 4:(i + 1) * 4] for i in range(4)])
+        GRASPS[(sd, mk, None, ())] = (bone_world(mark_bone(mk)).inverted() @ (bone_world("Root") @ rel_),
+                                      {n: Quaternion(q) for n, q in h_["fingers"].items()}, True)
+    report["reference_pose"] = job["reference_pose"]
 home_r = grasp("r", "grip", start=start)
 if home_r and STYLE and "support" in facts["marks"]:
     # the firing hand closes on the gun first; the support hand then wraps over it, against the gun and the
@@ -1172,6 +1185,25 @@ def hold_geometry():
 
 
 report["hold_geometry"] = hold_geometry()
+report["hold_contacts"] = {sd: contacts_now(sd) for sd in ("r", "l")} if STYLE else None
+if job.get("reference_scene"):
+    # a scene for a person to pose the hold in: the arms (gloved, at human size), the gun at the ready hold, the
+    # hands where the solver left them; a note says what to do. Nothing else of this run is needed then
+    t_ = bpy.data.texts.new("POSE_ME")
+    t_.write("Gun Kit reference hold: %s, grip style %s, character %s.\n"
+             "Pose the arms armature's hand and finger bones (Pose Mode) so both hands hold the gun as a person does.\n"
+             "Leave the gun where it is. Rotate the hand bones; move a hand only with its hand bone.\n"
+             "Fingers: rotate each finger bone; keep the glove skin out of the gun.\n"
+             "Then save this file (Ctrl+S) and tell Claude.\n" % (facts["name"], (STYLE or {}).get("id"), (CHAR or {}).get("id")))
+    L.arm.name = "ARMS_pose_me"
+    RA.name = "GUN_leave"
+    for ob_ in (L.arm, RA):
+        if ob_.animation_data:
+            ob_.animation_data.action = None          # no clip left on them: a frame change would undo the pose
+    bpy.ops.wm.save_as_mainfile(filepath=job["reference_scene"], copy=True)
+    json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
+    print("GUNKIT reference scene saved")
+    sys.exit(0)
 if job.get("render"):
     report["hold_pictures"] = L.render(views=("eye", "right", "left", "top"), size=(640, 360),
                                        ortho_cm=job.get("render_ortho_cm", 34.0))
