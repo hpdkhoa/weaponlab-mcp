@@ -25,6 +25,10 @@ import sys
 import bpy
 from mathutils import Matrix, Quaternion, Vector
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from weaponlab.gunkit import motion as MO  # noqa: E402
+from weaponlab.gunkit import reference as REFH  # noqa: E402
+
 job = json.load(open(sys.argv[sys.argv.index("--") + 1], encoding="utf-8"))
 sys.path.insert(0, job["poselab"])
 import lab as PL  # noqa: E402
@@ -818,6 +822,49 @@ def grasp(side, mark, part=None, offset=None, start=None):
     at = mark_world(mark, part, offset)
     plan = style_plan(side, mark) if STYLE and job.get("solver", True) else None
     con = ((STYLE or {}).get("hands", {}).get(side) or {}).get("contact", {})
+    rf = ((job.get("reference") or {}).get("hands") or {}).get(side)
+    if plan is not None and con.get("mark") == mark and rf and job.get("use_reference", True):
+        # the style's reference hold (an animator's hand on its own gun, carried in the grip's frame) put on the
+        # hand, the digits the style poses itself (the trigger finger along the frame) set from the style, then the
+        # one score adapts it to this gun in small moves
+        if start:
+            L.snapshot("load", start)
+        FRG = REFH.facts_frame(facts)
+        Q = RA.matrix_world
+        W_ = lambda c: list(Q @ g(REFH.from_grip(c, FRG)))     # noqa: E731
+        put = {"points": {k: W_(v) for k, v in rf["points"].items()}, "curls": rf["curls"], "thumb": rf["thumb"],
+               "thumb_tip": W_(rf["points"]["thumb_tip"]) if rf["points"].get("thumb_tip") else None,
+               "keep": rf.get("keep", [])}
+        oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")
+        r = {"reference": L.put_reference(side, put, glove_cm=GLOVE, other=oth)}
+        for fi in rf.get("keep", []):
+            f_ = plan.get(fi) or {}
+            if f_.get("pose") == "posture" and fi != "thumb":
+                for j, cc in zip(("01", "02", "03"), f_["curl"]):
+                    L._set_curl(side, fi, j, float(cc), _FL)
+        bpy.context.view_layer.update()
+        r["seed"] = L.hold_score(side, hand_rules(side)[0], GLOVE, oth, SOFT)[1]
+        r["adapt"] = L.adapt_hold(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE, other=oth, soft=SOFT,
+                                  span_cm=float(job.get("adapt_span_cm", 3.0)), turn_deg=float(job.get("adapt_turn_deg", 20.0)),
+                                  keep_w=float(job.get("adapt_keep_w", 1.0)), generations=int(job.get("adapt_generations", 40)),
+                                  pop=int(job.get("adapt_pop", 16)))
+        r["fits"] = (r["adapt"]["moved_cm"] < float(job.get("adapt_span_cm", 3.0)) - 0.05
+                     and r["adapt"]["turned_deg"] < float(job.get("adapt_turn_deg", 20.0)) - 0.5)
+        r["press"] = r["adapt"]["press"]
+        if r["adapt"]["arm_bad"] or r["press"] > 0.0:
+            # still a fault the contact rules pulled it into: the one repair on the hold itself, so the hold is what
+            # every frame shows (anatomy before touch)
+            r["repair"] = L.repair_hand(side, glove_cm=GLOVE, other=oth, soft=SOFT, keep_w=float(job.get("repair_keep_w", 6.0)),
+                                        generations=int(job.get("hold_repair_generations", 12)), pop=int(job.get("repair_pop", 8)))
+            r["press"] = r["repair"]["press"]
+        r["contacts"] = contacts_now(side)
+        report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
+        H = L._bw(hn).copy()
+        rel = bone_world(mark_bone(mark, part)).inverted() @ H
+        fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
+        L.snapshot("load", "before_grasp")
+        GRASPS[key] = (rel, fingers, r["press"] <= 0.01)
+        return GRASPS[key]
     if plan is not None and con.get("mark") == mark and con.get("search") == "natural" and hasattr(L, "natural_hold"):
         # the hold found over the whole arm's range, scored by the arm's ease, then the contact rules and presses;
         # nothing of the hand is set by hand
@@ -992,7 +1039,18 @@ def try_place(dv):
             {"short_r": round(sr, 2), "short_l": round(sl, 2), "clearance": cl, "rules": bad, "holding": holding, "view_off": round(view, 3)})
 
 
-if STYLE and STYLE.get("stance"):
+REF_EYE = (job.get("reference") or {}).get("eye") if job.get("use_reference", True) else None
+if REF_EYE and STYLE:
+    # the reference's own stance: the gun where the pack's camera saw it (its eye carried in the grip's frame), so
+    # the hold sits on arms reaching as the animator's did. Gun cm to Pose Lab's view: x right = the gun's left,
+    # y ahead and z up the other way round
+    E_ = REFH.from_grip(REF_EYE, REFH.facts_frame(facts))
+    vc_ = [E_[0], -E_[1], -E_[2]]
+    L.rifle_rest = Matrix.LocRotScale(L._from(vc_, "view"), Quaternion(), L.rifle_rest.to_scale())
+    L.pose_idle()
+    report["stance_view_cm"] = [round(x, 2) for x in vc_]
+    report["stance_from"] = "reference"
+elif STYLE and STYLE.get("stance"):
     # the style's stance: the bolt face at its place in front of the eye, the bore straight ahead (Pose Lab's arms
     # frame looks down the gun's own axes), the arms reaching it from the idle
     L.rifle_rest = Matrix.LocRotScale(L._from(STYLE["stance"]["view_cm"], "view"), Quaternion(), L.rifle_rest.to_scale())
@@ -1011,7 +1069,7 @@ _bf = L.screen(lab_gun(RA.matrix_world @ g((0.0, 0.0, 0.0))))
 if "x" in _bf:
     VIEW_REF["bolt_face"] = (_bf["x"], _bf["y"])
 report["view_reference"] = {k: list(v) for k, v in VIEW_REF.items()}
-if job.get("place_search", True) and "support" in facts["marks"]:
+if job.get("place_search", True) and "support" in facts["marks"] and not REF_EYE:
     qg = RA.matrix_world.to_quaternion()
     fwd, up_, left_ = (qg @ g((0, 1, 0))).normalized(), (qg @ g((0, 0, 1))).normalized(), (qg @ g((1, 0, 0))).normalized()
     tried = []
@@ -1252,57 +1310,11 @@ def _face_world(tgt):
     return (RA.matrix_world.to_quaternion() @ g(n)).normalized()
 
 
-def arc_dir(a, b):
-    """The way a hand lifts off between two targets: both holds' facings, or the one hold's."""
-    na, nb = _face_world(a), _face_world(b)
-    if na is None and nb is None:
-        return None
-    if na is None or nb is None:
-        return (na or nb).normalized()
-    d = na + nb
-    return (d if d.length > 1e-6 else na).normalized()
-
-
 def press_now(side, tree):
     """What a moving hand still does wrong: its presses past the allowance (kept 0.05 cm inside it, as the clearance
     check samples finer) and the grip's rules (the back of the hand toward the gun)."""
     pen = L.hand_presses(side, tree, GLOVE, allow_cm=0.15, palm_allow_cm=0.35, other=True, soft=SOFT)[0]
     return pen + 5.0 * len(L.grip(side, hold=False).get(side, {}).get("bad", []))
-
-
-def clear_lift(side, d, step_cm=0.5, most_cm=10.0):
-    """A hand on its way that still presses into the gun (or the other hand) is lifted further along d, half a
-    centimetre at a time, until nothing presses past what is allowed; when d alone does not clear it, the view's up
-    and the two blended are tried the same way. Returns the extra lift, cm."""
-    tree = L._tree()
-    pen = press_now(side, tree)
-    if pen <= 0.0 or d is None:
-        return 0.0
-    hn = L._n("hand", side)
-    H0 = L._bw(hn).copy()
-    best = (pen, Vector((0.0, 0.0, 0.0)))
-    up = Vector(PL.VIEW_UP).normalized()
-    out = Vector(PL.VIEW_RIGHT).normalized() * (-1.0 if side == "l" else 1.0)   # the hand's own side
-    back = -Vector(PL.VIEW_FWD).normalized()
-    fwd = -back                                     # round the front of the other hand (under the gun to over it)
-    ways = [d, (d + up).normalized(), up, (d + out).normalized(), (up + out).normalized(), out,
-            (d + back).normalized(), (up + back).normalized(), (d + fwd).normalized(), (up + fwd).normalized(),
-            (out + fwd).normalized(), fwd]
-    for way in ways:
-        k = step_cm
-        while k <= most_cm + 1e-6:
-            v = way * (k / 100.0)
-            L._put_hand(side, Matrix.Translation(v) @ H0)
-            bpy.context.view_layer.update()
-            pen = press_now(side, tree)
-            if pen < best[0] - 1e-9 or pen <= 0.0 and best[0] > 0.0:
-                best = (pen, v)
-            if pen <= 0.0:
-                return k
-            k += step_cm
-    L._put_hand(side, Matrix.Translation(best[1]) @ H0)
-    bpy.context.view_layer.update()
-    return best[1].length * 100.0
 
 
 def arc(a, b, w):
@@ -1320,28 +1332,6 @@ def arc(a, b, w):
     if d.length < 1e-6:
         d = na
     return d.normalized() * (ARC_CM / 100.0) * math.sin(math.pi * w)
-
-
-def elbow_ease(side):
-    """A wrist past its range relieved at the elbow: the elbow swung about the shoulder-to-wrist line, 10 degrees at
-    a time up to 40 each way, the hand kept where it is; the swing that leaves the arm least past its limits stays."""
-    base = arm_over(side)
-    if base <= 0.0:
-        return 0.0
-    L.snapshot("save", "_elbow")
-    best = (base, 0.0)
-    for deg in (-10.0, 10.0, -20.0, 20.0, -30.0, 30.0, -40.0, 40.0):
-        L.snapshot("load", "_elbow")
-        L._swing_elbow(side, deg)
-        bpy.context.view_layer.update()
-        o = arm_over(side)
-        if o < best[0] - 0.5:
-            best = (o, deg)
-    L.snapshot("load", "_elbow")
-    if best[1]:
-        L._swing_elbow(side, best[1])
-        bpy.context.view_layer.update()
-    return best[1]
 
 
 CLAV = {}                    # the clavicles' turns in the hold: each frame starts from them
@@ -1396,50 +1386,17 @@ def shoulder_reach(side, H):
     return deg
 
 
-def wrist_turns(side, degs=(4.0, 8.0)):
-    """A wrist still past its range: the hand turned a little about its palm's middle (each world axis, each way),
-    the turn kept that leaves the arm least past its limits with the hand pressing no deeper. Returns the degrees."""
-    o0 = arm_over(side)
-    if o0 <= 0.0:
-        return 0.0
-    tree = L._tree()
-    p0 = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
-    hn = L._n("hand", side)
-    H0 = L._bw(hn).copy()
-    P = H0.translation.lerp(L._bw(L._n("finger", side, "middle", "01")).translation, 0.5)
-    best = (o0, None)
-    for deg in degs:
-        for ax in (Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))):
-            for sg in (1.0, -1.0):
-                q = Quaternion(ax, math.radians(deg * sg))
-                M = Matrix.Translation(P) @ q.to_matrix().to_4x4() @ Matrix.Translation(-P) @ H0
-                L._put_hand(side, Matrix.LocRotScale(M.translation, M.to_quaternion(), L._unit()))
-                bpy.context.view_layer.update()
-                o = arm_over(side)
-                if o < best[0] - 0.5 and L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0] <= p0 + 1e-6:
-                    best = (o, M)
-        if best[1] is not None and best[0] <= 0.0:
-            break
-    M = best[1] if best[1] is not None else H0
-    L._put_hand(side, Matrix.LocRotScale(M.translation, M.to_quaternion(), L._unit()))
-    bpy.context.view_layer.update()
-    return 0.0 if best[1] is None else 1.0
-
-
-def wrist_relief(side):
-    """A hand resting on a hold the gun has turned away from (the hold was solved at another gun pose) with its wrist
-    past range: Pose Lab's mend turns it back inside, kept only when it leaves the arm less past its limits and the
-    hand pressing no deeper into the gun or the other hand."""
-    tree = L._tree()
-    o0 = arm_over(side)
-    p0 = L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0]
-    L.snapshot("save", "_relief")
-    L._mend_hand(side, fingers=False)
-    bpy.context.view_layer.update()
-    if arm_over(side) < o0 and L.hand_presses(side, tree, GLOVE, other=True, soft=SOFT)[0] <= p0 + 1e-6:
-        return True
-    L.snapshot("load", "_relief")
-    return False
+def repair(side):
+    """A frame's hand that presses into the gun or the other hand, or whose arm is past its limits, mended by the one
+    score (Pose Lab's repair_hand: the hand moved and turned, the elbow swung, drawn back to where the motion put
+    it). Returns the repair's parts, or None when the frame needed none."""
+    # only a real fault: a press past its allowance, or an arm rule broken (a grip rule a hand on its way breaks
+    # is the motion's, not the repair's)
+    if L.hand_presses(side, None, GLOVE, other=True, soft=SOFT)[0] <= 0.0 and not L._arm_report(side, L._limits()[0])[1]:
+        return None
+    return L.repair_hand(side, glove_cm=GLOVE, other=True, soft=SOFT, keep_w=float(job.get("repair_keep_w", 6.0)),
+                         span_cm=float(job.get("repair_span_cm", 10.0)), generations=int(job.get("repair_generations", 6)),
+                         pop=int(job.get("repair_pop", 8)))
 
 
 def blend(Ma, Mb, w):
@@ -1528,6 +1485,8 @@ for cid, clip in job["clips"].items():
     carrying = {}            # part -> (hand, the part's bone against the hand)
     clip_contacts = []       # (t, side, contacts) on frames a hand is on its own contact
     resolved = []
+    repairs = []             # the frames the one repair mended
+    moves = []               # each frame's hands as the player sees them, for the motion check
     for fr in clip["frames"]:
         t = round(fr["t"], 5)
         gun_pose(fr["gun"])
@@ -1590,20 +1549,11 @@ for cid, clip in job["clips"].items():
                     L.arm.pose.bones[n].rotation_quaternion = qb
                 elif qa is not None:
                     L.arm.pose.bones[n].rotation_quaternion = qa
-            if STYLE and job.get("clear_lift", True) and h["w"] < 1.0 and h["a"] != h["b"] and (mark_of(h["a"]) or mark_of(h["b"])):
-                p0_ = L.hand_presses(side, None, GLOVE, other=True, soft=SOFT)
-                k_ = clear_lift(side, arc_dir(h["a"], h["b"]))  # a hand on its way still in the gun: lifted further off
-                if cid in job.get("diagnose", []) and p0_[0] > 0.0:
-                    p1_ = L.hand_presses(side, None, GLOVE, other=True, soft=SOFT)
-                    report.setdefault("lifts", {}).setdefault(cid, []).append(
-                        {"t": t, "side": side, "before": [round(p0_[0], 2), p0_[1][:2]], "lift_cm": round(k_, 1), "after": [round(p1_[0], 2), p1_[1][:2]]})
-            if STYLE and job.get("elbow_ease", True):
-                elbow_ease(side)                          # a wrist past its range: the elbow swings, the hand stays
-            if STYLE and job.get("wrist_relief", True) and resting and arm_over(side) > 0.0:
-                wrist_relief(side)                        # still past: the hand turns back toward the forearm
-            if STYLE and job.get("wrist_turns", True) and arm_over(side) > 0.0:
-                wrist_turns(side, (4.0, 8.0) if resting else (4.0, 8.0, 12.0, 16.0, 20.0, 24.0))   # still past: turns about the palm
-                                                          # (a hand on its way holds nothing: it may turn further)
+            if STYLE and job.get("repair", True):
+                rr_ = repair(side)                        # one repair by the one score, only where the frame needs it
+                if rr_ is not None:
+                    repairs.append({"t": t, "side": side, "press": rr_["press"], "arm_bad": rr_["arm_bad"],
+                                    "moved_cm": rr_["moved_cm"]})
             if TRIGGER and side == "r" and cid in STYLE.get("trigger_clips", []):
                 for n, q in TRIGGER.items():              # the trigger finger on the trigger for the shot
                     L.arm.pose.bones[n].rotation_quaternion = q
@@ -1630,6 +1580,14 @@ for cid, clip in job["clips"].items():
                 carrying.pop(role, None)
                 frame_parts[role] = v
         resolved.append({"t": fr["t"], "parts": frame_parts})
+        mv = {}
+        for sd in ("r", "l"):
+            fr_b = L._finger_report(sd, _FL)[0]
+            th_b = L._thumb_report(sd, _TL)[0]
+            bends = {k: v[0] for k, v in fr_b.items()}
+            bends.update({k: v[0] for k, v in th_b.items() if k.startswith("thumb_")})
+            mv[sd] = {"at": list(L._to(hands_now[sd].translation, "view")), "bends": bends}
+        moves.append({"t": fr["t"], "hands": mv})
         # the contact rules of each hand on its own contact hold, measured on this frame
         if STYLE and job.get("contact_checks", True):
             for side in ("r", "l"):
@@ -1667,6 +1625,29 @@ for cid, clip in job["clips"].items():
                                                    "ok": worst[sc["segment"]] <= sc["max_cm"]} for sc in STYLE["soft_contacts"]}
     if clip_contacts and isinstance(cs, dict):
         cs["contacts"] = summarise_contacts(clip_contacts)
+    if isinstance(cs, dict) and job.get("verify", True):
+        # the drawn skin, every verify_step s (the capsules test a body slightly thinner than the picture's)
+        skin_rows, k = [], 0.0
+        while k <= clip["seconds"] + 1e-6:
+            L.pose_clip(name, k)
+            sp_ = L.skin_presses("both", glove_cm=GLOVE, other=True)
+            if not sp_["ok"]:
+                skin_rows.append({"t": round(k, 2), "r": sp_["r"], "l": sp_["l"]})
+            k += float(job.get("verify_step", 0.1))
+        worst_ = {sd: max([0.0] + [max(x[sd]["gun_cm"], x[sd]["hand_cm"]) for x in skin_rows]) for sd in ("r", "l")}
+        cs["skin"] = {"frames_bad": len(skin_rows), "worst_cm": worst_, "first": skin_rows[:3], "ok": not skin_rows}
+        # the eye at the clip's middle: the sights over the hands, the arms' share of the view, the hands shown
+        tm = clip["seconds"] / 2.0
+        L.pose_clip(name, tm)
+        frm = min(clip["frames"], key=lambda f: abs(f["t"] - tm))
+        gun_pose(frm["gun"])
+        rest_parts()
+        sights = [lab_gun(mark_world(m)) for m in ("slide_rear", "slide_front") if m in facts["marks"]]
+        vr = L.view_report(sights=sights)
+        vr["ok"] = all(v >= float(job.get("sight_min", 0.8)) for v in vr["sights"]) and vr["lower_left"] <= float(job.get("lower_left_max", 0.6))
+        cs["view"] = vr
+        cs["motion"] = MO.check(moves)
+        cs["repairs"] = {"frames": len(repairs), "first": repairs[:4]}
     if cid in job.get("diagnose", []):
         # which rule breaks when, every 0.1 s: the clip posed, each hand's anatomy and grip rules and the deepest
         # contact, with what each hand is doing then (its targets)

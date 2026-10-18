@@ -117,11 +117,13 @@ on the arms, so every picture of the hands shows the character who holds the gun
 
 1. Load the character's arms and hand covering.
 2. Pick the grip style from the action family (or the gun's own).
-3. Lay the firing hand, then the support hand, by the style's contacts.
+3. Put the style's reference hold on the firing hand, then the support hand, and adapt each to this gun in small
+   moves by the one score. A style without a reference lays them by its contacts.
 4. Solve the stance within the style's wrist and elbow targets and the anatomy limits.
 5. Make each hand clip: the action's events with the style's reload roles.
 6. Check every frame: anatomy, the style's grip rules, clearance against the gun with the glove's thickness, and the
-   sights each clip expects.
+   sights each clip expects. Verify then checks the drawn skin, the eye's view and the motion.
+7. The game check: import, play in the trial folder, Gate shots. A Gate failure sends the hold back to step 3.
 
 ## The action families
 

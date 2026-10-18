@@ -200,10 +200,45 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
            "prefix": "A_%s_Hands_" % facts["name"], "out": str(out), "grip_steps": grip_steps, "render": render,
            "style": st, "character": ch, "glove_cm": SU.glove_cm(ch), "diagnose": list(diagnose),
            # no bone and no part of the skin of a size no adult has (Pose Lab's body_size, ANSUR II ranges)
-           "body_ranges": _body_ranges(ch)}
+           "body_ranges": _body_ranges(ch),
+           # the grip style's reference hold (a pack's hand, in the grip's frame), kept beside the guns' folders
+           "reference": reference_for(facts_path, st)}
     job.update(options or {})          # the hand step's own switches (solver_*, regrip, arc_cm ...), for trials
     _blender("gunkit_hands.py", job, out, timeout=7200)
     return json.loads((out / "hands.json").read_text(encoding="utf-8"))
+
+
+def references_dir(facts_path):
+    """Where reference holds live: beside the guns' folders (work/gunkit/references), in the project, never in a
+    package (a pack's numbers keep its licence)."""
+    return Path(facts_path).resolve().parent.parent / "references"
+
+
+def reference_for(facts_path, style):
+    """The grip style's reference hold (references/<style id>.json), or None when it has none yet."""
+    from . import reference as REF
+    if not style:
+        return None
+    f = references_dir(facts_path) / ("%s.json" % style["id"])
+    if not f.exists():
+        return None
+    ref = json.loads(f.read_text(encoding="utf-8"))
+    bad = REF.check(ref)
+    if bad:
+        raise ValueError("%s: %s" % (f, "; ".join(bad)))
+    return ref
+
+
+def pack_hold(fbx, style, clip, gun, bones, out, frame=None, keep=None, source=None):
+    """A reference hold read from a pack's first-person clip at one frame (gunkit_pack_hold.py): each hand's points
+    in the grip's frame, its digits' bends. out: the reference file to write (references/<style>.json). Returns its
+    path and any faults."""
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    lines = _blender("gunkit_pack_hold.py", {"fbx": str(fbx), "clip": clip, "frame": frame, "style": style, "gun": gun,
+                                             "bones": bones, "keep": keep or {}, "source": source or {}, "out": str(out)},
+                     out.parent, timeout=600)
+    return json.loads(lines[-1][len("GUNKIT "):])
 
 
 def skin_variant(facts_path, name, offset_cm, below_z_cm=None):

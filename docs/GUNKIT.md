@@ -48,10 +48,24 @@ The other marks are places on the gun, such as `port`, `muzzle`, `mag_well` and 
 The hand step runs on Pose Lab (poselab-mcp) in Blender:
 
 1. It searches where the gun sits for both hands and the view.
-2. It solves every hold once.
+2. It solves every hold once. A grip style with a reference hold starts from it: Pose Lab puts the reference on the
+   hand (`put_reference`) and adapts it to this gun in small moves (`adapt_hold`). The one score (`hold_score`)
+   judges every hold and every repair.
 3. For each frame it poses the gun and its parts, and moves each hand from target to target. A hand on a moving part
-   rides it, and a carried magazine rides its hand.
+   rides it, and a carried magazine rides its hand. A frame that presses or breaks an arm rule gets one repair by
+   the same score (`repair_hand`).
 4. Pose Lab checks every clip for clipping, the arm and finger rules and the grip rules. It also checks each sight the
    action expects, such as the port in view during a press check.
+5. Verify adds three checks: the drawn skin against the gun and the other hand (`skin_presses`), what the eye sees
+   (`view_report`: the sights, the arms' cover, the hands shown) and the motion (`motion.py`: pops, jerks, finger
+   jumps).
+
+### Reference holds
+
+A reference hold is a known good hold in the grip's frame (`reference.py`: origin the magazine's lips, up the
+magazine's line). `run.pack_hold` reads one from a pack's first-person clip (`gunkit_pack_hold.py`) through a bone
+map. It is written to `<work>/gunkit/references/<style id>.json`, inside the project. A pack's numbers keep its
+licence: a Fab Standard licence lets them ship in the game, never in a public repository, so no reference file is
+part of this package.
 
 The shared arms come from the project's `weaponlab.json`: `"gunkit": {"arms": {"folder", "arms", "idle", "eye"}}`.
