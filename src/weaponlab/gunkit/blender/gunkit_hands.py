@@ -849,7 +849,8 @@ def grasp(side, mark, part=None, offset=None, start=None):
             # each start judged with its fingers closed on the grip, as the search will close them
             L.close_hand(side, {fi: ({"pose": "straight", "curl": [0.0, 0.0, 3.0]} if fi == "index" and m.get("index") == "extended"
                                      else {"pose": "wrap", "max_curl": [90.0, 100.0, 80.0]}) for fi in ("index", "middle", "ring", "pinky")},
-                         L._tree(), GLOVE, oth)
+                         L._tree(), GLOVE, oth, mend=False)
+            L.relax_fingers(side)                   # opened by the skin until it presses nothing
             sc_, why_ = L._hold_score(side, MARKS, GLOVE, oth, SOFT, L._tree())
             tries.append((sc_, roll, sd_))
             if sc_ <= min(t_[0] for t_ in tries):
