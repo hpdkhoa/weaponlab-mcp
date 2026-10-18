@@ -830,11 +830,18 @@ def grasp(side, mark, part=None, offset=None, start=None):
             L.snapshot("load", start)
         m = next(x for x in MARKS if x.get("role") == "hold" and x.get("hand") == side)
         oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")
+        pdir, rolls = m.get("palm_dir"), [float(x) for x in job.get("seed_rolls", range(-90, 91, 15))]
+        if m["purpose"] == "support":
+            # the support palm goes where the firing hand leaves the grip open, turned a little either way
+            od_, share_ = L.open_dir("r" if side == "l" else "l", m, GLOVE)
+            if od_ is not None:
+                pdir, rolls = od_, [float(x) for x in range(-45, 46, 15)]
+                report.setdefault("support_open", {"dir": [round(x, 3) for x in od_], "open_share": share_})
         L.snapshot("save", "_seed")
         tries = []
-        for roll in [float(x) for x in job.get("seed_rolls", range(-90, 91, 15))]:
+        for roll in rolls:
             L.snapshot("load", "_seed")
-            sd_ = L.seed_hold(side, m, palm_dir=m.get("palm_dir"), roll_deg=roll, along_cm=float(pu.get("along_cm", 0.0)))
+            sd_ = L.seed_hold(side, m, palm_dir=pdir, roll_deg=roll, along_cm=float(pu.get("along_cm", 0.0)) if m["purpose"] != "support" else 0.0)
             for fi, c3 in (pu.get("start_curls") or {}).items():
                 for j, cc in zip(("01", "02", "03"), c3):
                     L._set_curl(side, fi, j, 0.0 if fi != "index" or m.get("index") != "extended" else float(cc), _FL)
