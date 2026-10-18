@@ -832,13 +832,17 @@ def grasp(side, mark, part=None, offset=None, start=None):
         oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")
         L.snapshot("save", "_seed")
         tries = []
-        for roll in [float(x) for x in job.get("seed_rolls", (-40, -20, 0, 20, 40))]:
+        for roll in [float(x) for x in job.get("seed_rolls", range(-90, 91, 15))]:
             L.snapshot("load", "_seed")
             sd_ = L.seed_hold(side, m, palm_dir=m.get("palm_dir"), roll_deg=roll, along_cm=float(pu.get("along_cm", 0.0)))
             for fi, c3 in (pu.get("start_curls") or {}).items():
                 for j, cc in zip(("01", "02", "03"), c3):
-                    L._set_curl(side, fi, j, float(cc), _FL)
+                    L._set_curl(side, fi, j, 0.0 if fi != "index" or m.get("index") != "extended" else float(cc), _FL)
             bpy.context.view_layer.update()
+            # each start judged with its fingers closed on the grip, as the search will close them
+            L.close_hand(side, {fi: ({"pose": "straight", "curl": [0.0, 0.0, 3.0]} if fi == "index" and m.get("index") == "extended"
+                                     else {"pose": "wrap", "max_curl": [90.0, 100.0, 80.0]}) for fi in ("index", "middle", "ring", "pinky")},
+                         L._tree(), GLOVE, oth)
             sc_, why_ = L._hold_score(side, MARKS, GLOVE, oth, SOFT, L._tree())
             tries.append((sc_, roll, sd_))
             if sc_ <= min(t_[0] for t_ in tries):
@@ -846,8 +850,10 @@ def grasp(side, mark, part=None, offset=None, start=None):
         tries.sort(key=lambda t_: t_[0])
         L.snapshot("load", "_seed_best")
         r = {"seeds": [{"roll_deg": t_[1], "score": round(t_[0], 1)} for t_ in tries]}
+        # the fingers close on the grip (and the support's on the firing hand) each try; an extended index lies straight
+        wr_ = {fi: ("straight" if fi == "index" and m.get("index") == "extended" else "wrap") for fi in ("index", "middle", "ring", "pinky")}
         r["hold"] = L.hold_object(side, MARKS, glove_cm=GLOVE, other=oth, soft=SOFT,
-                                  generations=int(job.get("hold_generations", 40)), pop=int(job.get("hold_pop", 16)))
+                                  generations=int(job.get("hold_generations", 40)), pop=int(job.get("hold_pop", 16)), wrap=wr_)
         r["gate"] = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False)
         r["press"] = r["hold"]["press"]
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
@@ -1326,7 +1332,7 @@ report["hold_geometry"] = hold_geometry()
 report["hold_contacts"] = {sd: contacts_now(sd) for sd in ("r", "l")} if STYLE else None
 if job.get("render"):
     report["hold_pictures"] = L.render(views=("eye", "right", "left", "top"), size=(640, 360),
-                                       ortho_cm=job.get("render_ortho_cm", 34.0))
+                                       ortho_cm=job.get("render_ortho_cm", 30.0), centre=list(mark_world("grip")))
     report["hold_grip"] = L.grip("both", hold=True)
     report["hold_clearance"] = L.clearance(parts="both", top=4)
     report["hold_anatomy"] = L.anatomy("both")
