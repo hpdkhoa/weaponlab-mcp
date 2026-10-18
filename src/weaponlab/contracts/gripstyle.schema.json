@@ -289,6 +289,19 @@
             "fit_source": {
               "type": "string",
               "description": "where the anchors come from (a manual's figures, read onto this gun's faces)"
+            },
+            "search": {
+              "enum": [
+                "natural"
+              ],
+              "description": "natural: the hold found over the whole arm's range (the arm's ease first, then the contact rules), with no anchors"
+            },
+            "search_dists_cm": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "description": "natural: how far out from the surface the palm's middle may sit (cm; a palm over another hand sits farther)"
             }
           }
         },
@@ -536,7 +549,6 @@
       "required": [
         "id",
         "patch",
-        "region",
         "why"
       ],
       "additionalProperties": false,
@@ -576,6 +588,36 @@
         "min_share": {
           "type": "number",
           "description": "the share of the patch's points that must meet the rule (a pad laid along a surface, not one point touching)"
+        },
+        "on_hand": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "side",
+            "segments"
+          ],
+          "properties": {
+            "side": {
+              "enum": [
+                "l",
+                "r"
+              ]
+            },
+            "segments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "face": {
+              "enum": [
+                "back",
+                "pad",
+                "any"
+              ]
+            }
+          },
+          "description": "the region is the other hand: its named segments' skin (the back of its fingers, beside its thumb)"
         }
       }
     }

@@ -318,20 +318,15 @@
      0.0,
      0.0
     ],
-    "why": "the support palm on the grip's left side, filling what the firing hand leaves open (FM 3-23.35 2-3)",
-    "anchors": {
-     "web": [
-      5.5,
-      -4.0,
-      -5.5
-     ],
-     "knuckle": [
-      6.0,
-      1.5,
-      -8.5
-     ]
-    },
-    "across": "grip_axis"
+    "why": "the support palm on the grip's support side and over the firing fingers, filling what the firing hand leaves open (FM 3-23.35 2-2); placed where the whole arm is most at ease while every contact rule is met",
+    "across": "grip_axis",
+    "search": "natural",
+    "search_dists_cm": [
+     2.0,
+     3.0,
+     4.0,
+     5.0
+    ]
    },
    "fingers": {
     "index": {
@@ -619,6 +614,90 @@
      "need": "optional",
      "why": "the support palm's heel fills the grip's support-side panel the firing hand leaves bare: no space left on the grip, the gun held in a closed ring of both hands against recoil (FM 3-23.35 2-2, the fist grip)",
      "min_share": 0.3
+    },
+    {
+     "id": "support_fingers_over_firing",
+     "patch": "middle:pad",
+     "on_hand": {
+      "side": "r",
+      "segments": [
+       "middle1",
+       "middle2",
+       "ring1",
+       "ring2"
+      ],
+      "face": "back"
+     },
+     "gap_cm": [
+      -0.15,
+      0.4
+     ],
+     "facing_max_deg": 60,
+     "min_share": 0.3,
+     "need": "required",
+     "why": "the support fingers closed firmly over the firing fingers (FM 3-23.35 (2003) 2-2, the fist grip)"
+    },
+    {
+     "id": "support_ring_over_firing",
+     "patch": "ring:pad",
+     "on_hand": {
+      "side": "r",
+      "segments": [
+       "ring1",
+       "ring2",
+       "pinky1",
+       "pinky2"
+      ],
+      "face": "back"
+     },
+     "gap_cm": [
+      -0.15,
+      0.4
+     ],
+     "facing_max_deg": 60,
+     "min_share": 0.3,
+     "need": "required",
+     "why": "the support fingers closed firmly over the firing fingers (FM 3-23.35 (2003) 2-2, the fist grip)"
+    },
+    {
+     "id": "support_index_under_guard",
+     "patch": "index:pad",
+     "on_hand": {
+      "side": "r",
+      "segments": [
+       "middle1",
+       "middle2"
+      ],
+      "face": "back"
+     },
+     "gap_cm": [
+      -0.15,
+      0.5
+     ],
+     "facing_max_deg": 70,
+     "min_share": 0.2,
+     "need": "required",
+     "why": "the support index finger between the firing middle finger and the trigger guard (FM 3-23.35 (2003) 2-2, the fist grip)"
+    },
+    {
+     "id": "support_thumb_beside_firing",
+     "patch": "thumb:whole",
+     "on_hand": {
+      "side": "r",
+      "segments": [
+       "thumb2",
+       "thumb3"
+      ],
+      "face": "any"
+     },
+     "gap_cm": [
+      -0.15,
+      0.5
+     ],
+     "facing_max_deg": 180,
+     "min_share": 0.2,
+     "need": "required",
+     "why": "the support thumb alongside the firing thumb (FM 3-23.35 (2003) 2-2, the fist grip)"
     }
    ],
    "closure": {

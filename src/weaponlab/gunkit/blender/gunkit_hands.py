@@ -720,14 +720,17 @@ def hand_rules(side):
     rules = []
     for r_ in h.get("contact_rules", []):
         x = dict(r_)
-        x["polys"] = resolve_region(r_["region"])
+        if r_.get("on_hand"):
+            x["polys"] = []                               # the region is the other hand's skin, found each time
+        else:
+            x["polys"] = resolve_region(r_["region"])
         rules.append(x)
     wrap = None
     if h.get("wrap"):
         wrap = {"polys": resolve_region(h["wrap"]["region"]), "min": h["wrap"]["min"],
                 "sides": ["r", "l"] if h["wrap"].get("both_hands") else [side]}
     RULES[side] = (rules, wrap, h.get("closure"))
-    report.setdefault("contact_regions", {})[side] = {r_["id"]: len(r_["polys"]) for r_ in rules}
+    report.setdefault("contact_regions", {})[side] = {r_["id"]: ("hand " + r_["on_hand"]["side"] if r_.get("on_hand") else len(r_["polys"])) for r_ in rules}
     return RULES[side]
 
 
@@ -815,6 +818,43 @@ def grasp(side, mark, part=None, offset=None, start=None):
     at = mark_world(mark, part, offset)
     plan = style_plan(side, mark) if STYLE and job.get("solver", True) else None
     con = ((STYLE or {}).get("hands", {}).get(side) or {}).get("contact", {})
+    if plan is not None and con.get("mark") == mark and con.get("search") == "natural" and hasattr(L, "natural_hold"):
+        # the hold found over the whole arm's range, scored by the arm's ease, then the contact rules and presses;
+        # nothing of the hand is set by hand
+        if start:
+            L.snapshot("load", start)
+        Q = RA.matrix_world
+        nrm_w = (Q.to_quaternion() @ g(con["face"])).normalized()
+        acr = None
+        if con.get("across") == "grip_axis" and (facts.get("magazine") or {}).get("axis"):
+            acr = list((Q.to_quaternion() @ g([-x for x in facts["magazine"]["axis"]])).normalized())
+        r = L.natural_hold(side, list(at), list(nrm_w), hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
+                           other=job.get("solver_other", True), soft=SOFT, axis=acr,
+                           dists_cm=tuple(con.get("search_dists_cm", (0.0, 1.0, 2.0))), keep=int(job.get("natural_keep", 40)),
+                           refine=int(job.get("natural_refine", 40)))
+        th = plan.get("thumb") or {}
+        if job.get("es", True) and hasattr(L, "es_hold"):
+            # then one search over the hand, its fingers and its thumb together, from the most natural arm found
+            r["es"] = L.es_hold(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE, other=job.get("solver_other", True),
+                                soft=SOFT, generations=int(job.get("es_generations", 40)), pop=int(job.get("es_pop", 16)),
+                                sigma_cm=float(job.get("es_sigma_cm", 1.0)), sigma_deg=float(job.get("es_sigma_deg", 8.0)))
+        elif job.get("natural_chain", True) and hasattr(L, "hold_chain"):
+            # then the chain: a hand still pressing or a digit short of its rule moves a step at a time, the arm
+            # following within its ranges
+            r["chain"] = L.hold_chain(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
+                                      other=job.get("solver_other", True), soft=SOFT)
+        if th.get("to_world") and hasattr(L, "thumb_search") and not job.get("es", True):
+            trule = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
+            r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE, other=job.get("solver_other", True),
+                                        rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)))
+        r["contacts"] = contacts_now(side)
+        report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
+        H = L._bw(hn).copy()
+        rel = bone_world(mark_bone(mark, part)).inverted() @ H
+        fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
+        L.snapshot("load", "before_grasp")
+        GRASPS[key] = (rel, fingers, r.get("press", 1.0) <= 0.01)
+        return GRASPS[key]
     if plan is not None and con.get("mark") == mark and con.get("anchors"):
         # the hold as real technique sets it: the hand fitted to its anchor points on the gun (the web under the
         # tang, the middle knuckle under the guard ...), its palm facing the panel; then its digits closed by the
