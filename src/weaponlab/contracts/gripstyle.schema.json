@@ -135,6 +135,153 @@
           }
         }
       }
+    },
+    "purposes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "what each hand is for, judged on the gun's own geometry (Pose Lab's object reader and purposes)",
+      "properties": {
+        "why": {
+          "type": "string"
+        },
+        "r": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mark",
+            "purpose"
+          ],
+          "properties": {
+            "mark": {
+              "type": "string"
+            },
+            "purpose": {
+              "enum": [
+                "power_wrap",
+                "support",
+                "pinch",
+                "press"
+              ]
+            },
+            "thumb": {
+              "enum": [
+                "inline",
+                "opposed"
+              ]
+            },
+            "index": {
+              "enum": [
+                "wrap",
+                "extended"
+              ]
+            },
+            "palm": {
+              "enum": [
+                "back",
+                "front",
+                "left",
+                "right",
+                "up",
+                "down"
+              ]
+            },
+            "start_curls": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              }
+            },
+            "start_source": {
+              "type": "string"
+            },
+            "why": {
+              "type": "string"
+            },
+            "along_cm": {
+              "type": "number",
+              "description": "the start this far from the grip's inner end (a support hand under the firing hand)"
+            }
+          }
+        },
+        "l": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mark",
+            "purpose"
+          ],
+          "properties": {
+            "mark": {
+              "type": "string"
+            },
+            "purpose": {
+              "enum": [
+                "power_wrap",
+                "support",
+                "pinch",
+                "press"
+              ]
+            },
+            "thumb": {
+              "enum": [
+                "inline",
+                "opposed"
+              ]
+            },
+            "index": {
+              "enum": [
+                "wrap",
+                "extended"
+              ]
+            },
+            "palm": {
+              "enum": [
+                "back",
+                "front",
+                "left",
+                "right",
+                "up",
+                "down"
+              ]
+            },
+            "start_curls": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              }
+            },
+            "start_source": {
+              "type": "string"
+            },
+            "why": {
+              "type": "string"
+            },
+            "along_cm": {
+              "type": "number",
+              "description": "the start this far from the grip's inner end (a support hand under the firing hand)"
+            }
+          }
+        },
+        "notouch": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notouch_why": {
+          "type": "string"
+        }
+      }
     }
   },
   "additionalProperties": false,

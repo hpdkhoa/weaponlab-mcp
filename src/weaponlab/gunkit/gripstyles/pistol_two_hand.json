@@ -735,5 +735,77 @@
    "where": "Section on the grip, page 47",
    "status": "to read"
   }
- ]
+ ],
+ "purposes": {
+  "why": "what each hand is for, judged by numbers on the gun's own geometry (Pose Lab's object reader): the grip is the frame's run a hand can wrap nearest the grip mark, its opening is the trigger guard; no coordinates are written here",
+  "r": {
+   "mark": "grip",
+   "purpose": "power_wrap",
+   "thumb": "inline",
+   "index": "extended",
+   "palm": "back",
+   "start_curls": {
+    "index": [
+     0.0,
+     0.0,
+     3.0
+    ],
+    "middle": [
+     84.0,
+     40.0,
+     27.0
+    ],
+    "ring": [
+     86.0,
+     31.0,
+     20.0
+    ],
+    "pinky": [
+     87.0,
+     21.0,
+     14.0
+    ]
+   },
+   "start_source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median steady holds, movement 4 (index finger extension grasp): where the search starts, not a rule",
+   "why": "the firing hand high on the grip, palm and fingers round it, the thumb in line with the index on the support side, the trigger finger straight along the guard's line (FM 3-23.35 2-1)"
+  },
+  "l": {
+   "mark": "support",
+   "purpose": "support",
+   "thumb": "inline",
+   "palm": "left",
+   "start_curls": {
+    "index": [
+     26.0,
+     60.0,
+     40.0
+    ],
+    "middle": [
+     51.0,
+     16.0,
+     11.0
+    ],
+    "ring": [
+     51.0,
+     19.0,
+     13.0
+    ],
+    "pinky": [
+     52.0,
+     22.0,
+     15.0
+    ]
+   },
+   "start_source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median steady holds, movement 5 (medium wrap): where the search starts, not a rule",
+   "why": "the support hand filling the grip the firing hand leaves open, its fingers over the firing fingers, its thumb forward along the firing thumb (FM 3-23.35 2-2)",
+   "along_cm": 2.5
+  },
+  "notouch": [
+   "slide",
+   "hammer",
+   "trigger",
+   "release"
+  ],
+  "notouch_why": "the slide and hammer move, the trigger is pressed only for the shot, the release drops the magazine"
+ }
 }
