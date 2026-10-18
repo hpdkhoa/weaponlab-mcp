@@ -828,6 +828,20 @@ def grasp(side, mark, part=None, offset=None, start=None):
         # several turns about the grip tried as starts, the best one searched
         if start:
             L.snapshot("load", start)
+        o_ = "l" if side == "r" else "r"
+        ok_home = ((PUR or {}).get(o_) or {}).get("mark")
+        if ok_home and (o_, ok_home, None, ()) in GRASPS:
+            # the other hand on its own hold, as it was solved (the snapshot above has it where it started): a
+            # support hand is solved against the firing hand where it really holds
+            rel_o, fing_o, _ = GRASPS[(o_, ok_home, None, ())]
+            if o_ in CLAV_SET:
+                L.arm.pose.bones["clavicle_" + o_].rotation_quaternion = CLAV_SET[o_]
+                bpy.context.view_layer.update()
+            B_o = bone_world(mark_bone(ok_home))          # a home hold sits on its mark's bone
+            L._put_hand(o_, B_o @ rel_o)
+            for n_, q_ in fing_o.items():
+                L.arm.pose.bones[n_].rotation_quaternion = q_
+            bpy.context.view_layer.update()
         m = next(x for x in MARKS if x.get("role") == "hold" and x.get("hand") == side)
         oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")
         pdir, rolls = m.get("palm_dir"), [float(x) for x in job.get("seed_rolls", range(-90, 91, 15))]
@@ -838,31 +852,49 @@ def grasp(side, mark, part=None, offset=None, start=None):
                 pdir, rolls = od_, [float(x) for x in range(-45, 46, 15)]
                 report.setdefault("support_open", {"dir": [round(x, 3) for x in od_], "open_share": share_})
         L.snapshot("save", "_seed")
+        ext = m.get("index") == "extended"
+        straight_c = [0.0, 0.0, 3.0]
+        digits_ = tuple(fi for fi in ("index", "middle", "ring", "pinky") if not (fi == "index" and ext))
+        along_ = float(pu.get("along_cm", 0.0)) if m["purpose"] != "support" else 0.0
+
+        def seat(roll):
+            # a start: the hand by the run's frame, its palm settled onto the grip, the index laid straight when it
+            # lies along the guard, the other fingers closed onto the grip (or the firing hand) by the skin
+            L.snapshot("load", "_seed")
+            sd_ = L.seed_hold(side, m, palm_dir=pdir, roll_deg=roll, along_cm=along_)
+            L.settle_palm(side)
+            for fi in ("index", "middle", "ring", "pinky"):
+                for j, cc in zip(("01", "02", "03"), straight_c if (fi == "index" and ext) else (0.0, 0.0, 0.0)):
+                    L._set_curl(side, fi, j, float(cc), _FL)
+            bpy.context.view_layer.update()
+            L.conform_digits(side, digits_, other=oth)
+            return sd_
+
         tries = []
         for roll in rolls:
-            L.snapshot("load", "_seed")
-            sd_ = L.seed_hold(side, m, palm_dir=pdir, roll_deg=roll, along_cm=float(pu.get("along_cm", 0.0)) if m["purpose"] != "support" else 0.0)
-            for fi, c3 in (pu.get("start_curls") or {}).items():
-                for j, cc in zip(("01", "02", "03"), c3):
-                    L._set_curl(side, fi, j, 0.0 if fi != "index" or m.get("index") != "extended" else float(cc), _FL)
-            bpy.context.view_layer.update()
-            # each start judged with its fingers closed on the grip, as the search will close them
-            L.close_hand(side, {fi: ({"pose": "straight", "curl": [0.0, 0.0, 3.0]} if fi == "index" and m.get("index") == "extended"
-                                     else {"pose": "wrap", "max_curl": [90.0, 100.0, 80.0]}) for fi in ("index", "middle", "ring", "pinky")},
-                         L._tree(), GLOVE, oth, mend=False)
-            L.relax_fingers(side)                   # opened by the skin until it presses nothing
+            seat(roll)
             sc_, why_ = L._hold_score(side, MARKS, GLOVE, oth, SOFT, L._tree())
-            tries.append((sc_, roll, sd_))
-            if sc_ <= min(t_[0] for t_ in tries):
-                L.snapshot("save", "_seed_best")
-        tries.sort(key=lambda t_: t_[0])
-        L.snapshot("load", "_seed_best")
-        r = {"seeds": [{"roll_deg": t_[1], "score": round(t_[0], 1)} for t_ in tries]}
-        # the fingers close on the grip (and the support's on the firing hand) each try; an extended index lies straight
-        wr_ = {fi: ("straight" if fi == "index" and m.get("index") == "extended" else "wrap") for fi in ("index", "middle", "ring", "pinky")}
-        r["hold"] = L.hold_object(side, MARKS, glove_cm=GLOVE, other=oth, soft=SOFT,
-                                  generations=int(job.get("hold_generations", 40)), pop=int(job.get("hold_pop", 16)), wrap=wr_)
-        r["gate"] = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False)
+            tries.append((sc_, roll, L.arm_excess(side)))
+        r = {"seeds": sorted([{"roll_deg": t_[1], "score": round(t_[0], 1), "arm_excess_deg": t_[2]} for t_ in tries],
+                             key=lambda x_: (x_["arm_excess_deg"], x_["score"]))}
+        # the search from the best starts in turn (the body first, then the score), the best hold kept, stopping
+        # as soon as one passes the gate; the fingers close by the skin each try, an extended index lies straight
+        wr_ = {fi: ("straight" if fi == "index" and ext else "wrap") for fi in ("index", "middle", "ring", "pinky")}
+        best_, r["restarts"] = None, []
+        for k_, (_sc, roll, _ex) in enumerate(sorted(tries, key=lambda t_: (t_[2], t_[0]))[: int(job.get("hold_restarts", 3))]):
+            seat(roll)
+            h_ = L.hold_object(side, MARKS, glove_cm=GLOVE, other=oth, soft=SOFT, generations=int(job.get("hold_generations", 30)),
+                               pop=int(job.get("hold_pop", 12)), wrap=wr_, seed=5 + k_)
+            g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
+            ok_ = bool(g_.get(side, {}).get("pass"))
+            r["restarts"].append({"roll_deg": roll, "score": h_["score"], "gate": ok_})
+            if best_ is None or (ok_, -h_["score"]) > (best_[2], -best_[0]["score"]):
+                best_ = (h_, g_, ok_)
+                L.snapshot("save", "_held_" + side)
+            if ok_:
+                break
+        L.snapshot("load", "_held_" + side)
+        r["hold"], r["gate"] = best_[0], best_[1]
         r["press"] = r["hold"]["press"]
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         cn_ = "clavicle_" + side
@@ -1684,8 +1716,11 @@ for cid, clip in job["clips"].items():
                     L.arm.pose.bones[n].rotation_quaternion = qb
                 elif qa is not None:
                     L.arm.pose.bones[n].rotation_quaternion = qa
-            if STYLE and job.get("repair", True):
-                rr_ = repair(side)                        # one repair by the one score, only where the frame needs it
+            on_home = bool(MARKS) and resting and mark_of(h["b"]) == ((PUR or {}).get(side) or {}).get("mark")
+            if STYLE and job.get("repair", True) and not on_home:
+                # one repair, only where the frame needs it; a hand resting on its home hold is that hold (searched
+                # and gated on the contact model), so it is left as it is
+                rr_ = repair(side)
                 if rr_ is not None:
                     repairs.append({"t": t, "side": side, "press": rr_["press"], "arm_bad": rr_["arm_bad"],
                                     "moved_cm": rr_["moved_cm"]})
