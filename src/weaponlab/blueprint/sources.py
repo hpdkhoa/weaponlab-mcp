@@ -118,11 +118,27 @@ def scan(gun, source_id):
             "tables": [p["page"] for p in out if p["kind"] == "table"]}
 
 
+def _page_text(file, pdf, page):
+    """A page's text: its own layer (a scan's hidden OCR layer, when it has one), else OCR Lab's read of the page
+    (Tesseract), when ocrlab-mcp is installed."""
+    t = pdf[page - 1].get_text()
+    if len(re.sub(r"\s", "", t)) >= 20:
+        return t
+    try:
+        from ocrlab import read as OCR
+    except ImportError:
+        return t
+    try:
+        return OCR.page(file, page)["text"]
+    except (FileNotFoundError, ValueError):
+        return t
+
+
 def text(gun, source_id, page):
-    """A page's text, as the source holds it (a scan's hidden OCR layer, when it has one)."""
+    """A page's text, as the source holds it (a scan's hidden OCR layer, when it has one), else read by OCR."""
     src = _source(store.load(gun, "sources"), source_id)
     pdf = _pdf().open(src["file"])
-    return pdf[page - 1].get_text()
+    return _page_text(src["file"], pdf, page)
 
 
 def find(gun, pattern, source_id=None, limit=40):
@@ -136,7 +152,7 @@ def find(gun, pattern, source_id=None, limit=40):
             continue
         pdf = _pdf().open(s["file"])
         for i, page in enumerate(pdf):
-            for line in page.get_text().splitlines():
+            for line in _page_text(s["file"], pdf, i + 1).splitlines():
                 if rx.search(line):
                     hits.append({"source": s["id"], "page": i + 1, "line": line.strip()[:160]})
                     if len(hits) >= limit:
