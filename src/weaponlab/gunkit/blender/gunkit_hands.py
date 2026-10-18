@@ -1178,6 +1178,12 @@ if PUR:
     for part_ in PUR.get("notouch", []):
         if part_ in facts["parts"]:
             MARKS.append({"part": facts["parts"][part_]["bone"], "role": "notouch"})
+    # the gun's surface labelled once by region (the contact model's object), named in the gun's own frame
+    LEFT_ = list(g((1.0, 0.0, 0.0)).normalized())
+    for m_ in MARKS:
+        if m_.get("role") == "hold" and m_.get("purpose") == "power_wrap" and m_.get("palm_dir"):
+            m_["_web"] = L.web_point(m_, m_["palm_dir"])[0]
+    report["regions_cm2"] = L.object_regions(MARKS, LEFT_)
     report["marks"] = MARKS
     report["grip_run"] = ri_
 if job.get("object_only"):
