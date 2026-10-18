@@ -1185,6 +1185,35 @@ if job.get("object_only"):
     json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
     print("GUNKIT object read")
     sys.exit(0)
+if job.get("contact_view"):
+    # the contact model on a saved clip's frame: the gun's regions from its marks, the hands' labelled skin, every
+    # contact pair and press, and the pictures (object, hand, heat, contact); no hand is moved
+    cv = job["contact_view"]
+    cid = cv.get("clip", "idle")
+    path = os.path.join(OUT, "clips", job.get("prefix", "A_%s_Hands_" % facts["name"]) + cid + ".pose.json")
+    L.load_clip("cv_" + cid, path)
+    frames, fps = L._frames("cv_" + cid)
+    k_ = max(0, min(len(frames) - 1, int(round(float(cv.get("t", 0.0)) * fps))))
+    L._apply(frames[k_])
+    rest_parts()
+    tr_ = job["tracks"].get(cid)
+    if tr_:
+        tf_ = {round(f["t"], 5): f["bones"] for f in tr_["frames"]}.get(round(k_ / fps, 5))
+        if tf_:
+            pose_parts(tf_)
+    bpy.context.view_layer.update()
+    left_ = list(g((1.0, 0.0, 0.0)).normalized())
+    for m_ in MARKS or []:
+        if m_.get("role") == "hold" and m_.get("purpose") == "power_wrap" and m_.get("palm_dir") and "_web" not in m_:
+            m_["_web"] = L.web_point(m_, m_["palm_dir"])[0]        # the tang: the run's palm side up to the web
+    report["contact_view"] = {"clip": cid, "frame": k_, "regions_cm2": L.object_regions(MARKS, left_),
+                              "palm_check": {sd: L.palm_check(sd) for sd in ("r", "l")}}
+    report["contact_view"]["map"] = L.contact_map(("r", "l"), band_cm=float(cv.get("band_cm", 0.2)), marks=MARKS, left_dir=left_)
+    report["contact_view"]["pictures"] = L.contact_pictures(os.path.join(OUT, "contact"), centre=list(mark_world("grip")),
+                                                            frame_part="Root")
+    json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
+    print("GUNKIT contact view done")
+    sys.exit(0)
 if job.get("skin_check"):
     # the hand clips as made, replayed on this skin (the gun's mesh in gun_fbx): no hand is moved; each frame's
     # clearance, the firing hand's hold and each hand's contact rules on its own contact are measured, so a skin
