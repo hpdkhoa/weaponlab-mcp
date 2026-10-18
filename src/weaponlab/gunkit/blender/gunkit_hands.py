@@ -833,21 +833,10 @@ def grasp(side, mark, part=None, offset=None, start=None):
                            other=oth, soft=SOFT, axis=acr,
                            dists_cm=tuple(con.get("search_dists_cm", (0.0, 1.0, 2.0))), keep=int(job.get("natural_keep", 40)),
                            refine=int(job.get("natural_refine", 40)))
-        th = plan.get("thumb") or {}
-        if job.get("es", True) and hasattr(L, "es_hold"):
-            # then one search over the hand, its fingers and its thumb together, from the most natural arm found
-            r["es"] = L.es_hold(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE, other=oth,
-                                soft=SOFT, generations=int(job.get("es_generations", 40)), pop=int(job.get("es_pop", 16)),
-                                sigma_cm=float(job.get("es_sigma_cm", 1.0)), sigma_deg=float(job.get("es_sigma_deg", 8.0)))
-        elif job.get("natural_chain", True) and hasattr(L, "hold_chain"):
-            # then the chain: a hand still pressing or a digit short of its rule moves a step at a time, the arm
-            # following within its ranges
-            r["chain"] = L.hold_chain(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
-                                      other=job.get("solver_other", True), soft=SOFT)
-        if th.get("to_world") and hasattr(L, "thumb_search") and not job.get("es", True):
-            trule = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
-            r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE, other=job.get("solver_other", True),
-                                        rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)))
+        # then one search over the hand, its fingers and its thumb together, from the most natural arm found
+        r["es"] = L.es_hold(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE, other=oth,
+                            soft=SOFT, generations=int(job.get("es_generations", 40)), pop=int(job.get("es_pop", 16)),
+                            sigma_cm=float(job.get("es_sigma_cm", 1.0)), sigma_deg=float(job.get("es_sigma_deg", 8.0)))
         r["contacts"] = contacts_now(side)
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         H = L._bw(hn).copy()
@@ -863,72 +852,21 @@ def grasp(side, mark, part=None, offset=None, start=None):
         if start:
             L.snapshot("load", start)
         Q = RA.matrix_world
-        L.snapshot("save", "_multi")
-        tries = [{"face": con["face"], "anchors": con["anchors"]}] + list(con.get("starts", []))
-        best_try = None
-        for ti, tr_ in enumerate(tries):
-            L.snapshot("load", "_multi")
-            anc = {k: list(Q @ g(v)) for k, v in tr_["anchors"].items()}
-            face_w = (Q.to_quaternion() @ g([-x for x in tr_["face"]])).normalized()
-            acr = None
-            if con.get("across") == "grip_axis" and (facts.get("magazine") or {}).get("axis"):
-                ax_ = [-x for x in facts["magazine"]["axis"]]        # the magazine well's line, upward: the grip's axis
-                acr = list((Q.to_quaternion() @ g(ax_)).normalized())
-            elif isinstance(con.get("across"), list):
-                acr = list((Q.to_quaternion() @ g(con["across"])).normalized())
-            placed = L.place_hand(side, anc, facing=list(face_w), frame="world", across=acr)
-            r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=None, glove_cm=GLOVE, frame="world",
-                             soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 30)),
-                             span_cm=float(job.get("anchor_span_cm", 0.8)), turn_deg=float(job.get("anchor_turn_deg", 10.0)),
-                             other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
-                             from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 4.0)),
-                             contact_rules=hand_rules(side)[0] or None, contact_w=float(job.get("contact_weight", 8.0)))
-            th = plan.get("thumb") or {}
-            if job.get("hold_chain", True) and side in job.get("hold_chain_sides", ("r", "l")) and hasattr(L, "hold_chain") and hand_rules(side)[0]:
-                # a digit still short of its rule (at its limit): the wrist, the forearm and the shoulder help it
-                r["chain"] = L.hold_chain(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
-                                          other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
-                                          soft=SOFT, thumb_point=th.get("to_world") if th.get("pose") == "to" else None)
-            if th.get("pose") in ("to", "posture") and th.get("to_world") and hasattr(L, "thumb_search") and not th.get("via"):
-                trule = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
-                r["thumb"] = L.thumb_search(side, th["to_world"], glove_cm=GLOVE,
-                                            other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
-                                            rule=trule, spread_deg=float(job.get("thumb_spread_deg", 90.0)),
-                                            samples=int(job.get("thumb_samples", 220)), press_w=float(job.get("thumb_press_w", 6.0)))
-                if trule:
-                    r["thumb"]["rule_after"] = {k: L._rule_eval(side, trule, GLOVE).get(k) for k in ("error", "gap_cm", "facing_deg", "share")}
-            if job.get("thumb_probe") and th.get("pose") == "to":
-                # a probe: the thumb driven straight to its point (every joint, no guard), then measured
-                L.snapshot("save", "_probe")
-                tgt_ = Vector(th["to_world"])
-                L._thumb_to(side, tgt_, L._tree(), GLOVE, False, guard=False, rounds=40)
-                trule_ = next((x for x in hand_rules(side)[0] if x["patch"].startswith("thumb")), None)
-                ev_ = L._rule_eval(side, trule_, GLOVE) if trule_ else {}
-                Ri_ = RA.matrix_world.inverted()
-                tp_ = Ri_ @ L._finger_tip("thumb", side)
-                report.setdefault("thumb_probe", []).append({
-                    "start": ti, "tip": [round(tp_.x * 100, 1), round(-tp_.y * 100, 1), round(tp_.z * 100, 1)],
-                    "left_cm": round((L._finger_tip("thumb", side) - tgt_).length * 100, 2),
-                    "gap_cm": round(L._digit_gap(side, "thumb", L._tree(), GLOVE, False), 2),
-                    "rule": {k: ev_.get(k) for k in ("error", "gap_cm", "facing_deg", "share")},
-                    "thumb_rules": L._thumb_report(side, L._thumb_limits())[1]})
-                L.snapshot("load", "_probe")
-            cn_ = contacts_now(side)
-            # the start whose hold best meets the rules: each required rule's error, the wrap and the closure
-            sc_ = sum(x["error"] for x in cn_["rules"] if x.get("need") == "required") if cn_ else r["score"]
-            if cn_ and cn_.get("wrap") and not cn_["wrap"]["met"]:
-                sc_ += 2.0 * (cn_["wrap"]["min"] - cn_["wrap"]["share"])
-            if cn_ and not cn_["closure"]["closed"]:
-                sc_ += 5.0
-            sc_ += 0.05 * r["score"]
-            r["start"] = ti
-            r["start_score"] = round(sc_, 3)
-            report.setdefault("starts", {}).setdefault("%s:%s" % (side, mark), []).append(round(sc_, 3))
-            if best_try is None or sc_ < best_try[0]:
-                L.snapshot("save", "_multi_best")
-                best_try = (sc_, r, placed)
-        L.snapshot("load", "_multi_best")
-        r, placed = best_try[1], best_try[2]
+        anc = {k: list(Q @ g(v)) for k, v in con["anchors"].items()}
+        face_w = (Q.to_quaternion() @ g([-x for x in con["face"]])).normalized()
+        acr = None
+        if con.get("across") == "grip_axis" and (facts.get("magazine") or {}).get("axis"):
+            ax_ = [-x for x in facts["magazine"]["axis"]]        # the magazine well's line, upward: the grip's axis
+            acr = list((Q.to_quaternion() @ g(ax_)).normalized())
+        elif isinstance(con.get("across"), list):
+            acr = list((Q.to_quaternion() @ g(con["across"])).normalized())
+        placed = L.place_hand(side, anc, facing=list(face_w), frame="world", across=acr)
+        r = L.solve_hand(side, list(at), surface_normal(at, mark), plan=plan, toward=None, glove_cm=GLOVE, frame="world",
+                         soft=SOFT, samples=int(job.get("solver_samples", 60)), refine=int(job.get("solver_refine", 30)),
+                         span_cm=float(job.get("anchor_span_cm", 0.8)), turn_deg=float(job.get("anchor_turn_deg", 10.0)),
+                         other=job.get("solver_other", True) and not (side == "r" and mark == "grip"),
+                         from_current=True, anchors=anc, anchor_w=float(job.get("anchor_weight", 4.0)),
+                         contact_rules=hand_rules(side)[0] or None, contact_w=float(job.get("contact_weight", 8.0)))
         if job.get("es_after_anchor", True) and hasattr(L, "es_hold"):
             # then the one optimiser from this hold, in small steps: the faults left are mended together, the thumb kept
             oth_ = job.get("solver_other", True) and not (side == "r" and mark == "grip")
@@ -1158,7 +1096,7 @@ if job.get("skin_check"):
     sys.exit(0)
 REF = None
 if job.get("reference_pose"):
-    # a hold a person posed (gunkit_pose_read.py's output): each hand against the gun's body bone, every finger
+    # a reference hold (a pack clip retargeted to these arms): each hand against the gun's body bone, every finger
     # joint's turn; taken as the home holds instead of solving them
     REF = json.load(open(job["reference_pose"], encoding="utf-8"))
     for sd, mk in (("r", "grip"), ("l", facts.get("home_l", "support"))):
@@ -1242,24 +1180,6 @@ def hold_geometry():
 
 report["hold_geometry"] = hold_geometry()
 report["hold_contacts"] = {sd: contacts_now(sd) for sd in ("r", "l")} if STYLE else None
-if job.get("reference_scene"):
-    # a scene for a person to pose the hold in: the arms (gloved, at human size), the gun at the ready hold, the
-    # hands where the solver left them; a note says what to do. Nothing else of this run is needed then
-    t_ = bpy.data.texts.new("POSE_ME")
-    t_.write("Gun Kit reference hold: %s, grip style %s, character %s.\n"
-             "Pose the arms armature's hand and finger bones (Pose Mode) so both hands hold the gun as a person does.\n"
-             "Leave the gun where it is. Rotate the hand bones; move a hand only with its hand bone.\n"
-             "Fingers: rotate each finger bone; keep the glove skin out of the gun.\n"
-             "Then save this file (Ctrl+S) and tell Claude.\n" % (facts["name"], (STYLE or {}).get("id"), (CHAR or {}).get("id")))
-    L.arm.name = "ARMS_pose_me"
-    RA.name = "GUN_leave"
-    for ob_ in (L.arm, RA):
-        if ob_.animation_data:
-            ob_.animation_data.action = None          # no clip left on them: a frame change would undo the pose
-    bpy.ops.wm.save_as_mainfile(filepath=job["reference_scene"], copy=True)
-    json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
-    print("GUNKIT reference scene saved")
-    sys.exit(0)
 if job.get("render"):
     report["hold_pictures"] = L.render(views=("eye", "right", "left", "top"), size=(640, 360),
                                        ortho_cm=job.get("render_ortho_cm", 34.0))
