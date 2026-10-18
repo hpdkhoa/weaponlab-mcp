@@ -828,14 +828,15 @@ def grasp(side, mark, part=None, offset=None, start=None):
         acr = None
         if con.get("across") == "grip_axis" and (facts.get("magazine") or {}).get("axis"):
             acr = list((Q.to_quaternion() @ g([-x for x in facts["magazine"]["axis"]])).normalized())
+        oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")   # the firing hand closes on the gun alone
         r = L.natural_hold(side, list(at), list(nrm_w), hand_rules(side)[0], plan=plan, glove_cm=GLOVE,
-                           other=job.get("solver_other", True), soft=SOFT, axis=acr,
+                           other=oth, soft=SOFT, axis=acr,
                            dists_cm=tuple(con.get("search_dists_cm", (0.0, 1.0, 2.0))), keep=int(job.get("natural_keep", 40)),
                            refine=int(job.get("natural_refine", 40)))
         th = plan.get("thumb") or {}
         if job.get("es", True) and hasattr(L, "es_hold"):
             # then one search over the hand, its fingers and its thumb together, from the most natural arm found
-            r["es"] = L.es_hold(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE, other=job.get("solver_other", True),
+            r["es"] = L.es_hold(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE, other=oth,
                                 soft=SOFT, generations=int(job.get("es_generations", 40)), pop=int(job.get("es_pop", 16)),
                                 sigma_cm=float(job.get("es_sigma_cm", 1.0)), sigma_deg=float(job.get("es_sigma_deg", 8.0)))
         elif job.get("natural_chain", True) and hasattr(L, "hold_chain"):
@@ -928,6 +929,13 @@ def grasp(side, mark, part=None, offset=None, start=None):
                 best_try = (sc_, r, placed)
         L.snapshot("load", "_multi_best")
         r, placed = best_try[1], best_try[2]
+        if job.get("es_after_anchor", True) and hasattr(L, "es_hold"):
+            # then the one optimiser from this hold, in small steps: the faults left are mended together, the thumb kept
+            oth_ = job.get("solver_other", True) and not (side == "r" and mark == "grip")
+            r["es"] = L.es_hold(side, hand_rules(side)[0], plan=plan, glove_cm=GLOVE, other=oth_, soft=SOFT,
+                                generations=int(job.get("es_anchor_generations", 30)), pop=int(job.get("es_pop", 16)),
+                                sigma_cm=float(job.get("es_anchor_sigma_cm", 0.6)), sigma_deg=float(job.get("es_anchor_sigma_deg", 6.0)),
+                                freeze_thumb=bool((plan.get("thumb") or {}).get("via")))   # a thumb on its path stays on it
         r["placed"] = placed
         r["contacts"] = contacts_now(side)
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r

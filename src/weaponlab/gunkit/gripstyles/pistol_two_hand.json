@@ -16,7 +16,7 @@
      -0.6,
      0.0
     ],
-    "why": "the firing palm wraps the grip's right side and its backstrap, the web of the hand high under the tang on the backstrap's middle, so the thumb lies along the left side (FM 3-23.35 2-3); the fingers forward across the front strap, square to the grip's 18.7 degree slant",
+    "why": "the firing palm wraps the grip's right side and its backstrap, the web of the hand high under the tang on the backstrap's middle, so the thumb lies along the left side (FM 3-23.35 2-3); placed where the whole arm is most at ease while every contact rule is met",
     "fingers_toward": [
      0.0,
      0.95,
@@ -97,12 +97,12 @@
      "point": [
       2.7,
       -1.5,
-      -2.4
+      -2.0
      ],
      "via": [
-      2.6,
+      3.2,
       -7.8,
-      -3.5
+      -3.0
      ],
      "source": "Ninapro calibrated kinematics (Jarque-Bou, Atzori, Mueller 2020, CC BY 4.0), exercise 3, median of 10 subjects' steady holds; angles outside the joint's range dropped, a dropped ring angle the mean of middle and little, a dropped end joint two thirds of the middle joint; movement 4",
      "why": "the firing thumb round the backstrap's support-side rear corner and forward along the support side over the bare top of the grip panel, nearly straight (FM 3-23.35 2-1; Ninapro movement 4: MCP 7, IP 15)"
@@ -126,7 +126,7 @@
       "facing": "support_side",
       "window": {
        "y": [
-        "slide_rear+0.5",
+        "slide_rear-1.5",
         "stop+0.5"
        ],
        "z": [
@@ -136,13 +136,13 @@
       }
      },
      "gap_cm": [
-      -0.05,
-      0.25
+      -0.25,
+      0.4
      ],
-     "facing_max_deg": 50,
+     "facing_max_deg": 60,
      "need": "required",
      "why": "the firing thumb lies forward along the support side, over the frame and the top of the grip panel the fingers leave bare, so no part of the grip is left open (FM 3-23.35 2-1: the thumb rests alongside the weapon)",
-     "min_share": 0.6
+     "min_share": 0.4
     },
     {
      "id": "web_under_tang",
