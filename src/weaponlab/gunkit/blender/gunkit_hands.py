@@ -853,11 +853,16 @@ def grasp(side, mark, part=None, offset=None, start=None):
         best_, r["restarts"] = None, []
         for k_, (_sc, roll, _ex) in enumerate(sorted(tries, key=lambda t_: (t_[2], t_[0]))[: int(job.get("hold_restarts", 3))]):
             seat(roll)
-            h_ = L.hold_object(side, MARKS, glove_cm=GLOVE, other=oth, soft=SOFT, generations=int(job.get("hold_generations", 30)),
-                               pop=int(job.get("hold_pop", 12)), wrap=wr_, seed=5 + k_)
+            if job.get("hold_solver", "target") == "target":
+                # the target solver (no chance in it): each purpose names where its hand part goes
+                h_ = L.target_hold(side, MARKS, glove_cm=GLOVE, other=oth, wrap=wr_)
+            else:
+                h_ = L.hold_object(side, MARKS, glove_cm=GLOVE, other=oth, soft=SOFT, generations=int(job.get("hold_generations", 30)),
+                                   pop=int(job.get("hold_pop", 12)), wrap=wr_, seed=5 + k_)
             g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
             ok_ = bool(g_.get(side, {}).get("pass"))
-            r["restarts"].append({"roll_deg": roll, "score": h_["score"], "gate": ok_})
+            r["restarts"].append({"roll_deg": roll, "score": h_["score"], "gate": ok_, "rounds": h_.get("rounds"),
+                                  "unmet": h_.get("unmet"), "solve_s": h_.get("solve_s")})
             if best_ is None or (ok_, -h_["score"]) > (best_[2], -best_[0]["score"]):
                 best_ = (h_, g_, ok_)
                 L.snapshot("save", "_held_" + side)

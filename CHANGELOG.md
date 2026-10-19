@@ -24,6 +24,9 @@ Since 0.1.0 (2026-10-15 to 19): Gun Kit, Blueprint Lab and the hands.
   against the firing hand where it holds; a hand resting on its home hold is not repaired per frame. `contact_view`
   draws the contact map of a saved clip frame. Verify reads the drawn skin, the eye's view (sights, cover) and the
   motion (`motion.py`: pops, jerks, finger jumps).
+* **Holds by Pose Lab's target solver** (2026-10-19): each home hold is solved toward its purposes' targets with no
+  chance in it (`hold_solver`: "target", the default; "search" keeps the old random search for comparison); each
+  start's rounds and unmet purposes are in the report.
 * **Reference holds** (`reference.py`, `run.pack_hold`): a pack's hand read through a bone map into the grip's frame,
   kept inside the project (a pack's numbers keep its licence); a comparison only, not a rule.
 * Removed: the hold chain, the thumb search and probe, the hand-posing scene, the four per-frame repair passes.
