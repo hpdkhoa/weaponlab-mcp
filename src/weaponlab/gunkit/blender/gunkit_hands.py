@@ -844,37 +844,7 @@ def grasp(side, mark, part=None, offset=None, start=None):
             bpy.context.view_layer.update()
         m = next(x for x in MARKS if x.get("role") == "hold" and x.get("hand") == side)
         oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")
-        pdir, rolls = m.get("palm_dir"), [float(x) for x in job.get("seed_rolls", range(-90, 91, 15))]
-        if m["purpose"] == "support":
-            # the support palm goes where the firing hand leaves the grip open, turned a little either way
-            od_, share_ = L.open_dir("r" if side == "l" else "l", m, GLOVE)
-            if od_ is not None:
-                pdir, rolls = od_, [float(x) for x in range(-45, 46, 15)]
-                report.setdefault("support_open", {"dir": [round(x, 3) for x in od_], "open_share": share_})
-        L.snapshot("save", "_seed")
-        ext = m.get("index") == "extended"
-        straight_c = [0.0, 0.0, 3.0]
-        digits_ = tuple(fi for fi in ("index", "middle", "ring", "pinky") if not (fi == "index" and ext))
-        along_ = float(pu.get("along_cm", 0.0)) if m["purpose"] != "support" else 0.0
-
-        def seat(roll):
-            # a start: the hand by the run's frame, its palm settled onto the grip, the index laid straight when it
-            # lies along the guard, the other fingers closed onto the grip (or the firing hand) by the skin
-            L.snapshot("load", "_seed")
-            sd_ = L.seed_hold(side, m, palm_dir=pdir, roll_deg=roll, along_cm=along_)
-            L.settle_palm(side)
-            for fi in ("index", "middle", "ring", "pinky"):
-                for j, cc in zip(("01", "02", "03"), straight_c if (fi == "index" and ext) else (0.0, 0.0, 0.0)):
-                    L._set_curl(side, fi, j, float(cc), _FL)
-            bpy.context.view_layer.update()
-            L.conform_digits(side, digits_, other=oth)
-            return sd_
-
-        tries = []
-        for roll in rolls:
-            seat(roll)
-            sc_, why_ = L._hold_score(side, MARKS, GLOVE, oth, SOFT, L._tree())
-            tries.append((sc_, roll, L.arm_excess(side)))
+        tries, seat, ext = purpose_starts(side, m, pu, oth)
         r = {"seeds": sorted([{"roll_deg": t_[1], "score": round(t_[0], 1), "arm_excess_deg": t_[2]} for t_ in tries],
                              key=lambda x_: (x_["arm_excess_deg"], x_["score"]))}
         # the search from the best starts in turn (the body first, then the score), the best hold kept, stopping
@@ -1219,6 +1189,81 @@ if PUR:
     report["regions_cm2"] = L.object_regions(MARKS, LEFT_)
     report["marks"] = MARKS
     report["grip_run"] = ri_
+
+
+def purpose_starts(side, m, pu, oth):
+    """A hand's starts on its mark: the hand by the run's frame turned about the grip (a support hand's palm toward
+    where the firing hand leaves the grip open), its palm settled, the index laid straight when it lies along the
+    guard, the other fingers closed by the skin; each scored by the purposes and by how far past its limits the arm
+    is. Returns the starts [(score, turn, arm excess)], a function that seats the hand at a turn, and whether the
+    index is extended."""
+    pdir, rolls = m.get("palm_dir"), [float(x) for x in job.get("seed_rolls", range(-90, 91, 15))]
+    if m["purpose"] == "support":
+        od_, share_ = L.open_dir("r" if side == "l" else "l", m, GLOVE)
+        if od_ is not None:
+            pdir, rolls = od_, [float(x) for x in range(-45, 46, 15)]
+            report["support_open"] = {"dir": [round(x, 3) for x in od_], "open_share": share_}
+    L.snapshot("save", "_seed_" + side)
+    ext = m.get("index") == "extended"
+    digits_ = tuple(fi for fi in ("index", "middle", "ring", "pinky") if not (fi == "index" and ext))
+    along_ = float(pu.get("along_cm", 0.0)) if m["purpose"] != "support" else 0.0
+
+    def seat(roll):
+        L.snapshot("load", "_seed_" + side)
+        sd_ = L.seed_hold(side, m, palm_dir=pdir, roll_deg=roll, along_cm=along_)
+        L.settle_palm(side)
+        for fi in ("index", "middle", "ring", "pinky"):
+            for j, cc in zip(("01", "02", "03"), (0.0, 0.0, 3.0) if (fi == "index" and ext) else (0.0, 0.0, 0.0)):
+                L._set_curl(side, fi, j, float(cc), _FL)
+        bpy.context.view_layer.update()
+        L.conform_digits(side, digits_, other=oth)
+        return sd_
+
+    tries = []
+    for roll in rolls:
+        seat(roll)
+        sc_, _why = L._hold_score(side, MARKS, GLOVE, oth, SOFT, L._tree())
+        tries.append((sc_, roll, L.arm_excess(side)))
+    return tries, seat, ext
+
+
+if MARKS and job.get("stance_search", True) and not (job.get("contact_view") or job.get("skin_check") or job.get("object_only")):
+    # where the gun sits for both hands: a grid of places about the style's stance (ahead and back, up and down in
+    # the view), each judged by the two hands' best starts on it (how far past its limits each arm is first, then
+    # the purposes' score): the body decides the stance, as it decides each hold
+    base_ = L.rifle_rest.copy()
+    m_r = next(x for x in MARKS if x.get("role") == "hold" and x.get("hand") == "r")
+    m_l = next((x for x in MARKS if x.get("role") == "hold" and x.get("hand") == "l"), None)
+    L.snapshot("save", "_stance0")
+    rows_ = []
+    for dy in [float(v) for v in job.get("stance_ahead_cm", (-6.0, -3.0, 0.0, 3.0))]:
+        for dz in [float(v) for v in job.get("stance_up_cm", (-8.0, -6.0, -4.0, -2.0, 0.0))]:
+            L.snapshot("load", "_stance0")
+            L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * (dy / 100.0) + Vector(PL.VIEW_UP) * (dz / 100.0)) @ base_
+            L.pose_idle()
+            rest_parts()
+            L._place_rifle()
+            _BVH.clear()
+            tr_r, seat_r, _e = purpose_starts("r", m_r, PUR["r"], False)
+            b_r = min(tr_r, key=lambda t_: (t_[2], t_[0]))
+            tot = (10.0 * b_r[2] + b_r[0], b_r[2], b_r[0])
+            if m_l is not None:
+                seat_r(b_r[1])
+                tr_l, _seat_l, _e2 = purpose_starts("l", m_l, PUR["l"], True)
+                b_l = min(tr_l, key=lambda t_: (t_[2], t_[0]))
+                tot = (tot[0] + 10.0 * b_l[2] + b_l[0], tot[1] + b_l[2], tot[2] + b_l[0])
+            rows_.append({"ahead_cm": dy, "up_cm": dz, "value": round(tot[0], 1), "arm_excess_deg": tot[1], "score": round(tot[2], 1)})
+    best_s = min(rows_, key=lambda r_: r_["value"])
+    L.snapshot("load", "_stance0")
+    L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * (best_s["ahead_cm"] / 100.0) + Vector(PL.VIEW_UP) * (best_s["up_cm"] / 100.0)) @ base_
+    REST0 = L.rifle_rest.copy()
+    L.pose_idle()
+    rest_parts()
+    L._place_rifle()
+    _BVH.clear()
+    L.snapshot("save", "place_best")
+    start = "place_best"
+    report["stance_search"] = {"best": best_s, "tried": sorted(rows_, key=lambda r_: r_["value"])[:6]}
 if job.get("object_only"):
     # the gun as read, and nothing else of the hand step
     json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
@@ -1557,6 +1602,15 @@ def repair(side):
     """A frame's hand that presses into the gun or the other hand, or whose arm is past its limits, mended by the one
     score (Pose Lab's repair_hand: the hand moved and turned, the elbow swung, drawn back to where the motion put
     it). Returns the repair's parts, or None when the frame needed none."""
+    if MARKS and hasattr(L, "repair_frame"):
+        # on the contact ruler (the drawn skin, past its give; the arm's excess), as the holds were judged
+        rr_ = L.repair_frame(side, glove_cm=GLOVE, other=True, keep_w=float(job.get("repair_keep_w", 6.0)),
+                             generations=int(job.get("repair_generations", 6)), pop=int(job.get("repair_pop", 8)))
+        if rr_ is None:
+            return None
+        return {"press": rr_["after"]["press_cm2"] + rr_["after"]["hand_press_cm2"],
+                "arm_bad": [] if rr_["after"]["arm_excess_deg"] <= 0 else ["arm %.0f deg past its limits" % rr_["after"]["arm_excess_deg"]],
+                "moved_cm": rr_["moved_cm"]}
     # only a real fault: a press past its allowance, or an arm rule broken (a grip rule a hand on its way breaks
     # is the motion's, not the repair's)
     if L.hand_presses(side, None, GLOVE, other=True, soft=SOFT)[0] <= 0.0 and not L._arm_report(side, L._limits()[0])[1]:
