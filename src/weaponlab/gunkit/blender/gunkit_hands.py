@@ -810,6 +810,27 @@ def style_plan(side, mark):
 
 
 def grasp(side, mark, part=None, offset=None, start=None):
+    """The hand's hold on a mark (_grasp_solve), checked against the walls whichever way it was found: the hold is
+    posed, its walls read, and a hold past any wall is recorded as failed with the walls it breaks (report
+    "walls"); it never counts as found."""
+    key = (side, mark, part, tuple(offset or ()))
+    if key in GRASPS:
+        return GRASPS[key]
+    rel, fingers, found = _grasp_solve(side, mark, part, offset, start)
+    L.snapshot("save", "_wall_check")
+    L._put_hand(side, bone_world(mark_bone(mark, part)) @ rel)      # as every solver stored it: against the mark's bone
+    for n_, q_ in fingers.items():
+        L.arm.pose.bones[n_].rotation_quaternion = q_
+    bpy.context.view_layer.update()
+    w_ = L.wall_faults(side, other=True)
+    L.snapshot("load", "_wall_check")
+    if w_:
+        report.setdefault("walls", {})["%s:%s" % (side, mark)] = {k: round(v, 2) for k, v in w_.items()}
+    GRASPS[key] = (rel, fingers, bool(found) and not w_)
+    return GRASPS[key]
+
+
+def _grasp_solve(side, mark, part=None, offset=None, start=None):
     """The hand's hold on a mark, solved once with the parts as they are now: (the hand against the mark's bone, the
     fingers' turns, whether a hold passed). The palm is first laid on the surface facing into it (the support hand
     slid back along the bore while the arm cannot reach), then Pose Lab's grip search runs from there; its hold is
@@ -853,18 +874,17 @@ def grasp(side, mark, part=None, offset=None, start=None):
         best_, r["restarts"] = None, []
         for k_, (_sc, roll, _ex) in enumerate(sorted(tries, key=lambda t_: (t_[2], t_[0]))[: int(job.get("hold_restarts", 3))]):
             seat(roll)
-            if job.get("hold_solver", "target") == "target":
-                # the target solver (no chance in it): each purpose names where its hand part goes
-                h_ = L.target_hold(side, MARKS, glove_cm=GLOVE, other=oth, wrap=wr_)
-            else:
-                h_ = L.hold_object(side, MARKS, glove_cm=GLOVE, other=oth, soft=SOFT, generations=int(job.get("hold_generations", 30)),
-                                   pop=int(job.get("hold_pop", 12)), wrap=wr_, seed=5 + k_)
+            # the target solver (no chance in it), inside the walls: each purpose names where its hand part goes
+            h_ = L.target_hold(side, MARKS, glove_cm=GLOVE, other=oth, wrap=wr_)
             g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
             ok_ = bool(g_.get(side, {}).get("pass"))
+            ok_ = ok_ and not h_.get("walls")
             r["restarts"].append({"roll_deg": roll, "score": h_["score"], "gate": ok_, "rounds": h_.get("rounds"),
-                                  "unmet": h_.get("unmet"), "solve_s": h_.get("solve_s")})
-            if best_ is None or (ok_, -h_["score"]) > (best_[2], -best_[0]["score"]):
-                best_ = (h_, g_, ok_)
+                                  "unmet": h_.get("unmet"), "walls": h_.get("walls"), "solve_s": h_.get("solve_s")})
+            # the walls first (fewer broken, less past), then the gate, then the score
+            rank_ = (L._walls_rank(h_.get("walls") or {}), not ok_, h_["score"])
+            if best_ is None or rank_ < best_[3]:
+                best_ = (h_, g_, ok_, rank_)
                 L.snapshot("save", "_held_" + side)
             if ok_:
                 break
@@ -879,7 +899,7 @@ def grasp(side, mark, part=None, offset=None, start=None):
         rel = bone_world(mark_bone(mark, part)).inverted() @ H
         fingers = {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]}
         L.snapshot("load", "before_grasp")
-        GRASPS[key] = (rel, fingers, bool(r["gate"].get(side, {}).get("pass")))
+        GRASPS[key] = (rel, fingers, bool(r["gate"].get(side, {}).get("pass")) and not r["hold"].get("walls"))
         return GRASPS[key]
     rf = ((job.get("reference") or {}).get("hands") or {}).get(side)
     if plan is not None and con.get("mark") == mark and rf and job.get("use_reference", False):
@@ -1713,6 +1733,7 @@ for cid, clip in job["clips"].items():
     resolved = []
     repairs = []             # the frames the one repair mended
     moves = []               # each frame's hands as the player sees them, for the motion check
+    walled = []              # frames where a hand is past a wall (the clip is then not written)
     for fr in clip["frames"]:
         t = round(fr["t"], 5)
         gun_pose(fr["gun"])
@@ -1827,8 +1848,18 @@ for cid, clip in job["clips"].items():
                     cn = contacts_now(side)
                     if cn:
                         clip_contacts.append((fr["t"], side, cn))
+        for sd in ("r", "l"):
+            w_ = L.wall_faults(sd, other=True)
+            if w_:
+                walled.append({"t": round(fr["t"], 3), "side": sd, "walls": {k: round(v, 2) for k, v in w_.items()}})
         L.record_clip("key", seconds=fr["t"])
     L.record_clip("stop")
+    if walled:
+        # the walls are a real body's limits and physics: a clip with any frame past one is not written, only reported
+        report["clips"][cid] = {"clip": name, "written": [], "blocked": "frames past the walls: %d" % len(walled),
+                                "walls": walled[:12]}
+        print("GUNKIT HANDS: %s not written, %d frames past the walls" % (cid, len(walled)))
+        continue
     saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root")
     try:
         soft = [c["segment"] + "*" for c in (STYLE or {}).get("soft_contacts", [])]
