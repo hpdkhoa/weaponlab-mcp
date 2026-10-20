@@ -883,18 +883,25 @@ def _gun_shift(v):
 def touch_pairs(side):
     """Each hand's touch points paired with the gun's (the owner's words, 2026-10-20: "look at the points on the hand
     that touch the part of the gun, like the grip the trigger ring and other touchable parts"), in the gun body's own
-    frame so they ride the gun. From the shooting manual's two-hand grip (FM 3-23.35, 2-2 and 2-3) and the gun's marks:
-      firing hand: the web onto the web point under the grip safety, high on the backstrap (weight 2); the backstrap
-        down the palm: the hand's web-to-wrist line along the grip's axis, downward (2); the palm facing into the
-        firing side's panel, a direction only (3); the index's middle joint onto the frame's side by the trigger
-        guard's top edge, the finger along the frame, off the trigger (1). (The palm's middle onto the facts' grip
-        mark was tried first, 2026-10-20: that mark is a point on the panel, not where the manual puts the palm; the
-        hand's web-to-palm distance is 3.2 cm, the gun's web point to that mark 6.7 cm, so no hand meets both);
-      support hand: the palm's middle onto the support mark on the other panel, facing into it (3); the knuckles'
-        line along the grip's axis, the index's knuckle toward the top (the fingers wrap the front, over the firing
-        fingers) (1).
-    The trigger guard ring is not a pair here: the open hand's middle finger reaches it only once it curls, so it is
-    met by the fingers' closing (Step D) onto the gun."""
+    frame so they ride the gun. Each target says what kind it is (the owner's rule: a point, a line or a surface,
+    never a line or a surface made into one point), with its source: the shooting manual's two-hand grip
+    (FM 3-23.35, 2-2 and 2-3) and the gun's marks.
+      firing hand:
+        the web on the web point, the crook under the grip safety high on the backstrap: a point; the center the
+          hand turns about (the manual: the web high on the backstrap);
+        the index's middle joint along the frame by the trigger guard's top edge, on the firing side: a line, the
+          finger anywhere along it (the manual: the trigger finger along the frame, off the trigger, ready);
+        the palm facing into the firing side's panel: a facing (the palm wraps the grip);
+        the web-to-wrist line along the grip's axis, downward: a check only (the backstrap down the palm; the wrist
+          stands in for the heel of the hand, so it is not a target).
+      support hand:
+        the palm's middle on the support mark on the other panel: a point, the center (the manual: the support palm
+          fills the open side of the grip);
+        the knuckles' line along the grip's axis, the index's knuckle toward the top: a direction (its fingers over
+          the firing fingers).
+    The trigger guard ring is met by the fingers' closing (Step D): the open hand's middle finger reaches it only
+    once it curls. The facts' grip mark is not a target: it is a point on the panel, not where the manual puts the
+    palm (the hand's web-to-palm distance 3.2 cm, the gun's web point to that mark 6.7 cm)."""
     hm = report.get("hold_marks") or {}
     if not hm.get("web_point") or side not in FACE:
         return None
@@ -903,34 +910,83 @@ def touch_pairs(side):
     Fi = F.inverted()
 
     def onto(p):
-        """The gun's surface nearest p and its outward normal, in the gun's frame."""
-        D, _w, Nr = L.sdf_query(_np.array([list(p)]))
-        n_ = Vector(list(Nr[0])).normalized()
-        s_ = p - n_ * (float(D[0]) / 100.0)
-        return list(Fi @ s_), list((Fi.to_3x3() @ n_).normalized())
-    palm_r = (L._fitted_radii() or {}).get("palm", 0.018) * 100.0 + GLOVE
+        """The gun's surface nearest p, exactly (the mesh's nearest point, not a step back along the distance
+        grid's gradient, which misses in a corner like the crook under the grip safety), and the outward normal
+        there, in the gun's frame."""
+        loc_, nrm_, _i, _d = L._object_now()[0].find_nearest(p)
+        if loc_ is None:
+            raise ValueError("touch_pairs: no gun surface near %s" % (list(p),))
+        D, _w, _n = L.sdf_query(_np.array([list(loc_ + nrm_ * 0.001)]))
+        if float(D[0]) < 0.0:
+            nrm_ = -nrm_                                   # the face's winding points in: the outward side is the other
+        return list(Fi @ loc_), list((Fi.to_3x3() @ nrm_).normalized())
+    ga = hm["grip_axis"]
+    bvh_ = L._object_now()[0]
+
+    def side_hit(p, way):
+        """The gun's surface on the `way` side of p: a ray from 6 cm out along way back toward p, its first hit
+        (measured, not a guessed push), with its outward normal, in the gun's frame; None when it misses."""
+        o_ = p + way * 0.06
+        h_ = bvh_.ray_cast(o_, -way, 0.12)
+        if h_[0] is None:
+            return None, None
+        D, _w, Nr = L.sdf_query(_np.array([list(h_[0])]))
+        return list(Fi @ h_[0]), list((Fi.to_3x3() @ Vector(list(Nr[0]))).normalized())
     out = []
     if side == "r":
         at, n_ = onto(F @ Vector(hm["web_point"]))
-        out.append({"hand": "web", "at": at, "normal": n_, "off_cm": 0.9 + GLOVE, "weight": 2.0})
-        at, n_ = onto(mark_world("grip"))
-        out.append({"hand": "palm", "at": at, "normal": n_, "off_cm": palm_r, "weight": 3.0, "facing_only": True})
-        ga = hm["grip_axis"]
-        out.append({"line": ["web", "wrist"], "dir": list((Vector(ga["outer"]) - Vector(ga["inner"])).normalized()),
-                    "weight": 2.0})
+        out.append({"hand": "web_fold", "kind": "point", "center": True, "at": at, "normal": n_, "off_cm": GLOVE,
+                    "source": "FM 3-23.35: the web high on the backstrap, under the grip safety; the hand point is the "
+                              "web's skin fold measured on the skin (no guessed depth), the glove's thickness on it"})
         if hm.get("guard_line"):
             gl = hm["guard_line"]
-            mid = F @ ((Vector(gl[0]) + Vector(gl[1])) * 0.5)
             pd = (F.to_quaternion() @ Vector(FACE["r"])).normalized()
-            at, n_ = onto(mid + pd * 0.03)
-            out.append({"hand": "index_pip", "at": at, "normal": n_, "off_cm": 0.75 + GLOVE, "weight": 1.0})
+            e0, n0 = side_hit(F @ Vector(gl[0]), pd)
+            e1, _n1 = side_hit(F @ Vector(gl[1]), pd)
+            if e0 is None or e1 is None:
+                raise ValueError("touch_pairs: the frame's firing side by the guard was not found by its rays")
+            out.append({"hand": "index_pip_pad", "kind": "line", "at": e0, "normal": n0, "off_cm": GLOVE,
+                        "dir": list((Vector(e1) - Vector(e0)).normalized()),
+                        "source": "FM 3-23.35: the trigger finger along the frame, off the trigger (ready)"})
+        at, n_ = onto(mark_world("grip"))
+        out.append({"hand": "palm", "kind": "facing", "at": at, "normal": n_,
+                    "source": "the palm wraps the grip, facing into the firing side's panel"})
+        if "release" in facts["marks"] and "stop" in facts["marks"]:
+            r0, rn = onto(mark_world("release"))
+            r1, _sn = onto(mark_world("stop"))
+            out.append({"hand": "thumb_tip", "kind": "band", "at": r0, "normal": rn, "band_cm": 1.5,
+                        "dir": list((Vector(r1) - Vector(r0)).normalized()),
+                        "source": "FM 3-23.35: the firing thumb high on the frame's other side; the band runs from the "
+                                  "magazine release to the slide stop, 1.5 cm either side (the owner: the thumb on the "
+                                  "side opposite the index completes the grab)"})
+        out.append({"kind": "surface", "fingers": ["middle", "ring", "pinky"],
+                    "source": "FM 3-23.35: the other fingers wrap the front strap (closed onto the gun's surface)"})
+        out.append({"line": ["web_fold", "wrist"], "kind": "direction", "check": True,
+                    "dir": list((Vector(ga["outer"]) - Vector(ga["inner"])).normalized()),
+                    "source": "the backstrap down the palm (the wrist stands in for the heel: a check, not a target)"})
     elif "support" in facts["marks"]:
         at, n_ = onto(mark_world("support"))
-        out.append({"hand": "palm", "at": at, "normal": n_, "off_cm": palm_r, "weight": 3.0})
-        ga = hm["grip_axis"]
-        up_ = Vector(ga["inner"]) - Vector(ga["outer"])
-        out.append({"line": ["pinky_knuckle", "index_knuckle"], "dir": list(up_.normalized()), "weight": 1.0})
+        out.append({"hand": "palm_skin", "kind": "point", "center": True, "at": at, "normal": n_, "off_cm": GLOVE,
+                    "source": "FM 3-23.35: the support palm fills the open side of the grip"})
+        out.append({"line": ["pinky_knuckle", "index_knuckle"], "kind": "direction",
+                    "dir": list((Vector(ga["inner"]) - Vector(ga["outer"])).normalized()),
+                    "source": "FM 3-23.35: the support fingers over the firing fingers"})
     return out
+
+
+def keep_gun_measures(side, pairs):
+    """The gun's touch targets as measured this run, kept next to the code (weaponlab/gunkit/data/measured/<gun>.json)
+    with the gun file's hash, so the numbers can be read and checked (the owner's rule: exact numbers, kept)."""
+    import hashlib
+    d_ = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "measured")
+    os.makedirs(d_, exist_ok=True)
+    p_ = os.path.join(d_, "%s.json" % facts["name"])
+    data_ = json.load(open(p_, encoding="utf-8")) if os.path.exists(p_) else {}
+    data_["gun"] = facts["name"]
+    data_["gun_file_sha1"] = hashlib.sha1(open(job["gun_fbx"], "rb").read()).hexdigest()[:16]
+    data_["frame"] = "the gun body bone's frame, m"
+    data_.setdefault("hands", {})[side] = [{k: v for k, v in p.items()} for p in (pairs or [])]
+    json.dump(data_, open(p_, "w", encoding="utf-8"), indent=1)
 
 
 def start_pictures(side):
@@ -992,7 +1048,9 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
         oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")
         # the direct hold, in the owner's order: the hand at its touch points on the gun, then the body to it
         wr_ = {fi: ("straight" if fi == "index" and m.get("index") == "extended" else "wrap") for fi in ("index", "middle", "ring", "pinky")}
-        h_ = L.direct_hold(side, MARKS, touch_pairs(side), glove_cm=GLOVE, other=oth, wrap=wr_,
+        tp_ = touch_pairs(side)
+        keep_gun_measures(side, tp_)
+        h_ = L.direct_hold(side, MARKS, tp_, glove_cm=GLOVE, other=oth, wrap=wr_,
                            gun_shift=_gun_shift if side == "r" else None,      # the firing hand is on the gun first
                            f_pref=FPREF)
         g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
@@ -1486,7 +1544,16 @@ if home_r and STYLE and "support" in facts["marks"]:
     for _n, _q in home_r[1].items():
         L.arm.pose.bones[_n].rotation_quaternion = _q
     bpy.context.view_layer.update()
-home_l = grasp("l", facts.get("home_l", "support"), start=start) if "support" in facts["marks"] else None
+# one hand at a time (the owner, 2026-10-21): the support hand is solved only after the firing hand's hold passes
+_r_ok = bool(home_r and home_r[2])
+if "support" in facts["marks"] and DIRECT and not _r_ok:
+    home_l = None
+    report["notes"].append("the support hand was not solved: the firing hand's hold did not pass (one hand at a time)")
+    # the clips need both hands' holds: none is made from a firing hand that did not pass
+    report["clips_skipped"] = sorted(job.get("clips", {}))
+    job["clips"] = {}
+else:
+    home_l = grasp("l", facts.get("home_l", "support"), start=start) if "support" in facts["marks"] else None
 if home_l and job.get("solver_two_pass", False) and STYLE and style_plan("r", "grip") is not None:
     # the firing hand solved again with the support hand on: the two hands meet (thumbs stacked, fingers wrapped)
     L._put_hand("l", bone_world("Root") @ home_l[0])

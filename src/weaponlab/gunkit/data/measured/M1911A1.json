@@ -1,0 +1,106 @@
+{
+ "gun": "M1911A1",
+ "gun_file_sha1": "c31f415195e15c91",
+ "frame": "the gun body bone's frame, m",
+ "hands": {
+  "r": [
+   {
+    "hand": "web_fold",
+    "kind": "point",
+    "center": true,
+    "at": [
+     -0.010506011545658112,
+     0.07812008261680603,
+     -0.026299357414245605
+    ],
+    "normal": [
+     1.0,
+     -8.881782079418884e-16,
+     -1.1893261610198148e-14
+    ],
+    "off_cm": 0.15,
+    "source": "FM 3-23.35: the web high on the backstrap, under the grip safety; the hand point is the web's skin fold measured on the skin (no guessed depth), the glove's thickness on it"
+   },
+   {
+    "hand": "index_pip_pad",
+    "kind": "line",
+    "at": [
+     -0.01236000657081604,
+     -0.0020476579666137695,
+     -0.02968597412109375
+    ],
+    "normal": [
+     -0.9999900460243225,
+     -0.004465030040591955,
+     1.1911400820763599e-22
+    ],
+    "off_cm": 0.15,
+    "dir": [
+     0.6163811683654785,
+     -0.7846710085868835,
+     -0.06607329845428467
+    ],
+    "source": "FM 3-23.35: the trigger finger along the frame, off the trigger (ready)"
+   },
+   {
+    "hand": "palm",
+    "kind": "facing",
+    "at": [
+     -0.01629307121038437,
+     0.03571134805679321,
+     -0.06500005722045898
+    ],
+    "normal": [
+     -0.9971849918365479,
+     -0.07498127967119217,
+     -2.1164780150684237e-08
+    ],
+    "source": "the palm wraps the grip, facing into the firing side's panel"
+   },
+   {
+    "hand": "thumb_tip",
+    "kind": "band",
+    "at": [
+     0.012359995394945145,
+     0.006000012159347534,
+     -0.029999971389770508
+    ],
+    "normal": [
+     1.0,
+     5.864747976147555e-08,
+     -1.1893263304264042e-14
+    ],
+    "band_cm": 1.5,
+    "dir": [
+     0.0,
+     -0.9178721308708191,
+     0.39687618613243103
+    ],
+    "source": "FM 3-23.35: the firing thumb high on the frame's other side; the band runs from the magazine release to the slide stop, 1.5 cm either side (the owner: the thumb on the side opposite the index completes the grab)"
+   },
+   {
+    "kind": "surface",
+    "fingers": [
+     "middle",
+     "ring",
+     "pinky"
+    ],
+    "source": "FM 3-23.35: the other fingers wrap the front strap (closed onto the gun's surface)"
+   },
+   {
+    "line": [
+     "web_fold",
+     "wrist"
+    ],
+    "kind": "direction",
+    "check": true,
+    "dir": [
+     0.010958345606923103,
+     0.313264399766922,
+     -0.9496027231216431
+    ],
+    "source": "the backstrap down the palm (the wrist stands in for the heel: a check, not a target)"
+   }
+  ]
+ }
+}
