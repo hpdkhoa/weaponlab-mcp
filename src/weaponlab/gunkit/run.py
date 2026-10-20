@@ -204,9 +204,10 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
            # the grip style's reference hold (a pack's hand, in the grip's frame), kept beside the guns' folders
            "reference": reference_for(facts_path, st)}
     job.update(options or {})          # the hand step's own switches (solver_*, regrip, arc_cm ...), for trials
-    # the run plans to its time budget (time_budget_s, 10 minutes by default); the hard stop is two minutes past it
-    job.setdefault("time_budget_s", 600)
-    _blender("gunkit_hands.py", job, out, timeout=int(job["time_budget_s"]) + 120)
+    # the owner's rule: a run takes 10 minutes at most. The hard stop is at 10 minutes; the run plans its work to 9
+    # (time_budget_s), so it ends on its own before the stop
+    job.setdefault("time_budget_s", 540)
+    _blender("gunkit_hands.py", job, out, timeout=600)
     return json.loads((out / "hands.json").read_text(encoding="utf-8"))
 
 
@@ -278,9 +279,10 @@ def skin_check(facts_path, gun_fbx, name=None, style=None, character=None):
            "prefix": "A_%s_Hands_" % facts["name"], "out": str(out), "grip_steps": 3, "render": False,
            "style": st, "character": ch, "glove_cm": SU.glove_cm(ch), "body_ranges": None,
            "skin_check": {"name": name, "clips_dir": str(hands_dir / "clips")}}
-    # the run plans to its time budget (time_budget_s, 10 minutes by default); the hard stop is two minutes past it
-    job.setdefault("time_budget_s", 600)
-    _blender("gunkit_hands.py", job, out, timeout=int(job["time_budget_s"]) + 120)
+    # the owner's rule: a run takes 10 minutes at most. The hard stop is at 10 minutes; the run plans its work to 9
+    # (time_budget_s), so it ends on its own before the stop
+    job.setdefault("time_budget_s", 540)
+    _blender("gunkit_hands.py", job, out, timeout=600)
     return json.loads((out / "skin_check.json").read_text(encoding="utf-8"))
 
 
