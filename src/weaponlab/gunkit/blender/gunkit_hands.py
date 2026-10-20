@@ -50,6 +50,22 @@ if os.path.exists(_be):
 rigs_file = os.path.join(OUT, "gunkit_rigs.json")
 json.dump(rigs, open(rigs_file, "w", encoding="utf-8"), indent=1)
 L = PL.Lab(rigs_file, OUT)
+# The run's time budget (10 minutes unless the job says otherwise). Each phase gets a share and stops on time,
+# keeping its best so far: the stance search a quarter, the right hand to 55%, the left to 80%, the clips, the
+# checks and the render the rest. The timing file is written at every phase, so a stopped run still shows its
+# time. What a budget cut short is listed in the report (budget_cut).
+import time as _time
+T0 = _time.time()
+BUDGET = float(job.get("time_budget_s", 600))
+
+
+def by(share):
+    return T0 + share * BUDGET
+
+
+L.steps.out_path = os.path.join(OUT, "steps.json")
+L.steps.meta = {"run": "gunkit hands", "budget_s": BUDGET}
+L.steps.phase("load the arms and the gun")
 L.load_rig("gunkit")
 RA = L.rifle_arm
 report = {"gun": facts["name"], "clips": {}, "notes": []}
@@ -180,6 +196,7 @@ def put_gloves():
 
 
 # --- the hold: the gun moved so the right palm meets its grip, then each hand's hold searched ---------------------
+L.steps.phase("gloves, body size, style setup")
 rest_parts()
 L.pose_idle()
 shift = palm_r() - mark_world("grip")
@@ -830,6 +847,17 @@ def grasp(side, mark, part=None, offset=None, start=None):
     return GRASPS[key]
 
 
+def _gun_shift(d):
+    """The gun moved d metres along the sight line (Step C of the direct hold, the firing hand's solve): the aim does
+    not change. The gun's caches and the stance's place follow it."""
+    global REST0
+    if d:
+        L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * d) @ L.rifle_rest
+        L._place_rifle()
+    _BVH.clear()
+    REST0 = L.rifle_rest.copy()
+
+
 def _grasp_solve(side, mark, part=None, offset=None, start=None):
     """The hand's hold on a mark, solved once with the parts as they are now: (the hand against the mark's bone, the
     fingers' turns, whether a hold passed). The palm is first laid on the surface facing into it (the support hand
@@ -865,32 +893,48 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
             bpy.context.view_layer.update()
         m = next(x for x in MARKS if x.get("role") == "hold" and x.get("hand") == side)
         oth = job.get("solver_other", True) and not (side == "r" and mark == "grip")
-        tries, seat, ext = purpose_starts(side, m, pu, oth)
-        r = {"seeds": sorted([{"roll_deg": t_[1], "score": round(t_[0], 1), "arm_excess_deg": t_[2]} for t_ in tries],
-                             key=lambda x_: (x_["arm_excess_deg"], x_["score"]))}
-        # the search from the best starts in turn (the body first, then the score), the best hold kept, stopping
-        # as soon as one passes the gate; the fingers close by the skin each try, an extended index lies straight
-        wr_ = {fi: ("straight" if fi == "index" and ext else "wrap") for fi in ("index", "middle", "ring", "pinky")}
-        best_, r["restarts"] = None, []
-        for k_, (_sc, roll, _ex) in enumerate(sorted(tries, key=lambda t_: (t_[2], t_[0]))[: int(job.get("hold_restarts", 3))]):
-            seat(roll)
-            # the target solver (no chance in it), inside the walls: each purpose names where its hand part goes
-            h_ = L.target_hold(side, MARKS, glove_cm=GLOVE, other=oth, wrap=wr_)
+        if DIRECT and FACE.get(side):
+            # the direct hold: the hand on its mark from the grip style's face, the body solved backward; a support
+            # hand rests on the firing hand. One start, checked by the valid-start rule.
+            wr_ = {fi: ("straight" if fi == "index" and m.get("index") == "extended" else "wrap") for fi in ("index", "middle", "ring", "pinky")}
+            h_ = L.direct_hold(side, MARKS, palm_dir=FACE[side], glove_cm=GLOVE, other=oth, wrap=wr_,
+                               rest_on_hand=(m["purpose"] == "support"),
+                               gun_shift=_gun_shift if side == "r" else None)    # the firing hand is on the gun first
             g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
-            ok_ = bool(g_.get(side, {}).get("pass"))
-            ok_ = ok_ and not h_.get("walls")
-            r["restarts"].append({"roll_deg": roll, "score": h_["score"], "gate": ok_, "rounds": h_.get("rounds"),
-                                  "unmet": h_.get("unmet"), "walls": h_.get("walls"), "solve_s": h_.get("solve_s")})
-            # the walls first (fewer broken, less past), then the gate, then the score
-            rank_ = (L._walls_rank(h_.get("walls") or {}), not ok_, h_["score"])
-            if best_ is None or rank_ < best_[3]:
-                best_ = (h_, g_, ok_, rank_)
-                L.snapshot("save", "_held_" + side)
-            if ok_:
-                break
+            ok_ = bool(g_.get(side, {}).get("pass")) and not h_.get("walls")
+            r = {"method": "direct"}
+            best_ = (h_, g_, ok_, None)
+            L.snapshot("save", "_held_" + side)
+        else:
+            tries, seat, ext = purpose_starts(side, m, pu, oth)
+            r = {"seeds": sorted([{"roll_deg": t_[1], "score": round(t_[0], 1), "arm_excess_deg": t_[2]} for t_ in tries],
+                                 key=lambda x_: (x_["arm_excess_deg"], x_["score"]))}
+            # the search from the best starts in turn (the body first, then the score), the best hold kept, stopping
+            # as soon as one passes the gate; the fingers close by the skin each try, an extended index lies straight
+            wr_ = {fi: ("straight" if fi == "index" and ext else "wrap") for fi in ("index", "middle", "ring", "pinky")}
+            best_, r["restarts"] = None, []
+            for k_, (_sc, roll, _ex) in enumerate(sorted(tries, key=lambda t_: (t_[2], t_[0]))[: int(job.get("hold_restarts", 3))]):
+                if k_ > 0 and getattr(L, "_deadline", None) is not None and _time.time() > L._deadline:
+                    report.setdefault("budget_cut", []).append("%s %s: %d of the starts solved" % (side, mark, k_))
+                    break
+                seat(roll)
+                # the target solver (no chance in it), inside the walls: each purpose names where its hand part goes
+                h_ = L.target_hold(side, MARKS, glove_cm=GLOVE, other=oth, wrap=wr_)
+                g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
+                ok_ = bool(g_.get(side, {}).get("pass"))
+                ok_ = ok_ and not h_.get("walls")
+                r["restarts"].append({"roll_deg": roll, "score": h_["score"], "gate": ok_, "rounds": h_.get("rounds"),
+                                      "unmet": h_.get("unmet"), "walls": h_.get("walls"), "solve_s": h_.get("solve_s")})
+                # the walls first (fewer broken, less past), then the gate, then the score
+                rank_ = (L._walls_rank(h_.get("walls") or {}), not ok_, h_["score"])
+                if best_ is None or rank_ < best_[3]:
+                    best_ = (h_, g_, ok_, rank_)
+                    L.snapshot("save", "_held_" + side)
+                if ok_:
+                    break
         L.snapshot("load", "_held_" + side)
         r["hold"], r["gate"] = best_[0], best_[1]
-        r["press"] = r["hold"]["press"]
+        r["press"] = r["hold"].get("press")        # an invalid direct start makes no hold, so no press
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         cn_ = "clavicle_" + side
         if cn_ in L.arm.pose.bones:
@@ -1148,7 +1192,10 @@ _bf = L.screen(lab_gun(RA.matrix_world @ g((0.0, 0.0, 0.0))))
 if "x" in _bf:
     VIEW_REF["bolt_face"] = (_bf["x"], _bf["y"])
 report["view_reference"] = {k: list(v) for k, v in VIEW_REF.items()}
-if job.get("place_search", True) and "support" in facts["marks"] and not REF_EYE:
+L.steps.phase("place search")
+# v26 (2026-10-20): with purposes, the stance search below places the gun for both hands on the contact
+# model; this older search (capsule checks) only fed it a start, so it is skipped then.
+if job.get("place_search", True) and "support" in facts["marks"] and not REF_EYE and not (STYLE or {}).get("purposes"):
     qg = RA.matrix_world.to_quaternion()
     fwd, up_, left_ = (qg @ g((0, 1, 0))).normalized(), (qg @ g((0, 0, 1))).normalized(), (qg @ g((1, 0, 0))).normalized()
     tried = []
@@ -1172,8 +1219,13 @@ L._place_rifle()
 _BVH.clear()                                       # the gun's surface, in the world, as it now sits
 start = "place_best" if "placement_search" in report else None
 # --- the gun read from its own geometry, the marks from its facts --------------------------------------------
+L.steps.phase("the gun read, the marks")
 PUR = (STYLE or {}).get("purposes") if job.get("purposes", True) else None
 OBJ, MARKS = None, None
+# the direct hold (Pose Lab docs/DIRECT_HOLD_PLAN.md): the hand placed from the marks, the body solved backward;
+# hold_method "search" keeps the start search
+DIRECT = False
+FACE = {}
 CLAV_SET = {}                # each home hold's shoulder girdle, as its search left it
 GUN_DIRS = {"back": (0, -1, 0), "front": (0, 1, 0), "left": (1, 0, 0), "right": (-1, 0, 0), "up": (0, 0, 1), "down": (0, 0, -1)}
 if PUR:
@@ -1214,6 +1266,25 @@ if PUR:
     report["regions_cm2"] = L.object_regions(MARKS, LEFT_)
     report["marks"] = MARKS
     report["grip_run"] = ri_
+    # Step 0: the hold marks, from the gun's geometry and the grip style's contact faces (FM 3-23.35 2-2, 2-3),
+    # saved beside the run. The facts' support normal points down; the support palm faces the gun's side, so the
+    # support face comes from the grip style.
+    DIRECT = job.get("hold_method", "direct") == "direct"
+    for sd_ in ("r", "l"):
+        c_ = (((STYLE or {}).get("hands") or {}).get(sd_) or {}).get("contact") or {}
+        if c_.get("face"):
+            FACE[sd_] = list(g(c_["face"]).normalized())
+    run_ = runs_[ri_]
+    m_r0 = next((x for x in MARKS if x.get("role") == "hold" and x.get("hand") == "r"), {})
+    op_ = run_["openings"][m_r0["index_line"]] if "index_line" in m_r0 else None
+    report["hold_marks"] = {
+        "gun": facts["name"], "frame": "the gun body bone's frame, m",
+        "grip_axis": {"origin": run_["origin"], "axis": run_["axis"], "inner": run_["inner"], "outer": run_["outer"]},
+        "web_point": m_r0.get("_web"), "guard_line": op_["edge"] if op_ else None,
+        "firing_face": FACE.get("r"), "support_face": FACE.get("l"),
+        "support_normal_in_facts": facts.get("normals", {}).get("support"),
+        "faces_from": "the grip style's contact faces"}
+    json.dump(report["hold_marks"], open(os.path.join(OUT, "hold_marks.json"), "w", encoding="utf-8"), indent=1, default=str)
 
 
 def purpose_starts(side, m, pu, oth):
@@ -1252,7 +1323,45 @@ def purpose_starts(side, m, pu, oth):
     return tries, seat, ext
 
 
-if MARKS and job.get("stance_search", True) and not (job.get("contact_view") or job.get("skin_check") or job.get("object_only")):
+L.steps.wrap_dict(globals(), ["purpose_starts", "grasp", "_grasp_solve", "gun_pose", "contacts_now", "try_place"])
+L.steps.phase("stance search")
+if MARKS and DIRECT and FACE.get("r") and not (job.get("contact_view") or job.get("skin_check") or job.get("object_only")):
+    # Step B: the gun's distance along the view's forward line, from the reach that gives the preferred elbow
+    # flexion: D*^2 = l1^2 + l2^2 + 2 l1 l2 cos(f_pref); |W(d) - S| grows with d, so bisection finds it.
+    import directmath as DM
+    base_ = L.rifle_rest.copy()
+    m_r = next(x for x in MARKS if x.get("role") == "hold" and x.get("hand") == "r")
+    L.snapshot("save", "_stance0")
+    fpref = float(((STYLE or {}).get("stance") or {}).get("elbow_flexion_pref_deg", 20.0))
+
+    def _at(d_):
+        L.snapshot("load", "_stance0")
+        L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * d_) @ base_
+        L.pose_idle()
+        rest_parts()
+        L._place_rifle()
+        _BVH.clear()
+        L.seed_hold("r", m_r, palm_dir=FACE["r"], roll_deg=0.0)
+        return L.reach_now("r")
+    l1_, l2_, _d0 = _at(0.0)
+    Dstar = DM.reach_for_elbow(l1_, l2_, fpref)
+    d_, got_, n_ = DM.bisect(lambda x_: _at(x_)[2], Dstar, -0.15, 0.15, tol=0.001)
+    _at(d_)
+    L.snapshot("load", "_stance0")
+    L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * d_) @ base_
+    REST0 = L.rifle_rest.copy()
+    L.pose_idle()
+    rest_parts()
+    L._place_rifle()
+    _BVH.clear()
+    L.snapshot("save", "place_best")
+    start = "place_best"
+    report["stance_search"] = {"method": "direct", "best": {
+        "ahead_cm": round(d_ * 100.0, 2), "elbow_pref_deg": fpref, "l1_cm": round(l1_ * 100.0, 2),
+        "l2_cm": round(l2_ * 100.0, 2), "reach_target_cm": round(Dstar * 100.0, 2), "reach_got_cm": round(got_ * 100.0, 2),
+        "elbow_got_deg": round(DM.elbow_for_reach(l1_, l2_, got_) or -1.0, 1), "bisect_steps": n_,
+        "hit_range_end": abs(abs(d_) - 0.15) < 1e-9}}
+elif MARKS and job.get("stance_search", True) and not (job.get("contact_view") or job.get("skin_check") or job.get("object_only")):
     # where the gun sits for both hands: a grid of places about the style's stance (ahead and back, up and down in
     # the view), each judged by the two hands' best starts on it (how far past its limits each arm is first, then
     # the purposes' score): the body decides the stance, as it decides each hold
@@ -1261,8 +1370,32 @@ if MARKS and job.get("stance_search", True) and not (job.get("contact_view") or 
     m_l = next((x for x in MARKS if x.get("role") == "hold" and x.get("hand") == "l"), None)
     L.snapshot("save", "_stance0")
     rows_ = []
-    for dy in [float(v) for v in job.get("stance_ahead_cm", (-6.0, -3.0, 0.0, 3.0))]:
-        for dz in [float(v) for v in job.get("stance_up_cm", (-8.0, -6.0, -4.0, -2.0, 0.0))]:
+    # The stance depends only on the gun, the arms, the style and the solver's code: the same inputs give the
+    # same place, so it is kept on disk and the 20 place grid (400 seated starts) runs only when one changes.
+    import hashlib
+    _h = hashlib.sha1()
+    _fold = A["folder"] if os.path.isabs(A["folder"]) else os.path.join(OUT, A["folder"])
+    _files = [job["gun_fbx"], os.path.join(_fold, A["arms"]), os.path.join(_fold, A["idle"]), _be]
+    _files += [os.path.join(job["poselab"], f) for f in sorted(os.listdir(job["poselab"])) if f.endswith(".py")]
+    for _f in _files:
+        if os.path.exists(_f):
+            _h.update(open(_f, "rb").read())
+    _h.update(json.dumps([STYLE.get("stance") if STYLE else None, PUR, MARKS, list(job.get("stance_ahead_cm", [])),
+                          list(job.get("stance_up_cm", [])), list(job.get("seed_rolls", [])), GLOVE],
+                         sort_keys=True, default=str).encode())
+    _skey = _h.hexdigest()[:16]
+    _scache = os.path.join(OUT, "stance_cache.json")
+    _cached = json.load(open(_scache, encoding="utf-8")).get(_skey) if os.path.exists(_scache) else None
+    if not job.get("stance_cache", True):
+        _cached = None
+    # the places nearest the style's stance first, so a budget stop keeps the likeliest ones
+    _grid = sorted(((float(a_), float(b_)) for a_ in job.get("stance_ahead_cm", (-6.0, -3.0, 0.0, 3.0))
+                    for b_ in job.get("stance_up_cm", (-8.0, -6.0, -4.0, -2.0, 0.0))), key=lambda p_: (abs(p_[0]) + abs(p_[1]), p_))
+    for dy, dz in ([] if _cached else _grid):
+        if rows_ and _time.time() > by(0.25):
+            report.setdefault("budget_cut", []).append("stance search: %d of %d places" % (len(rows_), len(_grid)))
+            break
+        if True:
             L.snapshot("load", "_stance0")
             L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * (dy / 100.0) + Vector(PL.VIEW_UP) * (dz / 100.0)) @ base_
             L.pose_idle()
@@ -1278,7 +1411,15 @@ if MARKS and job.get("stance_search", True) and not (job.get("contact_view") or 
                 b_l = min(tr_l, key=lambda t_: (t_[2], t_[0]))
                 tot = (tot[0] + 10.0 * b_l[2] + b_l[0], tot[1] + b_l[2], tot[2] + b_l[0])
             rows_.append({"ahead_cm": dy, "up_cm": dz, "value": round(tot[0], 1), "arm_excess_deg": tot[1], "score": round(tot[2], 1)})
-    best_s = min(rows_, key=lambda r_: r_["value"])
+    if _cached:
+        best_s = _cached["best"]
+        rows_ = _cached["tried"]
+    else:
+        best_s = min(rows_, key=lambda r_: r_["value"])
+    if not _cached and len(rows_) == len(_grid):    # only a full search is kept: a budget-cut one is a partial answer
+        _all = json.load(open(_scache, encoding="utf-8")) if os.path.exists(_scache) else {}
+        _all[_skey] = {"best": best_s, "tried": sorted(rows_, key=lambda r_: r_["value"])[:6]}
+        json.dump(_all, open(_scache, "w", encoding="utf-8"), indent=1)
     L.snapshot("load", "_stance0")
     L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * (best_s["ahead_cm"] / 100.0) + Vector(PL.VIEW_UP) * (best_s["up_cm"] / 100.0)) @ base_
     REST0 = L.rifle_rest.copy()
@@ -1288,7 +1429,8 @@ if MARKS and job.get("stance_search", True) and not (job.get("contact_view") or 
     _BVH.clear()
     L.snapshot("save", "place_best")
     start = "place_best"
-    report["stance_search"] = {"best": best_s, "tried": sorted(rows_, key=lambda r_: r_["value"])[:6]}
+    report["stance_search"] = {"best": best_s, "tried": sorted(rows_, key=lambda r_: r_["value"])[:6],
+                               "from_cache": bool(_cached), "key": _skey}
 if job.get("object_only"):
     # the gun as read, and nothing else of the hand step
     json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
@@ -1396,7 +1538,10 @@ if job.get("reference_pose"):
         GRASPS[(sd, mk, None, ())] = (bone_world(mark_bone(mk)).inverted() @ (bone_world("Root") @ rel_),
                                       {n: Quaternion(q) for n, q in h_["fingers"].items()}, True)
     report["reference_pose"] = job["reference_pose"]
+L.steps.phase("home holds (both hands)")
+L._deadline = by(0.55)
 home_r = grasp("r", "grip", start=start)
+L._deadline = by(0.80)
 if home_r and STYLE and "support" in facts["marks"]:
     # the firing hand closes on the gun first; the support hand then wraps over it, against the gun and the
     # firing hand where it now is (a real two-hand grip is built in that order)
@@ -1475,7 +1620,11 @@ def hold_geometry():
 
 report["hold_geometry"] = hold_geometry()
 report["hold_contacts"] = {sd: contacts_now(sd) for sd in ("r", "l")} if STYLE else None
-if job.get("render"):
+L.steps.phase("render the home hold")
+L._deadline = by(0.95)
+if job.get("render") and T0 + BUDGET - _time.time() < 45:
+    report.setdefault("budget_cut", []).append("home hold render skipped: under 45 s left")
+if job.get("render") and T0 + BUDGET - _time.time() >= 45:
     report["hold_pictures"] = L.render(views=("eye", "right", "left", "top"), size=(640, 360),
                                        ortho_cm=job.get("render_ortho_cm", 30.0), centre=list(mark_world("grip")))
     report["hold_grip"] = L.grip("both", hold=True)
@@ -1666,6 +1815,8 @@ if job.get("render"):
     report["view_axes"] = {"right": list(PL.VIEW_RIGHT), "forward": list(PL.VIEW_FWD), "up": list(PL.VIEW_UP)}
 
 # --- every hold the clips need, solved once with the parts at rest ----------------------------------------------
+L.steps.phase("the holds the clips need")
+L.steps.wrap_dict(globals(), ["repair", "target_matrix", "arm_from_hold", "shoulder_reach", "end_joints_flat"])
 # each where the clips first use it: the gun posed as on the first frame the hand arrives (a working hold is taken
 # with the gun pulled in, where the arm reaches it), the other hand on its own hold then, so the solver keeps clear
 # of it
@@ -1722,7 +1873,10 @@ L.snapshot("load", "hold")
 report["holds"] = {"%s:%s" % (k[0], k[1]): ("found" if v[2] else "laid") for k, v in GRASPS.items()}
 
 # --- the clips -------------------------------------------------------------------------------------------------
+L.steps.phase("clips")
 for cid, clip in job["clips"].items():
+    L.steps.phase("clip " + cid, level=1)
+    L.steps.phase("key the frames (hands placed, repaired, walls read)", level=2)
     tr = job["tracks"].get(cid)
     tframes = {round(f["t"], 5): f["bones"] for f in (tr["frames"] if tr else [])}
     name = job.get("prefix", "A_%s_Hands_" % facts["name"]) + cid
@@ -1735,6 +1889,7 @@ for cid, clip in job["clips"].items():
     moves = []               # each frame's hands as the player sees them, for the motion check
     walled = []              # frames where a hand is past a wall (the clip is then not written)
     for fr in clip["frames"]:
+        L._cnt("frames")
         t = round(fr["t"], 5)
         gun_pose(fr["gun"])
         rest_parts()
@@ -1860,7 +2015,9 @@ for cid, clip in job["clips"].items():
                                 "walls": walled[:12]}
         print("GUNKIT HANDS: %s not written, %d frames past the walls" % (cid, len(walled)))
         continue
+    L.steps.phase("save the clip", level=2)
     saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root")
+    L.steps.phase("check set", level=2)
     try:
         soft = [c["segment"] + "*" for c in (STYLE or {}).get("soft_contacts", [])]
         # the firing hand holds the gun on every frame of every clip: its palm on the grip, its thumb opposing its fingers
@@ -1885,6 +2042,7 @@ for cid, clip in job["clips"].items():
                                                    "ok": worst[sc["segment"]] <= sc["max_cm"]} for sc in STYLE["soft_contacts"]}
     if clip_contacts and isinstance(cs, dict):
         cs["contacts"] = summarise_contacts(clip_contacts)
+    L.steps.phase("verify: skin, view, motion, hold gate", level=2)
     if isinstance(cs, dict) and job.get("verify", True):
         # the drawn skin, every verify_step s (the capsules test a body slightly thinner than the picture's)
         skin_rows, k = [], 0.0
@@ -1944,6 +2102,7 @@ for cid, clip in job["clips"].items():
                          "grip": {sd: gr.get(sd, {}).get("bad", []) for sd in ("l", "r")}, "clearance": cl["contacts"]})
             k += job.get("diagnose_step", 0.05)
         report.setdefault("diagnose", {})[cid] = rows
+    L.steps.phase("expectations (visible, faces the eye)", level=2)
     expects = []
     for x in clip.get("expect", []):
         if "visible" in x:
@@ -1962,5 +2121,8 @@ for cid, clip in job["clips"].items():
                 expects[-1]["pictures"] = L.render(views=("eye", "right"), size=(640, 360))
     report["clips"][cid] = {"clip": name, "written": saved["written"], "frames": saved["frames"], "checks": cs,
                             "expect": expects, "resolved": {"clip": cid, "seconds": clip["seconds"], "fps": clip["fps"], "frames": resolved}}
+L.steps.end_all()
+report["steps"] = L.steps.write(os.path.join(OUT, "steps.json"), {"run": "gunkit hands", "gun": facts["name"],
+                                                                   "clips": list(job["clips"])})["wall_s"]
 json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
 print("GUNKIT HANDS: %s, %d clips, hold %s" % (facts["name"], len(report["clips"]), report["hold"]))
