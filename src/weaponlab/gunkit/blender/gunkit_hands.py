@@ -847,12 +847,12 @@ def grasp(side, mark, part=None, offset=None, start=None):
     return GRASPS[key]
 
 
-def _gun_shift(d):
-    """The gun moved d metres along the sight line (Step C of the direct hold, the firing hand's solve): the aim does
-    not change. The gun's caches and the stance's place follow it."""
+def _gun_shift(v):
+    """The gun moved by the world vector v (metres), still pointing forward (Step C of the direct hold, the firing
+    hand's solve: the ready place is solved). The gun's caches and the stance's place follow it."""
     global REST0
-    if d:
-        L.rifle_rest = Matrix.Translation(Vector(PL.VIEW_FWD) * d) @ L.rifle_rest
+    if v.length > 0.0:
+        L.rifle_rest = Matrix.Translation(v) @ L.rifle_rest
         L._place_rifle()
     _BVH.clear()
     REST0 = L.rifle_rest.copy()
@@ -1541,6 +1541,10 @@ if job.get("reference_pose"):
 L.steps.phase("home holds (both hands)")
 L._deadline = by(0.55)
 home_r = grasp("r", "grip", start=start)
+if DIRECT and STYLE and (STYLE.get("stance") or {}).get("view_cm"):
+    # the ready place as solved (Steps B and C) against the grip style's guess, in the view's frame (cm)
+    report["ready_place"] = {"style_guess_view_cm": STYLE["stance"]["view_cm"],
+                             "solved_view_cm": [round(x, 2) for x in L._to(L.rifle_rest.translation, "view")]}
 L._deadline = by(0.80)
 if home_r and STYLE and "support" in facts["marks"]:
     # the firing hand closes on the gun first; the support hand then wraps over it, against the gun and the
