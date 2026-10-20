@@ -250,6 +250,23 @@ def fingers_way(side):
     return (L._bw(L._n("finger", side, "middle", "01")).translation - L._bw(hn).translation).normalized()
 
 
+def deprecated(f):
+    """The old hand code (marked deprecated by the owner, 2026-10-20): kept only for the gun families with no grip
+    style (rifles, bows and others), which still run on it. A style with touch purposes uses Pose Lab's direct hold.
+    Each use is listed in the report's "deprecated_used"."""
+    import functools
+
+    @functools.wraps(f)
+    def w(*a, **k):
+        used = report.setdefault("deprecated_used", [])
+        if f.__name__ not in used:
+            used.append(f.__name__)
+        return f(*a, **k)
+    w.__doc__ = "DEPRECATED (2026-10-20): the old hand code, for gun families with no grip style. " + (f.__doc__ or "")
+    return w
+
+
+@deprecated
 def lay_palm(side, at, normal, thickness_cm=None, toward=None):
     """The palm turned to face into the surface (the least turn) and its middle set a palm's thickness off it."""
     thickness_cm = PALM_CM if thickness_cm is None else thickness_cm
@@ -274,6 +291,7 @@ def lay_palm(side, at, normal, thickness_cm=None, toward=None):
     return short
 
 
+@deprecated
 def settle(side):
     """The palm onto the surface (Pose Lab's own measure of its gap) and the fingers closed."""
     hn = L._n("hand", side)
@@ -518,6 +536,7 @@ def thumb_to(side, target, tree, rounds=12, step_deg=8.0):
     return (L._finger_tip("thumb", side) - target).length * 100.0
 
 
+@deprecated
 def apply_hold(side, mark):
     """A working hold's fingers (the support hand racking the slide, seating a magazine)."""
     h = (STYLE or {}).get("hands", {}).get(side) or {}
@@ -603,6 +622,7 @@ def apply_style(side, trigger=False, normal=None):
     bpy.context.view_layer.update()
 
 
+@deprecated
 def arm_over(side):
     """How far the arm is past its limits now: the wrist's bend and side bends and the forearm's roll, degrees over."""
     Lm = L._limits()[0]
@@ -612,6 +632,7 @@ def arm_over(side):
     return over + 10.0 * len(bad)
 
 
+@deprecated
 def turn_search(side, at, n, toward):
     """The palm laid on the face at seven turns about its normal, 30 degrees apart round the style's finger direction
     (or the least turn): the one that leaves the arm least past its limits, then the closest to the hand's reach."""
@@ -632,6 +653,7 @@ def turn_search(side, at, n, toward):
     return lay_palm(side, at, n, toward=best[1])
 
 
+@deprecated
 def contact_search(side, mark, at, n, tw):
     """Where on its contact the hand lies: the palm laid at a few places down and up the grip and forward and back,
     each scored by the presses the style does not allow (the web through a pistol's tang), the palm's gap and the
@@ -911,6 +933,29 @@ def touch_pairs(side):
     return out
 
 
+def start_pictures(side):
+    """The heat pictures of a hand whose start the walls refused, posed as the check read it: the skin coloured by
+    its gap to the gun (and the other hand), from four sides about the palm. Each picture is stamped as a dev view,
+    not the game view."""
+    d_ = os.path.join(OUT, "start_check_" + side)
+    os.makedirs(d_, exist_ok=True)
+    sc_ = bpy.context.scene
+    keep_ = (sc_.render.use_stamp, sc_.render.use_stamp_note, sc_.render.stamp_note_text)
+    sc_.render.use_stamp, sc_.render.use_stamp_note = True, True
+    for k_ in ("use_stamp_date", "use_stamp_time", "use_stamp_render_time", "use_stamp_frame", "use_stamp_camera",
+               "use_stamp_lens", "use_stamp_scene", "use_stamp_filename", "use_stamp_memory", "use_stamp_hostname",
+               "use_stamp_marker", "use_stamp_sequencer_strip", "use_stamp_frame_range"):
+        if hasattr(sc_.render, k_):
+            setattr(sc_.render, k_, False)
+    sc_.render.stamp_note_text = "DEV VIEW, not the game view: heat = skin gap to the gun (%s hand start check)" % side
+    try:
+        L.contact_map(sides=(side,), marks=MARKS)
+        paths_ = L.contact_pictures(d_, L._anchor(side, "palm"), frame_part="Root", kinds=("heat", "hand"))
+    finally:
+        sc_.render.use_stamp, sc_.render.use_stamp_note, sc_.render.stamp_note_text = keep_
+    return paths_
+
+
 def _grasp_solve(side, mark, part=None, offset=None, start=None):
     """The hand's hold on a mark, solved once with the parts as they are now: (the hand against the mark's bone, the
     fingers' turns, whether a hold passed). The palm is first laid on the surface facing into it (the support hand
@@ -953,6 +998,8 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
         g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
         ok_ = bool(g_.get(side, {}).get("pass")) and not h_.get("walls")
         r = {"method": "direct", "hold": h_, "gate": g_, "passed": ok_}
+        if str(h_.get("result", "")).startswith("invalid start") and job.get("render"):
+            r["start_pictures"] = start_pictures(side)
         r["press"] = r["hold"].get("press")        # an invalid direct start makes no hold, so no press
         report.setdefault("solved", {})["%s:%s" % (side, mark)] = r
         cn_ = "clavicle_" + side
@@ -1157,6 +1204,7 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
 # where the gun sits for both hands: a few places round the first one (along the bore, up and down, a little to the
 # side), both palms laid at each; the place where both arms reach with the least clipping and the fewest broken rules
 # wins (Pose Lab's clearance and anatomy measures)
+@deprecated
 def try_place(dv):
     L.rifle_rest = Matrix.Translation(dv) @ REST0
     L.pose_idle()
