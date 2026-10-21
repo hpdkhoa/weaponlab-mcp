@@ -203,6 +203,7 @@ shift = palm_r() - mark_world("grip")
 L.rifle_rest = Matrix.Translation(shift) @ L.rifle_rest
 L._place_rifle()
 FINGER_BONES = {s: [pb.name for pb in L.arm.pose.bones if any(pb.name.startswith(f + "_") and pb.name.endswith("_" + s) for f in PL.FINGERS)] for s in ("l", "r")}
+L.wrap_at_nearest_section = bool(job.get("wrap_at_nearest_section"))   # comparison runs only: the earlier wrap
 if job.get("body_ranges") and hasattr(L, "body_size"):
     # the bare arms against human sizes before anything is posed on them: a bone or a part of the skin no adult has
     # fails the run (the gloves come after: a glove is not the body)
@@ -889,7 +890,7 @@ def touch_pairs(side):
       firing hand:
         the web on the web point, the crook under the grip safety high on the backstrap: a point; the center the
           hand turns about (the manual: the web high on the backstrap);
-        the index's middle joint along the frame by the trigger guard's top edge, on the firing side: a line, the
+        the index's middle joint along the firing side at the trigger ring's middle height (the owner, 2026-10-21): a line, the
           finger anywhere along it (the manual: the trigger finger along the frame, off the trigger, ready);
         the palm facing into the firing side's panel: a facing (the palm wraps the grip);
         the web-to-wrist line along the grip's axis, downward: a check only (the backstrap down the palm; the wrist
@@ -943,10 +944,36 @@ def touch_pairs(side):
             pd = (F.to_quaternion() @ Vector(FACE["r"])).normalized()
             e0, n0 = side_hit(F @ Vector(gl[0]), pd)
             e1, _n1 = side_hit(F @ Vector(gl[1]), pd)
+            # line B at the ring's top edge, kept: the pinky's height on the grip is read with the hand placed on it
+            # (the owner, 2026-10-21: the pinky stays as high as before line B moved)
+            top_edge_ = {"at": e0, "dir": list((Vector(e1) - Vector(e0)).normalized())} if e0 is not None and e1 is not None else None
+            # the trigger guard's lowest point (the middle finger sits just under it): a ray in the ring's plane from
+            # 8 cm below its centre back up, its first hit, measured
+            guard_bottom_ = None
+            if hm.get("guard_centre"):
+                gc_w = F @ Vector(hm["guard_centre"])
+                dn_ = (gc_w - F @ ((Vector(gl[0]) + Vector(gl[1])) * 0.5)).normalized()
+                hb_ = bvh_.ray_cast(gc_w + dn_ * 0.08, -dn_, 0.08)
+                if hb_[0] is not None:
+                    guard_bottom_ = list(Fi @ hb_[0])
+            if e0 is not None and e1 is not None and hm.get("guard_centre") and job.get("line_b") != "top_edge":
+                # the owner (2026-10-21): line B at the trigger ring's middle height, not its top edge. The ring's
+                # middle is its open hole (side rays there pass through), so the frame's side is hit at the top edge
+                # and both ends move straight down (along the grip's side plane) by the edge middle's height above
+                # the ring's centre.
+                gm_ = (Vector(gl[0]) + Vector(gl[1])) * 0.5
+                dv_ = Vector(hm["guard_centre"]) - gm_
+                ld_ = (Vector(e1) - Vector(e0)).normalized()
+                nn_ = Vector(n0).normalized()
+                dv_ = dv_ - ld_ * dv_.dot(ld_) - nn_ * dv_.dot(nn_)    # down within the side plane only
+                e0, e1 = list(Vector(e0) + dv_), list(Vector(e1) + dv_)
+                report["line_b"] = {"down_cm": round(dv_.length * 100.0, 3), "ends_gun_frame": [e0, e1],
+                                    "how": "top-edge side hits moved down to the ring's centre height, in the side plane"}
             if e0 is None or e1 is None:
                 raise ValueError("touch_pairs: the frame's firing side by the guard was not found by its rays")
             out.append({"hand": "index_pip_pad", "kind": "line", "at": e0, "normal": n0, "off_cm": GLOVE,
-                        "dir": list((Vector(e1) - Vector(e0)).normalized()),
+                        "dir": list((Vector(e1) - Vector(e0)).normalized()), "top_edge": top_edge_ if job.get("pinky_height", True) else None,
+                        "guard_bottom": guard_bottom_ if job.get("pinky_height", True) else None,
                         "source": "FM 3-23.35: the trigger finger along the frame, off the trigger (ready)"})
         at, n_ = onto(mark_world("grip"))
         out.append({"hand": "palm", "kind": "facing", "at": at, "normal": n_,
@@ -989,13 +1016,14 @@ def keep_gun_measures(side, pairs):
     json.dump(data_, open(p_, "w", encoding="utf-8"), indent=1)
 
 
-def six_views(side):
+def six_views(side, step=None):
     """The hand as the hold posed it, drawn straight on (orthographic): with the gun
     from above, below, the left and the right (40 cm across, centred between the palm and the gun's middle, the whole
     gun in view); without the gun from above and the left (22 cm, centred on the palm). The other hand is hidden (a
     mask on its skin while drawing; nothing is moved). Each picture is stamped as a dev view. Returns the paths."""
     import math as _m
-    d_ = os.path.join(OUT, "six_views_" + side)
+    d_ = os.path.join(OUT, "six_views_" + side + (("_" + job["views_tag"]) if job.get("views_tag") else "")
+                      + (("_" + step) if step else ""))
     os.makedirs(d_, exist_ok=True)
     sc_ = bpy.context.scene
     cam_d = bpy.data.cameras.get("six_cam") or bpy.data.cameras.new("six_cam")
@@ -1075,14 +1103,43 @@ def six_views(side):
              ("with_gun_left_to_right", left, up, True), ("with_gun_right_to_left", -left, up, True),
              ("no_gun_top_down", up, fwd, False), ("no_gun_left_to_right", left, up, False)]
     paths_ = []
+    # the walls' "gun inside the flesh" points (pierce_detail): magenta where the rays say outside (a false reading),
+    # blue where the rays agree it is inside; drawn as 2 mm balls on the with-gun views
+    marks_ = []
+    if not step:
+        L.pierce_detail(side)                              # the gun-in-flesh points of the posed hold, for the balls
+    mp_ = getattr(L, "_mark_points", None)
+    if mp_:
+        # green: the skin point the walls read deepest in the gun
+        for pts_, col_ in ((mp_[0], (1.0, 0.0, 1.0, 1.0)), (mp_[1], (0.0, 0.3, 1.0, 1.0)),
+                           (getattr(L, "_mark_skin", None) or [], (0.0, 0.9, 0.0, 1.0))):
+            for p3_ in pts_[:400]:
+                bpy.ops.mesh.primitive_ico_sphere_add(radius=0.0012, subdivisions=2, location=p3_)
+                o_ = bpy.context.active_object
+                a_ = o_.data.color_attributes.new("_clipmap", "FLOAT_COLOR", "POINT")
+                a_.data.foreach_set("color", list(col_) * len(o_.data.vertices))
+                o_.data.color_attributes.active_color = a_
+                marks_.append(o_)
+    zoom_c = None
+    if step:
+        # the flow's step pictures: the firing side, below, and the hand alone
+        views = [v_ for v_ in views if v_[0] in ("with_gun_left_to_right", "with_gun_bottom_up", "no_gun_left_to_right")]
+        if True:
+            # close-ups (6 cm across) on the pinky's tip, the same camera at every step; the gun see-through
+            zoom_c = L._finger_tip("pinky", side).copy()
+            views += [("zoom_left_to_right", left, up, True), ("zoom_bottom_up", -up, fwd, True),
+                      ("zoom_front", fwd, up, True), ("zoom_back", -fwd, up, True)]
     try:
         for name_, way, upv, with_gun in views:
-            for o_ in gun_meshes:
+            for o_ in gun_meshes + marks_:
                 o_.hide_render = not with_gun
             for o_ in gun_meshes:
                 o_.display_type = "WIRE" if with_gun else "TEXTURED"   # the gun as lines: skin inside it shows
             centre = (palm_c + gun_c) * 0.5 if with_gun else palm_c
             cam_d.ortho_scale = 0.40 if with_gun else 0.22
+            sh_.show_xray, sh_.xray_alpha = (True, 0.35) if name_.startswith("zoom") else (False, sh_.xray_alpha)
+            if name_.startswith("zoom"):
+                centre, cam_d.ortho_scale = zoom_c, 0.06
             cam.location = centre + way * 0.6
             z_ = way.normalized()
             x_ = upv.cross(z_).normalized()
@@ -1090,12 +1147,17 @@ def six_views(side):
             cam.rotation_euler = Matrix((x_, y_, z_)).transposed().to_euler()
             sc_.render.stamp_note_text = ("DEV VIEW, not the game view: %s, the %s hand as the hold posed it, the other "
                                           "hand hidden. Red: clip past the give, orange: pressing within the give, "
-                                          "yellow: touching" % (name_.replace("_", " "), "right" if side == "r" else "left"))
+                                          "yellow: touching" % (name_.replace("_", " "), "right" if side == "r" else "left")
+                                          + (". Balls: gun points the walls read inside the flesh; magenta = the rays "
+                                             "say outside (false), blue = the rays agree (inside); green = deepest skin "
+                                             "point in the gun" if mp_ else ""))
             p_ = os.path.join(d_, name_ + ".png")
             sc_.render.filepath = p_
             bpy.ops.render.render(write_still=True)
             paths_.append(p_)
     finally:
+        for o_ in marks_:
+            bpy.data.objects.remove(o_, do_unlink=True)
         for o_ in gun_meshes:
             o_.hide_render = False
             o_.display_type = "TEXTURED"
@@ -1108,7 +1170,10 @@ def six_views(side):
         skin_.data.color_attributes.remove(ca_)
         (sc_.camera, sc_.render.engine, sc_.render.resolution_x, sc_.render.resolution_y, sc_.render.filepath,
          sc_.render.use_stamp, sc_.render.use_stamp_note, sc_.render.stamp_note_text) = keep_
-    report.setdefault("six_views", {})[side] = clip_summary
+    if step:
+        report.setdefault("step_views", {}).setdefault(side, {})[step] = clip_summary
+    else:
+        report.setdefault("six_views", {})[side] = clip_summary
     return paths_
 
 
@@ -1175,7 +1240,8 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
         keep_gun_measures(side, tp_)
         h_ = L.direct_hold(side, MARKS, tp_, glove_cm=GLOVE, other=oth, wrap=wr_,
                            gun_shift=_gun_shift if side == "r" else None,      # the firing hand is on the gun first
-                           f_pref=FPREF, on_posed=six_views if job.get("six_views") else None)
+                           f_pref=FPREF, on_posed=six_views if job.get("six_views") else None,
+                           on_step=(lambda s_, n_: six_views(s_, n_)) if job.get("step_views") else None)
         g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
         ok_ = bool(g_.get(side, {}).get("pass")) and not h_.get("walls")
         r = {"method": "direct", "hold": h_, "gate": g_, "passed": ok_}
@@ -1528,6 +1594,7 @@ if PUR:
         "gun": facts["name"], "frame": "the gun body bone's frame, m",
         "grip_axis": {"origin": run_["origin"], "axis": run_["axis"], "inner": run_["inner"], "outer": run_["outer"]},
         "web_point": m_r0.get("_web"), "guard_line": op_["edge"] if op_ else None,
+        "guard_centre": op_["centre"] if op_ else None,
         "firing_face": FACE.get("r"), "support_face": FACE.get("l"),
         "support_normal_in_facts": facts.get("normals", {}).get("support"),
         "faces_from": "the grip style's contact faces"}
