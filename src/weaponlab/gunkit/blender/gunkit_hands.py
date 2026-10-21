@@ -204,6 +204,8 @@ L.rifle_rest = Matrix.Translation(shift) @ L.rifle_rest
 L._place_rifle()
 FINGER_BONES = {s: [pb.name for pb in L.arm.pose.bones if any(pb.name.startswith(f + "_") and pb.name.endswith("_" + s) for f in PL.FINGERS)] for s in ("l", "r")}
 L.wrap_at_nearest_section = bool(job.get("wrap_at_nearest_section"))   # comparison runs only: the earlier wrap
+# evidence pictures only: false draws the later steps though a step broke a wall (the hold still fails)
+L.walls_stop = bool(job.get("walls_stop", True))
 if job.get("body_ranges") and hasattr(L, "body_size"):
     # the bare arms against human sizes before anything is posed on them: a bone or a part of the skin no adult has
     # fails the run (the gloves come after: a glove is not the body)
