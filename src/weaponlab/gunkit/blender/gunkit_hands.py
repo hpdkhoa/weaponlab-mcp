@@ -206,6 +206,7 @@ FINGER_BONES = {s: [pb.name for pb in L.arm.pose.bones if any(pb.name.startswith
 L.wrap_at_nearest_section = bool(job.get("wrap_at_nearest_section"))   # comparison runs only: the earlier wrap
 # evidence pictures only: false draws the later steps though a step broke a wall (the hold still fails)
 L.walls_stop = bool(job.get("walls_stop", True))
+L.diag_palm_roll = bool(job.get("diag_palm_roll"))       # measurement only: the palm's walls over the roll about A-B
 if job.get("body_ranges") and hasattr(L, "body_size"):
     # the bare arms against human sizes before anything is posed on them: a bone or a part of the skin no adult has
     # fails the run (the gloves come after: a glove is not the body)
@@ -1128,7 +1129,8 @@ def six_views(side, step=None):
         views = [v_ for v_ in views if v_[0] in ("with_gun_left_to_right", "with_gun_bottom_up", "no_gun_left_to_right")]
         if True:
             # close-ups (6 cm across) on the pinky's tip, the same camera at every step; the gun see-through
-            zoom_c = L._finger_tip("pinky", side).copy()
+            zc_ = getattr(L, "_zoom_c", None)              # a diagnostic's spot when it set one, else the pinky tip
+            zoom_c = Vector(zc_) if zc_ else L._finger_tip("pinky", side).copy()
             views += [("zoom_left_to_right", left, up, True), ("zoom_bottom_up", -up, fwd, True),
                       ("zoom_front", fwd, up, True), ("zoom_back", -fwd, up, True)]
     try:

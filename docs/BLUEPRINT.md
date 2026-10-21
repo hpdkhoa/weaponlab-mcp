@@ -155,6 +155,24 @@ What the example found about its sources:
   - the stocks' top and bottom
   - the magazine catch's and the slide stop's places
 
+## Next: soft edges where a hand holds
+
+The owner, 2026-10-21: "the grip is no sharp edge, this will be the next improvement for Model Lab when read on the
+manual or images, make the corner round a bit, especially the places that human grab and hold, most of the time they
+will no sharp edge because sharp edges will hurt the hand/human, make them softer so hand can hold it".
+
+What it means for a build:
+
+- **Hand-contact parts get rounded edges.** The grip and every part a hand grabs or holds: the stocks (grip panels),
+  the grip safety, the mainspring housing, the front strap, the trigger guard, the magazine base. A real gun has no
+  sharp edge there, because a sharp edge hurts the hand.
+- **The round comes from a source, not a guess.** Read it from the manual or the part drawing when one shows it.
+  Otherwise use a human-engineering source for hand-contact edges, and record which one in the part's sources.
+- **Found by the hold.** On the M1911A1, the grip safety is a straight extrusion with square edges. Its left lower
+  edge pressed 0.42 cm into the firing palm (the palm gives 0.27 cm). The palm check found it (Pose Lab
+  walls_of, Step 2).
+- **Today:** `bevel_cm` rounds a part's edges (a Blender bevel). Only the frame has one (0.08 cm, marked a guess).
+
 ## Requirements
 
 `pip install weaponlab-mcp[blueprint]` adds PyMuPDF (PDF pages) and OpenCV (tracing). The build and Gun Kit need
