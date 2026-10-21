@@ -54,7 +54,7 @@ def _card(size, lines):
     return img
 
 
-def _side_by_side(gun, size, fig_id, view_png):
+def _side_by_side(gun, size, fig_id, view_png, source_caption=None, copy_caption=None):
     from PIL import Image
     w, h = size
     src = Image.open(store.abspath(gun, F.figure(gun, fig_id)["image"])).convert("RGB")
@@ -65,12 +65,13 @@ def _side_by_side(gun, size, fig_id, view_png):
         out.paste(im, (k * w // 2 + (w // 2 - im.size[0]) // 2, 50 + (h - 110 - im.size[1]) // 2))
     from PIL import ImageDraw
     d = ImageDraw.Draw(out)
-    d.text((24, h - 58), "Source: FM 23-35 (1940), Figure 2", fill=(40, 40, 40), font=_font(15))
-    d.text((w // 2 + 24, h - 58), "Copy: built from the manual's figures and data", fill=(40, 40, 40), font=_font(15))
+    d.text((24, h - 58), source_caption or "Source: FM 23-35 (1940), Figure 2", fill=(40, 40, 40), font=_font(15))
+    d.text((w // 2 + 24, h - 58), copy_caption or "Copy: built from the manual's figures and data", fill=(40, 40, 40), font=_font(15))
     return out
 
 
-def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames=60, compare_figure=None, timeout=3600):
+def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames=60, compare_figure=None, timeout=3600,
+         compare_view="view_left", source_caption=None, copy_caption=None, subtitle=None):
     """Renders and writes showcase/<gun>.gif and showcase/<gun>.mp4. Needs the gun built and through Gun Kit."""
     from PIL import Image
     from ..gunkit import run as R
@@ -95,12 +96,13 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
     head = "BLUEPRINT LAB MODEL %s (not a game view)" % gun
     bp = store.load(gun, "blueprint")
     seq = []
-    card = _card(size, [(title or bp.get("title", gun), True), ("A visual copy made from its public sources", False),
+    card = _card(size, [(title or bp.get("title", gun), True), (subtitle or "A visual copy made from its public sources", False),
                         (source_note or "", False), ("Blueprint Lab and Gun Kit, weaponlab-mcp", False)])
     seq += [card] * int(fps * 2.5)
-    view = store.folder(gun, "model", "views") / "view_left.png"
+    view = store.folder(gun, "model", "views") / ("%s.png" % compare_view)
     if compare_figure and view.exists():
-        sbs = _label(_side_by_side(gun, size, compare_figure, view), head, "The source figure and the copy, side by side")
+        sbs = _label(_side_by_side(gun, size, compare_figure, view, source_caption, copy_caption), head,
+                     "The source figure and the copy, side by side")
         seq += [sbs] * int(fps * 3)
     for s in shots:
         im = Image.open(frames_dir / ("f%05d.png" % s["frame"])).convert("RGB")
