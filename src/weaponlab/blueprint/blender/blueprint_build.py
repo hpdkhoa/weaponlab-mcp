@@ -60,9 +60,58 @@ def ccw(outline):
     return outline if s > 0 else list(reversed(outline))
 
 
+def rounded(outline):
+    """An outline whose points may carry a corner radius (y, z, r in cm, as the drawing gives it): each such corner
+    replaced by the arc tangent to both its edges, at least one point every 360/SEG degrees of turn. A radius too big
+    for its edges is cut to fit (half of the shorter edge) and noted."""
+    pts = [list(p) for i, p in enumerate(outline) if i == 0 or p[:2] != outline[i - 1][:2]]
+    if not any(len(p) > 2 and p[2] > 0 for p in pts):
+        return [p[:2] for p in pts]
+    out, n = [], len(pts)
+    for i, p in enumerate(pts):
+        r = p[2] if len(p) > 2 else 0.0
+        if r <= 0:
+            out.append(p[:2])
+            continue
+        P, A, B = Vector((p[0], p[1])), Vector(pts[i - 1][:2]), Vector(pts[(i + 1) % n][:2])
+        u, v = (A - P), (B - P)
+        la, lb = u.length, v.length
+        if la < 1e-9 or lb < 1e-9:
+            out.append(p[:2])
+            continue
+        u, v = u / la, v / lb
+        half = math.acos(max(-1.0, min(1.0, u.dot(v)))) / 2.0
+        if half < 1e-4 or half > math.pi / 2 - 1e-4:
+            out.append(p[:2])
+            continue
+        t = r / math.tan(half)
+        tmax = 0.5 * min(la, lb)
+        if t > tmax:
+            ROUND_NOTES.append({"corner": [round(p[0], 3), round(p[1], 3)], "radius_cm": r, "cut_to_cm": round(tmax * math.tan(half), 4)})
+            t, r = tmax, tmax * math.tan(half)
+        bis = (u + v).normalized()
+        C = P + bis * (r / math.sin(half))
+        T1, T2 = P + u * t, P + v * t
+        a1 = math.atan2(T1.y - C.y, T1.x - C.x)
+        a2 = math.atan2(T2.y - C.y, T2.x - C.x)
+        d = a2 - a1
+        while d > math.pi:
+            d -= 2 * math.pi
+        while d < -math.pi:
+            d += 2 * math.pi
+        k = max(2, int(math.ceil(abs(d) / (2 * math.pi / SEG))))
+        for j in range(k + 1):
+            a_ = a1 + d * j / k
+            out.append([C.x + r * math.cos(a_), C.y + r * math.sin(a_)])
+    return out
+
+
+ROUND_NOTES = []
+
+
 def prism(name, outline, x0, x1):
     """A side outline (y, z) run from x0 to x1: its two faces and its walls, closed."""
-    pts = ccw([p for i, p in enumerate(outline) if i == 0 or p != outline[i - 1]])
+    pts = ccw(rounded(outline))
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
     a = [bm.verts.new(g(x0, y, z)) for y, z in pts]
@@ -110,7 +159,7 @@ def lathe(name, profile, ax, az, bore_r=None):
 
 def prism_along(name, outline, axis, lo, hi):
     """An outline run along y (a front section, its points (x, z)) or along z (a top outline, its points (y, x))."""
-    pts = ccw([p for i, p in enumerate(outline) if i == 0 or p != outline[i - 1]])
+    pts = ccw(rounded(outline))
     if axis == "y":
         put = lambda a, b, t: g(a, t, b)        # noqa: E731
     else:
@@ -125,6 +174,139 @@ def prism_along(name, outline, axis, lo, hi):
     for i in range(n):
         j = (i + 1) % n
         bm.faces.new([a[i], a[j], b[j], b[i]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+def _seg_hits(pts, P, d):
+    """Where the line P + s d crosses the closed outline pts: the s values, sorted."""
+    out = []
+    n = len(pts)
+    for i in range(n):
+        A, B = Vector(pts[i]), Vector(pts[(i + 1) % n])
+        e = B - A
+        den = d.x * e.y - d.y * e.x
+        if abs(den) < 1e-12:
+            continue
+        w = A - P
+        s = (w.x * e.y - w.y * e.x) / den
+        u = (w.x * d.y - w.y * d.x) / den
+        if -1e-9 <= u <= 1.0 + 1e-9:
+            out.append(s)
+    return sorted(out)
+
+
+def relief(name, side, x, edge_cm, axis, grid_cm=0.08):
+    """A relief: the side outline (y, z) with a flat inner face at x[0], and an outer face arching across the part's
+    width (square to its long axis) as one circular arc, edge_cm thick at the rim and |x[1] - x[0]| at the middle of
+    each cross line, the width read where the line crosses the outline: a grip panel's crescent section. The outer face
+    is a constrained triangulation of the outline and a grid of points inside it (grid_cm apart)."""
+    from mathutils.geometry import delaunay_2d_cdt
+    pts = ccw(rounded(side))
+    x0, x1 = x
+    sgn = 1.0 if x1 >= x0 else -1.0
+    top = abs(x1 - x0)
+    ax = Vector(axis).normalized()
+    ac = Vector((-ax.y, ax.x))                          # across the width
+    ys, zs = [q[0] for q in pts], [q[1] for q in pts]
+    inner = []
+    gy = min(ys)
+    while gy <= max(ys):
+        gz = min(zs)
+        while gz <= max(zs):
+            P = Vector((gy, gz))
+            hits = _seg_hits(pts, P, Vector((1.0, 0.0)))
+            if sum(1 for s in hits if s > 0) % 2 == 1:
+                d_edge = min((P - (Vector(pts[i]) + (Vector(pts[(i + 1) % len(pts)]) - Vector(pts[i])) * max(0.0, min(1.0, (P - Vector(pts[i])).dot(Vector(pts[(i + 1) % len(pts)]) - Vector(pts[i])) / max(1e-12, (Vector(pts[(i + 1) % len(pts)]) - Vector(pts[i])).length_squared))))).length for i in range(len(pts)))
+                if d_edge > 0.4 * grid_cm:
+                    inner.append([gy, gz])
+            gz += grid_cm
+        gy += grid_cm
+    verts2 = [Vector(q) for q in pts] + [Vector(q) for q in inner]
+    nb = len(pts)
+    edges = [(i, (i + 1) % nb) for i in range(nb)]
+    vo, eo, fo, _ov, _oe, _of = delaunay_2d_cdt(verts2, edges, [], 2, 1e-7)    # 2: the faces inside the outline
+
+    # the arch across the width: the thickness at a point depends on its distance d to the nearest LONG edge (an
+    # outline edge within 35 degrees of the long axis): a circular arch from edge_cm at d = 0 to the full thickness at
+    # d = w/2 (w the part's widest span across the long axis). The short end edges stay full thickness (their round
+    # comes from the part's edge bevel), as the drawing's end views show.
+    nb_ = len(pts)
+    long_e = []
+    for i_ in range(nb_):
+        A_, B_ = Vector(pts[i_]), Vector(pts[(i_ + 1) % nb_])
+        e_ = B_ - A_
+        if e_.length > 1e-9 and abs(e_.normalized().dot(ax)) >= math.cos(math.radians(35.0)):
+            long_e.append((A_, B_))
+    across = [Vector(q).dot(ac) for q in pts]
+    w_full = max(across) - min(across)
+    h_ = top - edge_cm
+    half_w = w_full / 2.0
+    R_ = (half_w * half_w + h_ * h_) / (2.0 * h_) if h_ > 1e-9 else 1e9
+
+    def dist_long(P):
+        best = 1e9
+        for A_, B_ in long_e:
+            e_ = B_ - A_
+            s_ = max(0.0, min(1.0, (P - A_).dot(e_) / e_.length_squared))
+            best = min(best, (P - (A_ + e_ * s_)).length)
+        return best
+
+    def height(q):
+        if h_ <= 1e-9 or not long_e:
+            return top
+        d_ = min(dist_long(Vector((q.x, q.y))), half_w)
+        x_ = half_w - d_                                   # distance from the arch's middle
+        return edge_cm + max(0.0, math.sqrt(max(0.0, R_ * R_ - x_ * x_)) - (R_ - h_))
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    top_v = [bm.verts.new(g(x0 + sgn * height(q), q.x, q.y)) for q in vo]
+    bot_v = [bm.verts.new(g(x0, q.x, q.y)) for q in vo]
+    for f in fo:
+        bm.faces.new([top_v[i] for i in f])
+        bm.faces.new([bot_v[i] for i in reversed(f)])
+    # the wall round the rim: the triangulation's boundary edges (used by one face), each a quad between the faces
+    use = {}
+    for f in fo:
+        for i in range(len(f)):
+            e = (f[i], f[(i + 1) % len(f)])
+            k = tuple(sorted(e))
+            use.setdefault(k, []).append(e)
+    for k, es in use.items():
+        if len(es) == 1:
+            a_, b_ = es[0]
+            bm.faces.new([top_v[b_], top_v[a_], bot_v[a_], bot_v[b_]])
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+def sweep_prism(name, outline, a, b, ext=0.2):
+    """A prism along the side-view line a -> b (y, z), extended ext cm past both ends, its cross-section the outline in
+    (u, x): u along the line's normal in the side view (the direction turned +90 degrees), x across the gun."""
+    A, B = Vector((a[0], a[1])), Vector((b[0], b[1]))
+    d = (B - A).normalized()
+    n = Vector((-d.y, d.x))
+    A, B = A - d * ext, B + d * ext
+    pts = ccw([q[:2] for q in outline])
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    ra = [bm.verts.new(g(x, A.x + n.x * u, A.y + n.y * u)) for u, x in pts]
+    rb = [bm.verts.new(g(x, B.x + n.x * u, B.y + n.y * u)) for u, x in pts]
+    k = len(pts)
+    bm.faces.new(list(reversed(ra)))
+    bm.faces.new(rb)
+    for i in range(k):
+        j = (i + 1) % k
+        bm.faces.new([ra[i], ra[j], rb[j], rb[i]])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
@@ -246,23 +428,55 @@ for pid, p in bp["parts"].items():
             hx = h.get("x") or [x0 - 1.0, x1 + 1.0]
             if h["kind"] == "bore":
                 cut = lathe("%s_hole%d" % (pid, k), [[h["y"][0], h["r"]], [h["y"][1], h["r"]]], h["at"][0], h["at"][1])
+            elif h["kind"] == "sweep":
+                cut = sweep_prism("%s_hole%d" % (pid, k), h["outline"], h["from"], h["to"])
             elif h["kind"] == "polygon":
                 cut = prism("%s_hole%d" % (pid, k), h["outline"], hx[0], hx[1])
             else:
                 (y, z), r = h["at"], h["r"]
                 cut = prism("%s_hole%d" % (pid, k), [[y + r * math.cos(2 * math.pi * t / SEG), z + r * math.sin(2 * math.pi * t / SEG)] for t in range(SEG)], hx[0], hx[1])
             boolean(ob, cut)
+    elif sh["kind"] == "relief":
+        ob = relief(pid, sh["side"], sh["x"], sh["edge_cm"], sh["axis"], sh.get("grid_cm", 0.08))
+        x0, x1 = sorted(sh["x"])
+        if sh.get("both"):
+            ob2 = relief(pid + "_mirror", sh["side"], [-sh["x"][0], -sh["x"][1]], sh["edge_cm"], sh["axis"], sh.get("grid_cm", 0.08))
+            ob = join([ob, ob2], pid)
+            x0, x1 = -x1, x1
+        print("BLUEPRINT STEP %s (relief): %d vertices, %d faces" % (pid, len(ob.data.vertices), len(ob.data.polygons)))
+        for k, h in enumerate(p.get("holes", [])):
+            hx = h.get("x") or [x0 - 1.0, x1 + 1.0]
+            if h["kind"] == "polygon":
+                cut = prism("%s_hole%d" % (pid, k), h["outline"], hx[0], hx[1])
+            else:
+                (y, z), r = h["at"], h["r"]
+                cut = prism("%s_hole%d" % (pid, k), [[y + r * math.cos(2 * math.pi * t_ / SEG), z + r * math.sin(2 * math.pi * t_ / SEG)] for t_ in range(SEG)], hx[0], hx[1])
+            boolean(ob, cut)
     else:
         ob = lathe(pid, sh["profile"], sh["axis"][0], sh["axis"][1], sh.get("bore_r"))
     for k, ft in enumerate(p.get("features", [])):
         feature(ob, pid, k, ft, report["textures"])
     if p.get("bevel_cm"):
+        # the edges rounded to the drawing's (or the source's) radius: a round arc (profile 0.5), one segment for
+        # every 0.02 cm of radius, at least 3, so the round reads as a curve, not a chamfer
         mod = ob.modifiers.new("bevel", 'BEVEL')
         mod.width = p["bevel_cm"] / 100.0
-        mod.segments = 2
+        mod.segments = max(3, int(math.ceil(p["bevel_cm"] / 0.02)))
+        mod.profile = 0.5
         mod.limit_method = 'ANGLE'
+        mod.harden_normals = True
         bpy.context.view_layer.objects.active = ob
         bpy.ops.object.modifier_apply(modifier=mod.name)
+    # smooth shading on the curved faces, flat faces kept crisp (faces meeting under 30 degrees shade as one)
+    for poly in ob.data.polygons:
+        poly.use_smooth = True
+    try:
+        bpy.context.view_layer.objects.active = ob
+        ob.select_set(True)
+        bpy.ops.object.shade_auto_smooth(angle=math.radians(30.0))
+        ob.select_set(False)
+    except Exception as e_:                       # an older Blender without the operator: smooth shading only
+        print("BLUEPRINT NOTE auto smooth: %s" % e_)
     ob.data.materials.clear()                     # the cuts bring their cutters' empty slots: one finish a part
     ob.data.materials.append(material(p["finish"]))
     for poly in ob.data.polygons:
@@ -278,6 +492,7 @@ for pid, p in bp["parts"].items():
 blend = os.path.join(OUT, "%s.blend" % bp["name"])
 bpy.ops.wm.save_as_mainfile(filepath=blend)
 report["blend"] = blend
+report["rounds_cut_to_fit"] = ROUND_NOTES
 with open(os.path.join(OUT, "build.json"), "w", encoding="utf-8") as f:
     json.dump(report, f, indent=1)
 print("BLUEPRINT BUILD " + json.dumps({"parts": len(report["parts"]), "blend": blend}))

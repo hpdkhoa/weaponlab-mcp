@@ -945,8 +945,22 @@ def touch_pairs(side):
         if hm.get("guard_line"):
             gl = hm["guard_line"]
             pd = (F.to_quaternion() @ Vector(FACE["r"])).normalized()
-            e0, n0 = side_hit(F @ Vector(gl[0]), pd)
-            e1, _n1 = side_hit(F @ Vector(gl[1]), pd)
+            def side_hit_edge(p_g):
+                """the frame's side by the guard opening's top edge: on the edge a ray can pass through the opening,
+                so the point steps away from the opening's centre (0.05 cm a step, at most 0.5 cm) until it hits"""
+                h_ = side_hit(F @ Vector(p_g), pd)
+                if h_[0] is not None or not hm.get("guard_centre"):
+                    return h_, 0.0
+                away = (Vector(p_g) - Vector(hm["guard_centre"]))
+                away = away.normalized() if away.length > 1e-9 else Vector((0.0, 0.0, 1.0))
+                for k_ in range(1, 11):
+                    h_ = side_hit(F @ (Vector(p_g) + away * 0.0005 * k_), pd)
+                    if h_[0] is not None:
+                        return h_, 0.05 * k_
+                return h_, None
+            (e0, n0), st0 = side_hit_edge(gl[0])
+            (e1, _n1), st1 = side_hit_edge(gl[1])
+            report.setdefault("line_b", {})["edge_step_cm"] = [st0, st1]
             # line B at the ring's top edge, kept: the pinky's height on the grip is read with the hand placed on it
             # (the owner, 2026-10-21: the pinky stays as high as before line B moved)
             top_edge_ = {"at": e0, "dir": list((Vector(e1) - Vector(e0)).normalized())} if e0 is not None and e1 is not None else None

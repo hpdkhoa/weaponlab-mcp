@@ -125,7 +125,7 @@ def to_px(f, pts):
     """Gun space (y, z) in cm to pixel points."""
     u, n = axes(f)
     o, s = f["frame"]["origin"], f["scale"]["cm_per_px"]
-    return [[o[0] + (y * u[0] + z * n[0]) / s, o[1] + (y * u[1] + z * n[1]) / s] for y, z in pts]
+    return [[o[0] + (y * u[0] + z * n[0]) / s, o[1] + (y * u[1] + z * n[1]) / s] for y, z, *_ in pts]
 
 
 def figure(gun, fig_id):

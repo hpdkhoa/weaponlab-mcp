@@ -78,7 +78,7 @@ def edge_line(outline, z0, z1, front=True, y_max=None):
         dense += [[a[0] + (c[0] - a[0]) * k / n, a[1] + (c[1] - a[1]) * k / n] for k in range(n)]
     pts = [p for p in dense if z0 <= p[1] <= z1 and (y_max is None or p[0] <= y_max)]
     bands = {}
-    for y, z in pts:
+    for y, z, *_ in pts:
         k = round(z / 0.25)
         if k not in bands or (y > bands[k][0] if front else y < bands[k][0]):
             bands[k] = (y, z)

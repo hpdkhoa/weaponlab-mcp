@@ -34,7 +34,7 @@ def silhouette(bp, include=None):
         sh = p["shape"]
         if sh["kind"] == "extrude":
             polys.append(sh["outline"])
-        elif sh["kind"] == "views":
+        elif sh["kind"] in ("views", "relief"):
             polys.append(sh["side"])
         else:
             z0 = sh["axis"][1]
@@ -50,7 +50,7 @@ def _raster(polys, holes, bounds, res):
     (y0, y1), (z0, z1) = bounds
     w, h = int((y1 - y0) / res) + 3, int((z1 - z0) / res) + 3
     m = np.zeros((h, w), np.uint8)
-    to = lambda poly: np.array([[(y - y0) / res + 1, (z1 - z) / res + 1] for y, z in poly], dtype=np.int32)   # noqa: E731
+    to = lambda poly: np.array([[(y - y0) / res + 1, (z1 - z) / res + 1] for y, z, *_ in poly], dtype=np.int32)   # noqa: E731
     for p in polys:
         cv2.fillPoly(m, [to(p)], 255)
     for p in holes:
@@ -62,8 +62,8 @@ def _holes(bp):
     out = []
     for p in bp["parts"].values():
         for h in p.get("holes", []):
-            if h.get("x") or h["kind"] == "bore":
-                continue                   # a cut that stops inside the part, or runs along the bore, still shows its outside
+            if h.get("x") or h["kind"] in ("bore", "sweep"):
+                continue                   # a cut that stops inside the part, runs along the bore, or shapes an edge, still shows its outside
             if h["kind"] == "polygon":
                 out.append(h["outline"])
             else:
@@ -103,7 +103,7 @@ def detail(bp, src):
     kinds = {}
     for pid, p in bp["parts"].items():
         sh = p["shape"]
-        k = "lathe" if sh["kind"] == "lathe" else ("shaped" if sh["kind"] == "views" and ("front" in sh or "top" in sh) else "slab")
+        k = "lathe" if sh["kind"] == "lathe" else ("shaped" if (sh["kind"] == "views" and ("front" in sh or "top" in sh)) or sh["kind"] == "relief" else "slab")
         kinds.setdefault(k, []).append(pid)
     feats = [f["kind"] for p in bp["parts"].values() for f in p.get("features", [])]
     return {"listed": len(listed), "visible": len(visible), "missing": missing,
@@ -114,11 +114,15 @@ def detail(bp, src):
 
 def volume_cm3(p):
     sh = p["shape"]
+    if sh["kind"] == "relief":                      # no larger than its side times its thickness (a pair: twice)
+        return Pl.area(sh["side"]) * abs(sh["x"][1] - sh["x"][0]) * (2 if sh.get("both") else 1)
     if sh["kind"] in ("extrude", "views"):          # a shaped part is no larger than its side times its width
         v = Pl.area(sh["outline"] if sh["kind"] == "extrude" else sh["side"]) * (sh["x"][1] - sh["x"][0])
         for h in p.get("holes", []):
             if h["kind"] == "bore":
                 v -= math.pi * h["r"] ** 2 * abs(h["y"][1] - h["y"][0])
+                continue
+            if h["kind"] == "sweep":                # a shaping cut along an edge: small, left out of the bound
                 continue
             w = (h["x"][1] - h["x"][0]) if h.get("x") else (sh["x"][1] - sh["x"][0])
             v -= (Pl.area(h["outline"]) if h["kind"] == "polygon" else math.pi * h["r"] ** 2) * w

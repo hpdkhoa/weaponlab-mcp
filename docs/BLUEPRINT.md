@@ -43,7 +43,14 @@ bore under the traced sight. The bolt face is the muzzle less the barrel's lengt
 - **extrude:** a side outline in (y, z), run across x from the gun's right (x0) to its left (x1). Clips cut the
   outline where a neighbour starts. A clip is a level line (`y` or `z`) or any line (`line`), and each says why.
 - **lathe:** a profile (y, r) turned round a line parallel to the bore, with an optional bore along it.
-- **holes:** an outline or a circle cut across x (limited to part of x when given), or a bore along y.
+- **views:** a side outline cut against front sections and a top outline: a part whose width changes.
+- **relief:** a side outline with a flat inner face and an outer face arched across its width, from `edge_cm` at the
+  rim to full thickness in the middle (`both` makes the mirrored pair). Grip panels, as their drawing's sections show.
+- **outline corners:** any outline point may carry a third number, the drawing's corner radius in cm. The corner
+  becomes a true arc tangent to both edges.
+- **holes:** an outline or a circle cut across x (limited to part of x when given), a bore along y, or a `sweep`: a
+  cross-section in (u, x) swept along a slanted side-view line, to shape a face along an edge (a front strap's round).
+- **bevel_cm:** the part's edges rounded (an arc, one segment every 0.02 cm of radius), the round faces shaded smooth.
 
 A part's role is `body` or one of its action family's part roles. A moving part's motion is `slide`, `turn` or
 `free`. An action may let a part move in more than one way. A pistol's trigger, for one, turns or slides
@@ -98,6 +105,53 @@ The MP4 is H.264 from Blender's encoder, so no ffmpeg is needed. The files are i
 | outline | IoU at least 0.95 and a mean edge gap at most 0.15 cm against the reference silhouette |
 | length | within 1 percent of the overall length fact |
 | weight | warns only: the copy is solid where the gun is hollow |
+
+## From engineering drawings
+
+When the gun's own drawings exist, Blueprint Lab builds from them, not from a photo. The M1911A1 now comes from the
+Ordnance Department's sheets (1936, revised to 1944): the receiver D35359, the stocks C64062, the barrel, hammer and
+trigger, and the two sectional views.
+
+How the drawings become a blueprint (`digitize/M1911A1/drawings/to_blueprint.py`):
+
+1. **Read the numbers.** Each sheet is read in zoomed crops: every printed value with its view and a confidence.
+2. **Build outlines like a CAD sketch.** The frame's side outline takes 34 of its 52 points from printed dimensions,
+   the rest traced. Its printed radii (the guard's .462 and .59, the 9/16 and 7/16 fillets) are true arcs.
+
+![The receiver drawing with the frame outline on it](images/blueprint_receiver_dims.jpg)
+
+3. **One assembly layout.** Every part is traced on the sectional view at the sheet's own scale bar. Each part's
+   exact outline is fitted onto it (rotation and shift, least squares on nearest points).
+4. **Gun space.** cm, with y = 0 at the breech face and z = 0 on the bore, the muzzle at the barrel's printed length.
+5. **Check against the sources.** Every part is drawn back on the drawing. The length is checked against the
+   manual's printed overall length: 21.824 cm against 21.826 cm.
+
+![The rebuilt parts drawn on the 1936 sectional view](images/blueprint_on_drawing.jpg)
+
+What the new shapes give:
+
+- **Curved panels:** the stocks are .260 in thick in the middle and thin to 1/32 in rims, flat inside, as C64062's
+  sections show.
+
+![The grip panel: its domed face and its crescent section](images/blueprint_relief_panel.jpg)
+
+- **Real cross-sections:** a slice through the grip shows the crescent stocks on both sides and the front strap's
+  17/32 in round across the .762 in frame.
+
+![Cross-sections through the grip](images/blueprint_grip_sections.jpg)
+
+- **No sharp edge where a hand holds:** every hand-contact edge is rounded, from the drawing or by at least 0.75 mm
+  (MIL-STD-1472G 5.7.7.6).
+
+![The photo-built copy and the drawing-built copy](images/blueprint_before_after.jpg)
+
+What the drawings do not give, so far:
+
+- the slide, grip safety, housing and magazine have no drawing of their own in the set: they are traced from the
+  section view (good to about 0.03 to 0.07 in), their widths reasoned;
+- the thumb safety, slide stop, magazine catch and lanyard loop keep their photo shapes, placed on the drawing's pins;
+- where the scan and a printed value disagree (the lower stock screw hole, 0.25 in apart), the part's own printed
+  value decides and the conflict is recorded.
 
 ## The worked example: M1911A1
 

@@ -156,7 +156,15 @@
     "outline": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/vec2"
+        "anyOf": [
+          {
+            "$ref": "#/$defs/vec2"
+          },
+          {
+            "$ref": "#/$defs/vec3"
+          }
+        ],
+        "description": "a point (y, z); a third number rounds the corner there: the radius in cm, as a drawing gives it (an arc tangent to both edges)"
       },
       "minItems": 3
     },
@@ -259,6 +267,45 @@
           ],
           "additionalProperties": false,
           "description": "the shape the side outline, the front sections and the top outline share (three views intersected)"
+        },
+        {
+          "description": "a relief: a side outline with a flat inner face at x[0] and an outer face that arches across the part's width (square to its long axis) as one circular arc, from edge_cm thick at the rim to |x[1] - x[0]| at the middle: a grip panel's crescent section",
+          "required": [
+            "kind",
+            "side",
+            "x",
+            "edge_cm",
+            "axis"
+          ],
+          "properties": {
+            "kind": {
+              "const": "relief"
+            },
+            "side": {
+              "$ref": "#/$defs/outline"
+            },
+            "x": {
+              "$ref": "#/$defs/vec2"
+            },
+            "edge_cm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "axis": {
+              "$ref": "#/$defs/vec2",
+              "description": "the long axis in the side view (y, z); the arch runs square to it"
+            },
+            "grid_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "the outer face's point spacing (default 0.08)"
+            },
+            "both": {
+              "type": "boolean",
+              "description": "also the mirror image across x = 0 (a pair of grip panels)"
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -342,6 +389,34 @@
             "source"
           ],
           "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "sweep"
+            },
+            "from": {
+              "$ref": "#/$defs/vec2"
+            },
+            "to": {
+              "$ref": "#/$defs/vec2"
+            },
+            "outline": {
+              "$ref": "#/$defs/outline"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "from",
+            "to",
+            "outline",
+            "source"
+          ],
+          "additionalProperties": false,
+          "description": "a cut swept along the side-view line from -> to (y, z): its cross-section outline in (u, x), u along the line's normal in the side view (the line's direction turned +90 degrees), x across the gun; to shape a face along a slanted edge (a front strap's round)"
         }
       ],
       "description": "a circle or polygon cut across x (all the way through unless x limits it), in the side view's (y, z); or a bore, a round cut along y from y[0] to y[1]"

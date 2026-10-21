@@ -74,6 +74,7 @@ def check_sources(doc):
 
 # the numbers each shape and motion kind holds, and so the keys its part's sources must have
 NEEDS = {"extrude": ("outline", "x"), "lathe": ("profile", "axis"), "views": ("side", "x"),
+         "relief": ("side", "x", "edge_cm", "axis"),
          "slide": ("axis", "travel_cm"), "turn": ("axis", "turn_deg", "pivot"), "free": ()}
 
 
