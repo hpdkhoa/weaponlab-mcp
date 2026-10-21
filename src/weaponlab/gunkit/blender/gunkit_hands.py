@@ -989,6 +989,129 @@ def keep_gun_measures(side, pairs):
     json.dump(data_, open(p_, "w", encoding="utf-8"), indent=1)
 
 
+def six_views(side):
+    """The hand as the hold posed it, drawn straight on (orthographic): with the gun
+    from above, below, the left and the right (40 cm across, centred between the palm and the gun's middle, the whole
+    gun in view); without the gun from above and the left (22 cm, centred on the palm). The other hand is hidden (a
+    mask on its skin while drawing; nothing is moved). Each picture is stamped as a dev view. Returns the paths."""
+    import math as _m
+    d_ = os.path.join(OUT, "six_views_" + side)
+    os.makedirs(d_, exist_ok=True)
+    sc_ = bpy.context.scene
+    cam_d = bpy.data.cameras.get("six_cam") or bpy.data.cameras.new("six_cam")
+    cam = bpy.data.objects.get("six_cam") or bpy.data.objects.new("six_cam", cam_d)
+    if cam.name not in sc_.collection.objects:
+        sc_.collection.objects.link(cam)
+    cam_d.type, cam_d.ortho_scale, cam_d.clip_start, cam_d.clip_end = "ORTHO", 0.22, 0.01, 5.0
+    keep_ = (sc_.camera, sc_.render.engine, sc_.render.resolution_x, sc_.render.resolution_y, sc_.render.filepath,
+             sc_.render.use_stamp, sc_.render.use_stamp_note, sc_.render.stamp_note_text)
+    sc_.camera = cam
+    sc_.render.engine = "BLENDER_WORKBENCH"
+    sc_.display.shading.light = "STUDIO"
+    sc_.display.shading.color_type = "MATERIAL"
+    sc_.display.shading.show_cavity = True
+    sc_.render.resolution_x, sc_.render.resolution_y = 900, 900
+    sc_.render.use_stamp, sc_.render.use_stamp_note = True, True
+    for k_ in ("use_stamp_date", "use_stamp_time", "use_stamp_render_time", "use_stamp_frame", "use_stamp_camera",
+               "use_stamp_lens", "use_stamp_scene", "use_stamp_filename", "use_stamp_memory", "use_stamp_hostname",
+               "use_stamp_marker", "use_stamp_sequencer_strip", "use_stamp_frame_range"):
+        if hasattr(sc_.render, k_):
+            setattr(sc_.render, k_, False)
+    stamp_keep = (tuple(sc_.render.stamp_foreground), tuple(sc_.render.stamp_background), sc_.render.stamp_font_size)
+    sc_.render.stamp_foreground, sc_.render.stamp_background = (0.0, 0.0, 0.0, 1.0), (1.0, 1.0, 1.0, 0.9)
+    sc_.render.stamp_font_size = 16                          # the dev-view label readable on any background
+    q = L._gun().to_quaternion()
+    up, left, fwd = q @ Vector((0, 0, 1)), q @ Vector((1, 0, 0)), q @ Vector((0, -1, 0))
+    palm_c = L._anchor(side, "palm_skin")
+    gun_meshes = [o_ for o_ in sc_.objects if o_.type == "MESH" and o_ not in L.meshes]
+    gb_ = [L.rifle_mesh.matrix_world @ Vector(c_) for c_ in L.rifle_mesh.bound_box]
+    gun_c = sum(gb_, Vector()) / 8.0
+    # the other hand hidden: a vertex group of its side's skin and an inverted mask while drawing
+    skin_ = L.meshes[0]
+    _b, _T, sidev_, _k, _s = L._skin_static()
+    other_code = 2 if side == "r" else 1
+    vg_ = skin_.vertex_groups.new(name="_six_hide")
+    import numpy as _np6
+    vg_.add([int(i) for i in _np6.nonzero(sidev_ == other_code)[0]], 1.0, "REPLACE")
+    # the clip map: each skin point of this hand coloured by its gap to the gun (exact near each colour's edge):
+    # red past its give (a clip), orange pressing within its give, yellow touching (within 0.1 cm), else the glove
+    import numpy as _np7
+    P_, N_ = L._skin_arrays()[:2]
+    idx_, lab_ = L._hand_label_arrays(side, P_, N_)
+    Dg_ = _np7.asarray(L.sdf_query(P_[idx_], want_normal=False)[0], dtype=float)
+    near_ = _np7.nonzero(Dg_ < 0.5)[0]
+    D_ = Dg_.copy()
+    if len(near_):
+        D_[near_] = L.exact_signed(P_[idx_][near_])
+    from contactlab import SKIN_GIVE as _SG, _lab_key as _lk
+    give_ = _np7.array([_SG.get(_lk(l_), _SG["default"]) for l_ in lab_])
+    clip_ = D_ < -give_
+    press_ = (D_ < 0.0) & ~clip_
+    touch_ = (D_ >= 0.0) & (D_ <= 0.1)
+    cols = _np7.tile([0.23, 0.26, 0.2, 1.0], (len(skin_.data.vertices), 1))
+    for m_, c_ in ((touch_, (0.95, 0.85, 0.1, 1.0)), (press_, (1.0, 0.5, 0.0, 1.0)), (clip_, (0.9, 0.05, 0.05, 1.0))):
+        cols[idx_[m_]] = c_
+    ca_ = skin_.data.color_attributes.get("_clipmap") or skin_.data.color_attributes.new("_clipmap", "FLOAT_COLOR", "POINT")
+    ca_.data.foreach_set("color", cols.ravel())
+    keep_active = skin_.data.color_attributes.active_color_name
+    skin_.data.color_attributes.active_color = ca_
+    by_part = {}
+    for k_ in _np7.nonzero(clip_)[0]:
+        key_ = lab_[k_].split("_")[0]
+        e_ = by_part.setdefault(key_, [0, 0.0])
+        e_[0] += 1
+        e_[1] = max(e_[1], round(float(-D_[k_] - give_[k_]), 3))
+    clip_summary = {"clipping_points": int(clip_.sum()), "pressing_within_give": int(press_.sum()),
+                    "touching": int(touch_.sum()), "clipping_by_part": {k_: {"points": v_[0], "deepest_past_give_cm": v_[1]}
+                                                                         for k_, v_ in sorted(by_part.items())}}
+    sh_ = sc_.display.shading
+    shade_keep = (sh_.color_type, sh_.show_xray, sh_.xray_alpha)
+    sh_.color_type = "VERTEX"
+    # the other hand hidden only now: the mask changes the drawn mesh's vertex count, and the clip map above reads
+    # the full skin
+    mask_ = skin_.modifiers.new("_six_mask", "MASK")
+    mask_.vertex_group, mask_.invert_vertex_group = vg_.name, True
+    views = [("with_gun_top_down", up, fwd, True), ("with_gun_bottom_up", -up, fwd, True),
+             ("with_gun_left_to_right", left, up, True), ("with_gun_right_to_left", -left, up, True),
+             ("no_gun_top_down", up, fwd, False), ("no_gun_left_to_right", left, up, False)]
+    paths_ = []
+    try:
+        for name_, way, upv, with_gun in views:
+            for o_ in gun_meshes:
+                o_.hide_render = not with_gun
+            for o_ in gun_meshes:
+                o_.display_type = "WIRE" if with_gun else "TEXTURED"   # the gun as lines: skin inside it shows
+            centre = (palm_c + gun_c) * 0.5 if with_gun else palm_c
+            cam_d.ortho_scale = 0.40 if with_gun else 0.22
+            cam.location = centre + way * 0.6
+            z_ = way.normalized()
+            x_ = upv.cross(z_).normalized()
+            y_ = z_.cross(x_)
+            cam.rotation_euler = Matrix((x_, y_, z_)).transposed().to_euler()
+            sc_.render.stamp_note_text = ("DEV VIEW, not the game view: %s, the %s hand as the hold posed it, the other "
+                                          "hand hidden. Red: clip past the give, orange: pressing within the give, "
+                                          "yellow: touching" % (name_.replace("_", " "), "right" if side == "r" else "left"))
+            p_ = os.path.join(d_, name_ + ".png")
+            sc_.render.filepath = p_
+            bpy.ops.render.render(write_still=True)
+            paths_.append(p_)
+    finally:
+        for o_ in gun_meshes:
+            o_.hide_render = False
+            o_.display_type = "TEXTURED"
+        skin_.modifiers.remove(mask_)
+        skin_.vertex_groups.remove(vg_)
+        sc_.render.stamp_foreground, sc_.render.stamp_background, sc_.render.stamp_font_size = stamp_keep
+        sh_.color_type, sh_.show_xray, sh_.xray_alpha = shade_keep
+        if keep_active:
+            skin_.data.color_attributes.active_color = skin_.data.color_attributes[keep_active]
+        skin_.data.color_attributes.remove(ca_)
+        (sc_.camera, sc_.render.engine, sc_.render.resolution_x, sc_.render.resolution_y, sc_.render.filepath,
+         sc_.render.use_stamp, sc_.render.use_stamp_note, sc_.render.stamp_note_text) = keep_
+    report.setdefault("six_views", {})[side] = clip_summary
+    return paths_
+
+
 def start_pictures(side):
     """The heat pictures of a hand whose start the walls refused, posed as the check read it: the skin coloured by
     its gap to the gun (and the other hand), from four sides about the palm. Each picture is stamped as a dev view,
@@ -1052,7 +1175,7 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
         keep_gun_measures(side, tp_)
         h_ = L.direct_hold(side, MARKS, tp_, glove_cm=GLOVE, other=oth, wrap=wr_,
                            gun_shift=_gun_shift if side == "r" else None,      # the firing hand is on the gun first
-                           f_pref=FPREF, diagnose_nearest=bool(job.get("diagnose_nearest", False)))
+                           f_pref=FPREF, on_posed=six_views if job.get("six_views") else None)
         g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
         ok_ = bool(g_.get(side, {}).get("pass")) and not h_.get("walls")
         r = {"method": "direct", "hold": h_, "gate": g_, "passed": ok_}
