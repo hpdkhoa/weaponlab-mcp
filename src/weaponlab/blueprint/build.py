@@ -18,10 +18,23 @@ def magazine_line(outline):
     """A magazine's own line from its side outline: the direction of its longest straight side (a magazine's front
     and back run along its well; the points' spread would lean toward a slanted outline's diagonal), pointing down,
     out of the well; and its length along it."""
+    import math
     import numpy as np
-    P = np.array(outline, dtype=float)
-    segs = [(np.linalg.norm(b - a), b - a) for a, b in zip(P, np.roll(P, -1, axis=0))]
-    d = max(segs, key=lambda s: s[0])[1]
+    P = np.array([q[:2] for q in outline], dtype=float)
+    segs = [b - a for a, b in zip(P, np.roll(P, -1, axis=0)) if np.linalg.norm(b - a) > 1e-9]
+    # a traced side is many short segments: neighbours running the same way (within 8 degrees of the run's start) are
+    # one straight run; the longest run is the magazine's front or back
+    runs, cur = [], None
+    for v in segs + segs[:1]:
+        u = v / np.linalg.norm(v)
+        if cur is not None and float(u @ cur[1]) >= math.cos(math.radians(8.0)):
+            cur[0] += v
+        else:
+            if cur is not None:
+                runs.append(cur[0])
+            cur = [v.copy(), u]
+    runs.append(cur[0])
+    d = max(runs, key=lambda r: float(np.linalg.norm(r)))
     d = d / np.linalg.norm(d)
     if d[1] > 0:
         d = -d
