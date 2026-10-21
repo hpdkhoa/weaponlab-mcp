@@ -172,7 +172,7 @@ def test_grip_styles_and_characters_follow_their_contracts():
     for i in SU.ids("characters"):
         assert C.check(SU.character(i)) == [], i
     assert SU.style_for("pistol_slide")["id"] == "pistol_two_hand"
-    assert SU.glove_cm(SU.character("nomex_full_gloves")) == pytest.approx(0.15)
+    assert SU.glove_cm(SU.character("nomex_full_gloves")) == pytest.approx(0.099)   # MIL-DTL-81188C 3.3.1
     st = dict(SU.style("pistol_two_hand"))
     st["hands"] = {"r": dict(st["hands"]["r"], contact=dict(st["hands"]["r"]["contact"], mark="nowhere")), "l": st["hands"]["l"]}
     assert any("nowhere" in b for b in C.check(st))
