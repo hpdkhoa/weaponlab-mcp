@@ -14,9 +14,9 @@
      -0.026299357414245605
     ],
     "normal": [
-     1.0,
-     -8.881782079418884e-16,
-     -1.1893261610198148e-14
+     -1.0,
+     8.881782079418884e-16,
+     1.1893261610198148e-14
     ],
     "off_cm": 0.099,
     "source": "FM 3-23.35: the web high on the backstrap, under the grip safety; the hand point is the web's skin fold measured on the skin (no guessed depth), the glove's thickness on it"
@@ -102,5 +102,15 @@
     "source": "the backstrap down the palm (the wrist stands in for the heel: a check, not a target)"
    }
   ]
+ },
+ "grid_check": {
+  "grid_version": 3,
+  "points": 6000,
+  "wrong_side": 28,
+  "of": 5095,
+  "largest_difference_cm": 0.112,
+  "shells": 21,
+  "open_edges": 0,
+  "method": "poselab-mcp examples/sdf_sign_check.py, 2026-10-21"
  }
 }
