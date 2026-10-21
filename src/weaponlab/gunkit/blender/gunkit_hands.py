@@ -1052,7 +1052,7 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
         keep_gun_measures(side, tp_)
         h_ = L.direct_hold(side, MARKS, tp_, glove_cm=GLOVE, other=oth, wrap=wr_,
                            gun_shift=_gun_shift if side == "r" else None,      # the firing hand is on the gun first
-                           f_pref=FPREF)
+                           f_pref=FPREF, diagnose_nearest=bool(job.get("diagnose_nearest", False)))
         g_ = L.hold_gate(MARKS, sides=(side,), glove_cm=GLOVE, skin=False, other=oth)
         ok_ = bool(g_.get(side, {}).get("pass")) and not h_.get("walls")
         r = {"method": "direct", "hold": h_, "gate": g_, "passed": ok_}
@@ -1544,6 +1544,16 @@ if home_r and STYLE and "support" in facts["marks"]:
     for _n, _q in home_r[1].items():
         L.arm.pose.bones[_n].rotation_quaternion = _q
     bpy.context.view_layer.update()
+# the arms with their press morph targets, for the game to import as the arms mesh (the clips key their curves)
+if L.meshes[0].data.shape_keys and any(k.name.startswith("press_") for k in L.meshes[0].data.shape_keys.key_blocks):
+    for o_ in bpy.context.view_layer.objects:
+        o_.select_set(False)
+    L.arm.select_set(True)
+    L.meshes[0].select_set(True)
+    _mp = os.path.join(OUT, "Arms_press_morphs.fbx")
+    bpy.ops.export_scene.fbx(filepath=_mp, use_selection=True, object_types={"ARMATURE", "MESH"}, add_leaf_bones=False,
+                             bake_anim=False)
+    report["press_morphs_fbx"] = _mp
 # one hand at a time (the owner, 2026-10-21): the support hand is solved only after the firing hand's hold passes
 _r_ok = bool(home_r and home_r[2])
 if "support" in facts["marks"] and DIRECT and not _r_ok:
@@ -2017,7 +2027,21 @@ for cid, clip in job["clips"].items():
         print("GUNKIT HANDS: %s not written, %d frames past the walls" % (cid, len(walled)))
         continue
     L.steps.phase("save the clip", level=2)
-    saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root")
+    # the palm's press (a morph target) follows the firing hand's hold: 1 while it holds its home grip, blended as it
+    # takes hold or lets go, 0 off it
+    morphs_ = None
+    _kb = L.meshes[0].data.shape_keys.key_blocks if L.meshes[0].data.shape_keys else {}
+    if "press_r" in _kb and clip.get("frames"):
+        _home = ((PUR or {}).get("r") or {}).get("mark", "grip")
+        _vals = []
+        for f_ in clip["frames"]:
+            h_ = f_["hands"]["r"]
+            w_ = float(h_.get("w", 1.0))
+            a_on = mark_of(h_["a"]) == _home
+            b_on = mark_of(h_["b"]) == _home
+            _vals.append((1.0 - w_) * a_on + w_ * b_on)
+        morphs_ = {"press_r": _vals}
+    saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root", morphs=morphs_)
     L.steps.phase("check set", level=2)
     try:
         soft = [c["segment"] + "*" for c in (STYLE or {}).get("soft_contacts", [])]

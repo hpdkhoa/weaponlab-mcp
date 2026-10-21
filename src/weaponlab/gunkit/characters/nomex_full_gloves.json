@@ -11,8 +11,13 @@
  "covering": {
   "kind": "full_gloves",
   "material": "Nomex (aramid knit)",
-  "thickness_cm": 0.15,
-  "why": "a close-fitting Nomex glove: about 1.5 mm of fabric over every finger and the palm (a guess for a thin flame-resistant glove)"
+  "thickness_cm": 0.099,
+  "why": "the flyer's glove spec's thickest palm leather: MIL-DTL-81188C (2001) 3.3.1, the palm and finger-palm leather 'not less than 1 1/4 ounces nor more than 2 1/2 ounces at any place in the finished glove' (ASTM D1814); 1 oz of leather = 1/64 inch, so 0.050 to 0.099 cm; the thickest end is used so a clip never passes for a touch. The back is a meta-aramid knit of 9-10 oz/sq yd (3.3.3), no thickness given; it is not on the touching side",
+  "source": "MIL-DTL-81188C, Gloves, Flyers', Summer, Type GS/FRP-2 (2001), 3.3.1 and 3.3.3",
+  "range_cm": [
+   0.05,
+   0.099
+  ]
  },
  "finish": {
   "skin": "skin",

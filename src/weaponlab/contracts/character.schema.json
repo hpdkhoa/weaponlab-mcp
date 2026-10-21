@@ -83,6 +83,20 @@
         "why": {
           "type": "string",
           "minLength": 8
+        },
+        "source": {
+          "type": "string",
+          "description": "the published source of thickness_cm (a standard, a paper)"
+        },
+        "range_cm": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "the source's range for the thickness (cm): thickness_cm is chosen inside it"
         }
       },
       "additionalProperties": false
