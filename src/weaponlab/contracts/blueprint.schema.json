@@ -705,6 +705,112 @@
           ],
           "additionalProperties": false,
           "description": "a surface pattern too fine for the mesh: it goes to the finish (Coating Lab) as a texture"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "knurl"
+            },
+            "face": {
+              "enum": [
+                "left",
+                "right",
+                "both",
+                "top",
+                "front",
+                "rear"
+              ]
+            },
+            "pattern": {
+              "enum": [
+                "diamond",
+                "straight"
+              ]
+            },
+            "pitch_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "depth_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "angle_deg": {
+              "type": "number",
+              "description": "the lines' angle to the face's long direction (diamond: +- this)"
+            },
+            "border_cm": {
+              "type": "number",
+              "minimum": 0,
+              "description": "a plain band kept round the knurled field"
+            },
+            "y": {
+              "$ref": "#/$defs/vec2"
+            },
+            "z": {
+              "$ref": "#/$defs/vec2"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            },
+            "rotate_deg": {
+              "type": "number",
+              "description": "the pattern turned in the face: its long direction's angle to the face's first axis (gun y, or x on front/rear)"
+            },
+            "skip": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/vec3"
+              },
+              "description": "round plain areas (y, z, r cm): a boss round a screw hole"
+            }
+          },
+          "required": [
+            "kind",
+            "face",
+            "pattern",
+            "pitch_cm",
+            "depth_cm",
+            "source"
+          ],
+          "additionalProperties": false,
+          "description": "knurling or checkering pressed into a face as V grooves (90 degree), real geometry: the face's mesh refined to a quarter pitch and moved in along its normals"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "crown"
+            },
+            "face": {
+              "enum": [
+                "front",
+                "rear",
+                "top"
+              ]
+            },
+            "r_cm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "the face's radius across the part's width (x), its middle staying put"
+            },
+            "y": {
+              "$ref": "#/$defs/vec2"
+            },
+            "z": {
+              "$ref": "#/$defs/vec2"
+            },
+            "source": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "required": [
+            "kind",
+            "face",
+            "r_cm",
+            "source"
+          ],
+          "additionalProperties": false,
+          "description": "a face curved across the width to a printed radius (a palm face, a housing's back): its mesh refined and each point moved in by r - sqrt(r^2 - x^2)"
         }
       ]
     }

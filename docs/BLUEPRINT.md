@@ -51,6 +51,10 @@ bore under the traced sight. The bolt face is the muzzle less the barrel's lengt
 - **holes:** an outline or a circle cut across x (limited to part of x when given), a bore along y, or a `sweep`: a
   cross-section in (u, x) swept along a slanted side-view line, to shape a face along an edge (a front strap's round).
 - **bevel_cm:** the part's edges rounded (an arc, one segment every 0.02 cm of radius), the round faces shaded smooth.
+- **knurl (feature):** real knurling or checkering pressed into a face as 90 degree V grooves: diamond or straight, its
+  pitch, angle, turn, depth, a plain border and plain round bosses. The face's mesh is refined to a quarter pitch.
+- **crown (feature):** a face curved across the part's width to a printed radius (a grip safety's palm face, a
+  housing's back), the knurl following it.
 
 A part's role is `body` or one of its action family's part roles. A moving part's motion is `slide`, `turn` or
 `free`. An action may let a part move in more than one way. A pistol's trigger, for one, turns or slides

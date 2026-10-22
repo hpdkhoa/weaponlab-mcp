@@ -100,6 +100,16 @@ def build(gun, segments=32, timeout=900):
         raise RuntimeError("the build failed (see %s):\n%s" % (out / "build.log", "\n".join(tail)))
     rep = json.loads((out / "build.json").read_text(encoding="utf-8"))
     pm = partsmap(bp, rep["blend"])
+    # a gun with real knurling also gets a plain copy (no grooves, coarser reliefs) for the hand step's collision: the
+    # grooves are finer than the skin's give and would only slow the distance grids
+    if any(f.get("kind") == "knurl" for p_ in bp["parts"].values() for f in p_.get("features", [])):
+        jp = out / "build_plain.job.json"
+        jp.write_text(json.dumps({"blueprint": bp, "out": str(out), "segments": segments, "plain": True}), encoding="utf-8")
+        q = subprocess.run([str(project().blender()), "-b", "--factory-startup", "-P", str(SCRIPT), "--", str(jp)],
+                           capture_output=True, text=True, timeout=timeout)
+        (out / "build_plain.log").write_text((q.stdout or "") + "\n" + (q.stderr or ""), encoding="utf-8", errors="replace")
+        if q.returncode == 0 and "BLUEPRINT BUILD" in (q.stdout or ""):
+            pm["collision_model"] = json.loads((out / "build_plain.json").read_text(encoding="utf-8"))["blend"]
     bad = C.check_partsmap(pm)
     (out / "partsmap.json").write_text(json.dumps(pm, indent=1), encoding="utf-8")
     return {"blend": rep["blend"], "parts": rep["parts"], "partsmap": str(out / "partsmap.json"), "partsmap_problems": bad}

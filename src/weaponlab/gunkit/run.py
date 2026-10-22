@@ -44,6 +44,17 @@ def rig(partsmap, shapes=None, name=None):
     out = folder(name or pm["name"])
     _blender("gunkit_rig.py", {"partsmap": pm, "shapes": shapes, "out": str(out), "pkg": str(PKG)}, out)
     facts = json.loads((out / "gunfacts.json").read_text(encoding="utf-8"))
+    if pm.get("collision_model"):
+        # the plain copy rigged the same way, into collision/: the hand step reads it (its grooves-free mesh)
+        out_c = out / "collision"
+        out_c.mkdir(exist_ok=True)
+        pm_c = dict(pm, model=pm["collision_model"])
+        pm_c.pop("collision_model", None)
+        _blender("gunkit_rig.py", {"partsmap": pm_c, "shapes": shapes, "out": str(out_c), "pkg": str(PKG)}, out_c)
+        fc = json.loads((out_c / "gunfacts.json").read_text(encoding="utf-8"))
+        facts["model"]["collision_file"] = fc["model"]["file"]
+        facts["model"]["collision_triangles"] = fc["model"].get("triangles")
+        (out / "gunfacts.json").write_text(json.dumps(facts, indent=1), encoding="utf-8")
     bad = F.check(facts, A.load(facts["action"]))
     return {"folder": str(out), "facts": str(out / "gunfacts.json"), "problems": bad, "model": facts["model"]}
 
@@ -196,7 +207,7 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
     tl = {cid: T.hand_clip(a, facts, cid) for cid in want}
     tracks = {cid: R.tracks(facts, c) for cid, c in tl.items()}
     job = {"poselab": str(Path(poselab_mcp.__file__).resolve().parent / "blender"), "arms": arms(),
-           "gun_fbx": facts["model"]["file"], "facts": facts, "clips": tl, "tracks": tracks,
+           "gun_fbx": facts["model"].get("collision_file") or facts["model"]["file"], "facts": facts, "clips": tl, "tracks": tracks,
            "prefix": "A_%s_Hands_" % facts["name"], "out": str(out), "grip_steps": grip_steps, "render": render,
            "style": st, "character": ch, "glove_cm": SU.glove_cm(ch), "diagnose": list(diagnose),
            # no bone and no part of the skin of a size no adult has (Pose Lab's body_size, ANSUR II ranges)

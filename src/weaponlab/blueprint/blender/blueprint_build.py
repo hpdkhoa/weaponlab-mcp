@@ -20,6 +20,7 @@ job = json.load(open(sys.argv[sys.argv.index("--") + 1], encoding="utf-8"))
 bp = job["blueprint"]
 OUT = job["out"]
 SEG = int(job.get("segments", 32))
+PLAIN = bool(job.get("plain"))           # the collision copy: no knurl grooves, the reliefs on a coarser grid
 os.makedirs(OUT, exist_ok=True)
 for _o in list(bpy.data.objects):          # the factory scene's cube, camera and light are not the gun's
     bpy.data.objects.remove(_o)
@@ -265,10 +266,14 @@ def relief(name, side, x, edge_cm, axis, grid_cm=0.08):
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
     top_v = [bm.verts.new(g(x0 + sgn * height(q), q.x, q.y)) for q in vo]
-    bot_v = [bm.verts.new(g(x0, q.x, q.y)) for q in vo]
+    # the flat inside face needs no grid: one face round the outline, its points shared with the walls
+    bot_by = {}
+    for i, q in enumerate(vo):
+        key = (round(q.x, 6), round(q.y, 6))
+        if any(abs(q.x - pp[0]) < 1e-6 and abs(q.y - pp[1]) < 1e-6 for pp in pts):
+            bot_by[i] = bm.verts.new(g(x0, q.x, q.y))
     for f in fo:
         bm.faces.new([top_v[i] for i in f])
-        bm.faces.new([bot_v[i] for i in reversed(f)])
     # the wall round the rim: the triangulation's boundary edges (used by one face), each a quad between the faces
     use = {}
     for f in fo:
@@ -276,10 +281,19 @@ def relief(name, side, x, edge_cm, axis, grid_cm=0.08):
             e = (f[i], f[(i + 1) % len(f)])
             k = tuple(sorted(e))
             use.setdefault(k, []).append(e)
+    rim = []
     for k, es in use.items():
         if len(es) == 1:
             a_, b_ = es[0]
-            bm.faces.new([top_v[b_], top_v[a_], bot_v[a_], bot_v[b_]])
+            bm.faces.new([top_v[b_], top_v[a_], bot_by[a_], bot_by[b_]])
+            rim.append((a_, b_))
+    # the inside face: the rim's loop, in order
+    nxt = {a_: b_ for a_, b_ in rim}
+    loop, cur = [], rim[0][0]
+    for _ in range(len(rim)):
+        loop.append(cur)
+        cur = nxt[cur]
+    bm.faces.new([bot_by[i] for i in reversed(loop)])
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
@@ -338,6 +352,8 @@ def bounds_cm(ob):
 def feature(ob, pid, k, ft, textures):
     """A surface feature: grooves cut, a screw head added, a texture noted for the finish."""
     b = bounds_cm(ob)
+    if ft["kind"] in ("knurl", "crown"):            # shaped after the edges are rounded (see the part loop)
+        return
     if ft["kind"] == "texture":
         textures.append({"part": pid, "pattern": ft["pattern"], "face": ft["face"], "pitch_cm": ft.get("pitch_cm"), "text": ft.get("text")})
         return
@@ -372,10 +388,129 @@ def feature(ob, pid, k, ft, textures):
             union(ob, head)
 
 
+FACE_DIR = {"left": Vector((1.0, 0.0, 0.0)), "right": Vector((-1.0, 0.0, 0.0)), "top": Vector((0.0, 0.0, 1.0)),
+            "front": Vector((0.0, -1.0, 0.0)), "rear": Vector((0.0, 1.0, 0.0))}          # Blender frame (y flipped)
+
+
+def knurl(ob, ft):
+    """V grooves (90 degrees included) pressed into the faces of ob that face ft["face"] (within 50 degrees), inside its
+    y/z region and its border: the faces refined to a quarter pitch, each vertex moved in along its normal by the
+    groove depth there. Diamond: two line families at +- angle_deg to the face's long direction; straight: one family.
+    The face's own 2D coordinates: across x and up z for front/rear, y and z for left/right, y and x for top."""
+    faces = ["left", "right"] if ft["face"] == "both" else [ft["face"]]
+    pitch, depth = ft["pitch_cm"] / 100.0, ft["depth_cm"] / 100.0
+    border = ft.get("border_cm", 0.0) / 100.0
+    ang = math.radians(ft.get("angle_deg", 45.0 if ft["pattern"] == "diamond" else 0.0))
+    yr = [v / 100.0 for v in ft["y"]] if ft.get("y") else None
+    zr = [v / 100.0 for v in ft["z"]] if ft.get("z") else None
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.normal_update()
+    cosl = math.cos(math.radians(50.0))
+
+    def in_region(co):
+        gy = -co.y
+        if yr and not (yr[0] + border <= gy <= yr[1] - border):
+            return False
+        if zr and not (zr[0] + border <= co.z <= zr[1] - border):
+            return False
+        return True
+    for face in faces:
+        fd = FACE_DIR[face]
+        sel = [f for f in bm.faces if f.normal.dot(fd) >= cosl and in_region(f.calc_center_median())]
+        if not sel:
+            continue
+        # refine: split the selected faces' edges until none is longer than a quarter pitch
+        for _ in range(8):
+            edges = {e for f in sel for e in f.edges if e.calc_length() > pitch / 2.8}   # a quarter-pitch grid's diagonals pass
+            if not edges:
+                break
+            res = bmesh.ops.subdivide_edges(bm, edges=list(edges), cuts=1, use_grid_fill=True)
+            bm.normal_update()
+            sel = [f for f in bm.faces if f.normal.dot(fd) >= cosl and in_region(f.calc_center_median())]
+        verts = {v for f in sel for v in f.verts if in_region(v.co)}
+        if border > 0:
+            # the plain band: no groove within border of the knurled face's own edge (its edges used by one face of it)
+            from mathutils.kdtree import KDTree
+            sel_set = set(sel)
+            rim = {v for f in sel for e in f.edges if sum(1 for lf in e.link_faces if lf in sel_set) == 1 for v in e.verts}
+            if rim:
+                kd = KDTree(len(rim))
+                for i_, v in enumerate(rim):
+                    kd.insert(v.co, i_)
+                kd.balance()
+                verts = {v for v in verts if kd.find(v.co)[2] >= border}
+        skips = [(q[0] / 100.0, q[1] / 100.0, q[2] / 100.0) for q in ft.get("skip", [])]
+        if skips:
+            verts = {v for v in verts if all((-v.co.y - sy) ** 2 + (v.co.z - sz) ** 2 >= sr * sr for sy, sz, sr in skips)}
+        rot = math.radians(ft.get("rotate_deg", 0.0))
+        dirs = [(math.cos(rot + ang), math.sin(rot + ang))]
+        if ft["pattern"] == "diamond":
+            dirs.append((math.cos(rot - ang), math.sin(rot - ang)))
+        for v in verts:
+            if face in ("front", "rear"):
+                a_, b_ = v.co.x, v.co.z
+            elif face == "top":
+                a_, b_ = -v.co.y, v.co.x
+            else:
+                a_, b_ = -v.co.y, v.co.z
+            cut = 0.0
+            for cx, cy in dirs:
+                s_ = -a_ * cy + b_ * cx                    # distance across the line family
+                fr = (s_ / pitch) % 1.0
+                dist = min(fr, 1.0 - fr) * pitch           # to the nearest groove's centre line
+                cut = max(cut, depth - dist)               # a 90 degree V: one deeper for one nearer
+            if cut > 0:
+                nrm = v.normal if v.normal.length > 1e-9 else fd
+                v.co -= nrm.normalized() * cut
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+
+
+def crown(ob, ft):
+    """The faces of ob facing ft["face"] (within 50 degrees), inside its y/z region, curved across the part's width to
+    the radius r_cm: the faces refined to 0.05 cm across x, each point moved in along the face's direction by
+    r - sqrt(r^2 - (x - x_mid)^2), x_mid the faces' middle across."""
+    r = ft["r_cm"] / 100.0
+    fd = FACE_DIR[ft["face"]]
+    yr = [v / 100.0 for v in ft["y"]] if ft.get("y") else None
+    zr = [v / 100.0 for v in ft["z"]] if ft.get("z") else None
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.normal_update()
+    cosl = math.cos(math.radians(50.0))
+
+    def ok(co):
+        if yr and not (yr[0] <= -co.y <= yr[1]):
+            return False
+        return not (zr and not (zr[0] <= co.z <= zr[1]))
+    sel = [f for f in bm.faces if f.normal.dot(fd) >= cosl and ok(f.calc_center_median())]
+    for _ in range(8):
+        edges = {e for f in sel for e in f.edges if abs(e.verts[0].co.x - e.verts[1].co.x) > 0.0005}
+        if not edges:
+            break
+        bmesh.ops.subdivide_edges(bm, edges=list(edges), cuts=1, use_grid_fill=True)
+        bm.normal_update()
+        sel = [f for f in bm.faces if f.normal.dot(fd) >= cosl and ok(f.calc_center_median())]
+    verts = {v for f in sel for v in f.verts}
+    if verts:
+        xs = [v.co.x for v in verts]
+        xm = (min(xs) + max(xs)) / 2.0
+        for v in verts:
+            dx = min(abs(v.co.x - xm), r)
+            v.co -= fd * (r - math.sqrt(max(0.0, r * r - dx * dx)))
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+
+
 def union(ob, other):
     mod = ob.modifiers.new("add", 'BOOLEAN')
     mod.operation = 'UNION'
     mod.solver = 'EXACT'
+    mod.use_self = True              # operands may overlap themselves (joined sections, crossing grooves)
+    mod.use_hole_tolerant = True
     mod.object = other
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.modifier_apply(modifier=mod.name)
@@ -387,6 +522,8 @@ def intersect(ob, other):
     mod = ob.modifiers.new("keep", 'BOOLEAN')
     mod.operation = 'INTERSECT'
     mod.solver = 'EXACT'
+    mod.use_self = True              # operands may overlap themselves (joined sections, crossing grooves)
+    mod.use_hole_tolerant = True
     mod.object = other
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.modifier_apply(modifier=mod.name)
@@ -401,6 +538,8 @@ def boolean(ob, cutter):
     mod = ob.modifiers.new("cut", 'BOOLEAN')
     mod.operation = 'DIFFERENCE'
     mod.solver = 'EXACT'
+    mod.use_self = True              # operands may overlap themselves (joined sections, crossing grooves)
+    mod.use_hole_tolerant = True
     mod.object = cutter
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.modifier_apply(modifier=mod.name)
@@ -437,10 +576,11 @@ for pid, p in bp["parts"].items():
                 cut = prism("%s_hole%d" % (pid, k), [[y + r * math.cos(2 * math.pi * t / SEG), z + r * math.sin(2 * math.pi * t / SEG)] for t in range(SEG)], hx[0], hx[1])
             boolean(ob, cut)
     elif sh["kind"] == "relief":
-        ob = relief(pid, sh["side"], sh["x"], sh["edge_cm"], sh["axis"], sh.get("grid_cm", 0.08))
+        grid_ = max(sh.get("grid_cm", 0.08), 0.08) if PLAIN else sh.get("grid_cm", 0.08)
+        ob = relief(pid, sh["side"], sh["x"], sh["edge_cm"], sh["axis"], grid_)
         x0, x1 = sorted(sh["x"])
         if sh.get("both"):
-            ob2 = relief(pid + "_mirror", sh["side"], [-sh["x"][0], -sh["x"][1]], sh["edge_cm"], sh["axis"], sh.get("grid_cm", 0.08))
+            ob2 = relief(pid + "_mirror", sh["side"], [-sh["x"][0], -sh["x"][1]], sh["edge_cm"], sh["axis"], grid_)
             ob = join([ob, ob2], pid)
             x0, x1 = -x1, x1
         print("BLUEPRINT STEP %s (relief): %d vertices, %d faces" % (pid, len(ob.data.vertices), len(ob.data.polygons)))
@@ -467,6 +607,13 @@ for pid, p in bp["parts"].items():
         mod.harden_normals = True
         bpy.context.view_layer.objects.active = ob
         bpy.ops.object.modifier_apply(modifier=mod.name)
+    for ft in p.get("features", []):                # crowns first: a knurl then follows the curved face
+        if ft["kind"] == "crown":
+            crown(ob, ft)
+    for ft in p.get("features", []):
+        if ft["kind"] == "knurl" and not PLAIN:
+            knurl(ob, ft)
+            report["textures"].append({"part": pid, "pattern": ft["pattern"], "face": ft["face"], "pitch_cm": ft["pitch_cm"], "geometry": True})
     # smooth shading on the curved faces, flat faces kept crisp (faces meeting under 30 degrees shade as one)
     for poly in ob.data.polygons:
         poly.use_smooth = True
@@ -489,10 +636,10 @@ for pid, p in bp["parts"].items():
     report["parts"][pid] = {"role": p["role"], "vertices": len(ob.data.vertices), "faces": len(ob.data.polygons),
                             "bounds_cm": {"x": [round(lo.x * 100, 3), round(hi.x * 100, 3)], "y": [round(-hi.y * 100, 3), round(-lo.y * 100, 3)],
                                           "z": [round(lo.z * 100, 3), round(hi.z * 100, 3)]}}
-blend = os.path.join(OUT, "%s.blend" % bp["name"])
+blend = os.path.join(OUT, "%s%s.blend" % (bp["name"], "_plain" if PLAIN else ""))
 bpy.ops.wm.save_as_mainfile(filepath=blend)
 report["blend"] = blend
 report["rounds_cut_to_fit"] = ROUND_NOTES
-with open(os.path.join(OUT, "build.json"), "w", encoding="utf-8") as f:
+with open(os.path.join(OUT, "build_plain.json" if PLAIN else "build.json"), "w", encoding="utf-8") as f:
     json.dump(report, f, indent=1)
 print("BLUEPRINT BUILD " + json.dumps({"parts": len(report["parts"]), "blend": blend}))
