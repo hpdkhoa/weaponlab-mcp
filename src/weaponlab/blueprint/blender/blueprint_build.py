@@ -594,6 +594,10 @@ for pid, p in bp["parts"].items():
             boolean(ob, cut)
     else:
         ob = lathe(pid, sh["profile"], sh["axis"][0], sh["axis"][1], sh.get("bore_r"))
+        for k, h in enumerate(p.get("holes", [])):          # a turned part takes bores only (a chamber, a counterbore)
+            if h["kind"] != "bore":
+                raise SystemExit("BLUEPRINT BUILD FAILED: %s is turned (lathe): its holes must be bores, not %s" % (pid, h["kind"]))
+            boolean(ob, lathe("%s_hole%d" % (pid, k), [[h["y"][0], h["r"]], [h["y"][1], h["r"]]], h["at"][0], h["at"][1]))
     for k, ft in enumerate(p.get("features", [])):
         feature(ob, pid, k, ft, report["textures"])
     if p.get("bevel_cm"):

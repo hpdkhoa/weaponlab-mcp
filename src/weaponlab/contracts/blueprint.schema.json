@@ -68,6 +68,23 @@
     "checks": {
       "type": "object",
       "description": "the check step's last results (written by check)"
+    },
+    "magazine_line": {
+      "type": "object",
+      "required": [
+        "axis",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "$ref": "#/$defs/vec3"
+        },
+        "source": {
+          "$ref": "#/$defs/ref"
+        }
+      },
+      "description": "the line a magazine slides along, out of its well (gun space, a unit vector pointing out): the well's own line where the drawing gives it; without it the magazine's longest straight side is used"
     }
   },
   "additionalProperties": false,

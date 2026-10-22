@@ -12,12 +12,16 @@ from . import figures as F
 from . import store
 
 HERE = Path(__file__).resolve().parent / "blender"
-CLIPS = [  # action suffix, label, slow, view, repeat, zoom (the camera's distance)
-    ("fire", "Firing: the slide cycles (6x slow)", 6, "right_close", 2, 1.0),
-    ("reload_empty", "Empty reload: the empty magazine drops free, a new one goes in, the slide runs forward (2x slow)", 2, "right", 1, 1.7),
-    ("check_chamber", "Chamber check: the slide eased back to see the round", 1, "right", 1, 1.0),
-    ("check_mag", "Magazine check: out, looked at, back in", 1, "left", 1, 1.5),
+CLIPS = [  # action suffix, label, slow, view, repeat, zoom (the camera's distance), chamber loaded
+    ("fire", "Firing: the slide cycles (6x slow)", 6, "right_close", 2, 1.0, "when_home"),
+    ("reload_empty", "Empty reload: the empty magazine drops free, a new one goes in, the slide runs forward (2x slow)", 2, "right", 1, 1.7, "after_home"),
+    ("check_chamber", "Chamber check: the slide eased back, the round's case shows at the port (2x slow)", 2, "port", 1, 0.45, "always"),
+    ("check_mag", "Magazine check: released, drawn out, looked at, seated again", 1, "left", 1, 1.5, "always"),
 ]
+# loaded: when the chamber holds a round. always; when_home: only while the slide is home (firing: the case leaves
+# with the slide, the next round goes in as it closes); after_home: empty until the slide closes at the clip's end
+# (an empty reload). The arms are not drawn, so a part a hand carries (the magazine) is played along the hand clip's
+# way (timeline.free_path).
 
 
 def _font(size):
@@ -83,9 +87,26 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
     if frames_dir.exists():
         shutil.rmtree(frames_dir)
     frames_dir.mkdir()
-    clips = [{"action": "A_%s_%s" % (gun, a), "label": lab, "slow": s, "view": v, "repeat": r, "zoom": z} for a, lab, s, v, r, z in CLIPS]
+    from ..gunkit import actions as A, timeline as T
+    facts = json.loads((Path(R.folder(gun)) / "gunfacts.json").read_text(encoding="utf-8"))
+    action = A.load(facts["action"])
+    clips = []
+    for a, lab, s, v, r, z, loaded in CLIPS:
+        free = {}
+        for role, track in T.free_path(action, facts, a).items():
+            bone = (facts.get("magazine") or {}).get("bone") if role in ("magazine", "cell") else facts["parts"].get(role, {}).get("bone")
+            if bone:
+                free[bone] = track
+        clips.append({"action": "A_%s_%s" % (gun, a), "label": lab, "slow": s, "view": v, "repeat": r, "zoom": z, "loaded": loaded,
+                      "free": free, "free_fps": T.FPS})
+    # the round in the chamber, where the gun has one (<gun>/round.json: a turned profile in gun cm), and the marks the
+    # port view looks at
+    rnd = store.root() / gun / "round.json"
     jf = out / "showcase.job.json"
-    jf.write_text(json.dumps({"out": str(frames_dir), "size": list(size), "fps": fps, "turn_frames": turn_frames, "clips": clips}), encoding="utf-8")
+    jf.write_text(json.dumps({"out": str(frames_dir), "size": list(size), "fps": fps, "turn_frames": turn_frames, "clips": clips,
+                              "round": json.loads(rnd.read_text(encoding="utf-8")) if rnd.exists() else None,
+                              "slide_bone": facts["parts"].get("slide", {}).get("bone"),
+                              "port": facts["marks"].get("port")}), encoding="utf-8")
     p = subprocess.run([str(project().blender()), "-b", str(clips_blend), "-P", str(HERE / "blueprint_showcase.py"), "--", str(jf)],
                        capture_output=True, text=True, timeout=timeout)
     (out / "showcase.log").write_text((p.stdout or "") + "\n" + (p.stderr or ""), encoding="utf-8", errors="replace")

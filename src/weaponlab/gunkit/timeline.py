@@ -207,6 +207,83 @@ def gun_clip(action, facts, clip_id, fps=FPS):
             "frames": [{"t": t, "parts": part_values(action, clip, t)} for t in frames_of(clip["seconds"], fps)]}
 
 
+def free_path(action, facts, clip_id, fps=FPS):
+    """A free part's place in a gun-only view (no arms drawn), frame by frame: {part: [[x, y, z] cm from its seat, one
+    a frame]}. Where the gun clip moves it (a drop), that; while the hand clip's hand carries it, the hand's own way
+    between its targets, the part held at the grasp mark; once the hand has seated it, at its seat. A hand's target off
+    the gun (a pouch, in view space) stands for "away": 50 cm out along the well's line, out of sight, so a fresh
+    magazine comes up that line into the well (a hand lines it up before it goes in)."""
+    if clip_id not in action.get("hand_clips", {}) or clip_id not in action.get("gun_clips", {}):
+        return {}
+    g = gun_clip(action, facts, clip_id, fps)
+    h = hand_clip(action, facts, clip_id, fps)
+    out = {}
+    for role, p in action["parts"].items():
+        if p["kind"] != "free":
+            continue
+        grasp = facts["marks"].get("mag_grab") or _add(facts["magazine"]["lips"], [0.0, 0.0, -10.0])
+        away = _add(well(facts, "clear"), well(facts, 50.0))
+        track, last, carried = [], [0.0, 0.0, 0.0], False
+        for fg, fh in zip(g["frames"], h["frames"]):
+            v = fh["parts"].get(role)
+            if isinstance(v, dict) and "follow" in v:
+                carried = True
+                hd = fh["hands"][v["follow"]]
+
+                def at(tg, last=last):
+                    if tg["space"] == "view":
+                        return away
+                    if tg["space"] == "gun" and tg["point"] is not None:
+                        return [tg["point"][i] - grasp[i] for i in range(3)]
+                    return last
+                a, b = at(hd["a"]), at(hd["b"])
+                last = [a[i] + (b[i] - a[i]) * hd["w"] for i in range(3)]
+            elif carried:
+                last = v if isinstance(v, list) else [0.0, 0.0, 0.0]
+            else:
+                gv = fg["parts"].get(role)
+                last = gv if isinstance(gv, list) else [0.0, 0.0, 0.0]
+            track.append(list(last))
+        out[role] = [[round(x, 4) for x in q] for q in well_bound(_smooth(track, fps), facts)]
+    return out
+
+
+def _smooth(track, fps, sigma_s=0.05):
+    """The way smoothed in time (a Gaussian of sigma_s seconds, ends held): the joins between a hand's moves (each its
+    own ease) run on without a corner. A held place stays held; a monotone move stays monotone."""
+    sig = sigma_s * fps
+    rad = int(math.ceil(3 * sig))
+    w = [math.exp(-0.5 * (k / sig) ** 2) for k in range(-rad, rad + 1)]
+    n, out = len(track), []
+    for i in range(n):
+        acc, tot = [0.0, 0.0, 0.0], 0.0
+        for k, wk in zip(range(-rad, rad + 1), w):
+            q = track[min(max(i + k, 0), n - 1)]
+            acc = [acc[j] + wk * q[j] for j in range(3)]
+            tot += wk
+        out.append([a / tot for a in acc])
+    return out
+
+
+def well_bound(track, facts, ramp_cm=2.0):
+    """A magazine is boxed in by its well: while any of it is still in the grip it moves only along the well's line.
+    Each place split into d, the way out along the line, and the rest (sideways); the sideways part kept only as the
+    magazine's top clears the grip: none until d reaches the magazine's length, all of it ramp_cm further out."""
+    m = facts.get("magazine") or {}
+    ax = m.get("axis") or [0.0, 0.0, -1.0]
+    n = math.sqrt(sum(a * a for a in ax))
+    ax = [a / n for a in ax]
+    length = float(m.get("length_cm", 10.0))
+    out = []
+    for q in track:
+        d = sum(q[i] * ax[i] for i in range(3))
+        side = [q[i] - d * ax[i] for i in range(3)]
+        k = min(max((d - length) / ramp_cm, 0.0), 1.0)
+        k = k * k * (3.0 - 2.0 * k)
+        out.append([max(d, 0.0) * ax[i] + side[i] * k for i in range(3)])
+    return out
+
+
 def hand_clip(action, facts, clip_id, fps=FPS):
     """The hand clip's frames: the parts (the gun clip of the same name moves them, or they rest), the gun's pose and
     each hand's way from one target to the next."""
