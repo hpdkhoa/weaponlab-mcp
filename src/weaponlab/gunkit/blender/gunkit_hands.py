@@ -2281,7 +2281,8 @@ def pulled(p, cid):
         return p
     q = dict(p)
     mv = list(q.get("move", [0.0, 0.0, 0.0]))
-    q["move"] = [mv[0], mv[1] - float(PULL["back_cm"]), mv[2] - float(PULL["down_cm"])]
+    # Gun Kit's view: +x the player's left; a pull to the right moves x down
+    q["move"] = [mv[0] - float(PULL.get("right_cm", 0.0)), mv[1] - float(PULL["back_cm"]), mv[2] - float(PULL["down_cm"])]
     q["pitch"] = float(q.get("pitch", 0.0)) + float(PULL["pitch_deg"])
     return q
 
@@ -2630,6 +2631,10 @@ for cid, clip in job["clips"].items():
         # carried parts ride their hand: taken where they are when the carry starts
         frame_parts = {}
         for role, v in fr["parts"].items():
+            if isinstance(v, dict) and v.get("follow") and role not in bone_of:
+                # an optional part this gun does not have (a loose shell): nothing to carry
+                frame_parts[role] = v
+                continue
             if isinstance(v, dict) and v.get("follow"):
                 side = v["follow"]
                 bone = bone_of[role]
@@ -2668,9 +2673,14 @@ for cid, clip in job["clips"].items():
                         clip_contacts.append((fr["t"], side, cn))
         if POSE_ENGINE == "fakepose":
             # the market's rule (the owner's choice (b)): the clipping the first-person camera sees, every Nth frame
-            if len(resolved) % int(job.get("eye_every", 6)) == 1:
+            if len(resolved) % int(job.get("eye_every", 2)) == 1:
                 ec_ = FP.eye_clip(res=tuple(job.get("eye_res_clips", (96, 54))))
-                eye_frames.append({"t": round(fr["t"], 3), "clip_pixels": ec_["clip_pixels"], "deepest_seen_cm": ec_["deepest_seen_cm"]})
+                row_ = {"t": round(fr["t"], 3), "seen_before_fix": ec_["clip_pixels"], "sides": ec_.get("sides")}
+                if ec_["clip_pixels"]:
+                    # the market's fix: the hand the eye sees clipping set back off the gun, then checked again
+                    row_["moved_cm"], ec_ = FP.unclip_seen(ec_, res=tuple(job.get("eye_res_clips", (96, 54))))
+                row_.update({"clip_pixels": ec_["clip_pixels"], "deepest_seen_cm": ec_["deepest_seen_cm"]})
+                eye_frames.append(row_)
         else:
             for sd in ("r", "l"):
                 w_ = L.wall_faults(sd, other=True)
@@ -2681,6 +2691,7 @@ for cid, clip in job["clips"].items():
     if POSE_ENGINE == "fakepose":
         report.setdefault("fakepose_clips_eye", {})[cid] = {
             "seconds": round(_time.time() - _tc0, 1), "frames": len(clip["frames"]),
+            "frames_fixed": sum(1 for e_ in eye_frames if e_.get("moved_cm")),
             "frames_checked": len(eye_frames), "frames_with_clip": sum(1 for e_ in eye_frames if e_["clip_pixels"]),
             "most_pixels": max((e_["clip_pixels"] for e_ in eye_frames), default=0),
             "deepest_seen_cm": max((e_["deepest_seen_cm"] for e_ in eye_frames), default=0.0),
