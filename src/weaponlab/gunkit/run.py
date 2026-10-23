@@ -190,6 +190,16 @@ def _body_ranges(ch):
     return ranges((ch or {}).get("sex", "male"))
 
 
+def _fakepose_dir():
+    """fakepose-mcp's Blender folder: the installed package's, else FAKEPOSE_DIR, else None (the job then says so)."""
+    import os
+    try:
+        import fakepose_mcp
+        return str(Path(fakepose_mcp.__file__).resolve().parent / "blender")
+    except ImportError:
+        return os.environ.get("FAKEPOSE_DIR")
+
+
 def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, character=None, diagnose=(), options=None):
     """The hand clips on the shared arms (Pose Lab's Lab in Blender): each written as FBX and bone data, with Pose
     Lab's clipping, anatomy and grip checks, the expected sights (a port in view) and the carried parts' tracks.
@@ -213,7 +223,10 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
            # no bone and no part of the skin of a size no adult has (Pose Lab's body_size, ANSUR II ranges)
            "body_ranges": _body_ranges(ch),
            # the grip style's reference hold (a pack's hand, in the grip's frame), kept beside the guns' folders
-           "reference": reference_for(facts_path, st)}
+           "reference": reference_for(facts_path, st),
+           # the hold's engine (the owner, 2026-10-23: "my flow will have the toggle to switch between poselab and
+           # fakepose, default until poselab is ready will be fakepose")
+           "pose_engine": "fakepose", "fakepose": _fakepose_dir()}
     job.update(options or {})          # the hand step's own switches (solver_*, regrip, arc_cm ...), for trials
     # the owner's rule: a run takes 10 minutes at most. The hard stop is at 10 minutes; the run plans its work to 9
     # (time_budget_s), so it ends on its own before the stop

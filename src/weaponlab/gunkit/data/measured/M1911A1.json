@@ -9,53 +9,121 @@
     "kind": "point",
     "center": true,
     "at": [
-     0.007815670222043991,
-     0.08151045441627502,
-     -0.023390531539916992
+     0.00034849345684051514,
+     0.0651618242263794,
+     -0.044567108154296875
     ],
     "normal": [
-     0.9659445881843567,
-     0.11085359007120132,
-     0.23380039632320404
+     0.01962227188050747,
+     0.9995003342628479,
+     -0.024780582636594772
     ],
     "off_cm": 0.099,
+    "define": {
+     "on_surface_cm": 0.02,
+     "checks": [
+      {
+       "what": "in the crook under the grip safety (its middle, the slide's start)",
+       "of": "at",
+       "ref": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "dir": [
+        1.0,
+        -0.0,
+        0.0
+       ],
+       "min": -0.1,
+       "max": 0.1
+      }
+     ]
+    },
     "source": "FM 3-23.35: the web high on the backstrap, under the grip safety; the hand point is the web's skin fold measured on the skin (no guessed depth), the glove's thickness on it"
    },
    {
     "hand": "index_pip_pad",
     "kind": "line",
     "at": [
-     0.00520562008023262,
-     -0.01510794647037983,
-     -0.03122745454311371
+     -0.009677007794380188,
+     -0.013055412098765373,
+     -0.04105478525161743
     ],
     "normal": [
-     0.5645117163658142,
-     0.29470711946487427,
-     -0.7710216045379639
+     -1.0,
+     9.27257648442037e-09,
+     0.0
     ],
     "off_cm": 0.099,
+    "ends": [
+     [
+      -0.009677007794380188,
+      -0.013055412098765373,
+      -0.04105478525161743
+     ],
+     [
+      -0.009677007794380188,
+      -0.026207024231553078,
+      -0.04105478525161743
+     ]
+    ],
+    "define": {
+     "checks": [
+      {
+       "what": "the line's middle at the trigger ring's middle height",
+       "of": "middle",
+       "ref": [
+        4.600325772375051e-05,
+        -0.011616996157937527,
+        -0.0410547836488128
+       ],
+       "dir": [
+        0.0,
+        -0.0,
+        1.0
+       ],
+       "min": -0.05,
+       "max": 0.05
+      },
+      {
+       "what": "both ends on the firing side's face (the gun's right)",
+       "of": "ends",
+       "ref": [
+        4.600325772375051e-05,
+        -0.011616996157937527,
+        -0.0410547836488128
+       ],
+       "dir": [
+        -1.0,
+        0.0,
+        -0.0
+       ],
+       "min": 0.2
+      }
+     ]
+    },
     "dir": [
-     -0.5887813568115234,
-     -0.5235761404037476,
-     -0.615795910358429
+     0.0,
+     -1.0,
+     0.0
     ],
     "top_edge": {
      "at": [
-      0.009343903511762619,
-      -0.02066248655319214,
-      -0.03032398223876953
+      -0.009677011519670486,
+      -0.013655473478138447,
+      -0.02896410971879959
      ],
      "dir": [
-      -0.5887813568115234,
-      -0.5235761404037476,
-      -0.615795910358429
+      5.665146431965695e-07,
+      -0.9087470769882202,
+      -0.41734737157821655
      ]
     },
     "guard_bottom": [
-     9.071081876754761e-05,
-     0.021966278553009033,
-     -0.0681452751159668
+     0.00012739747762680054,
+     0.026675760746002197,
+     -0.08338439464569092
     ],
     "source": "FM 3-23.35: the trigger finger along the frame, off the trigger (ready)"
    },
@@ -72,6 +140,26 @@
      0.07629765570163727,
      0.0261069405823946
     ],
+    "define": {
+     "on_surface_cm": 0.02,
+     "checks": [
+      {
+       "what": "on the firing side (the gun's right panel)",
+       "of": "at",
+       "ref": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "dir": [
+        -1.0,
+        0.0,
+        -0.0
+       ],
+       "min": 0.2
+      }
+     ]
+    },
     "source": "the palm wraps the grip, facing into the firing side's panel"
    },
    {
@@ -88,6 +176,26 @@
      -1.189325144580278e-14
     ],
     "band_cm": 1.5,
+    "define": {
+     "on_surface_cm": 0.02,
+     "checks": [
+      {
+       "what": "on the other side (the gun's left)",
+       "of": "at",
+       "ref": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "dir": [
+        1.0,
+        -0.0,
+        0.0
+       ],
+       "min": 0.2
+      }
+     ]
+    },
     "dir": [
      -0.036604736000299454,
      -0.7084973454475403,
@@ -102,7 +210,32 @@
      "ring",
      "pinky"
     ],
+    "define": {
+     "note": "the gun's own surface: nothing to place"
+    },
     "source": "FM 3-23.35: the other fingers wrap the front strap (closed onto the gun's surface)"
+   },
+   {
+    "line": [
+     "index_knuckle",
+     "pinky_knuckle"
+    ],
+    "kind": "direction",
+    "role": "backstrap",
+    "dir": [
+     -0.005648450925946236,
+     0.3884333670139313,
+     -0.9214594960212708
+    ],
+    "left": [
+     1.0,
+     -0.0,
+     0.0
+    ],
+    "define": {
+     "note": "a direction, not a place: the backstrap line (the grip run read along the well)"
+    },
+    "source": "the owner's chart (Sharp Shooting, backstrap placement) and photo 3: the knuckles stacked down the front strap"
    },
    {
     "line": [
@@ -111,10 +244,13 @@
     ],
     "kind": "direction",
     "check": true,
+    "define": {
+     "note": "a check, not a target"
+    },
     "dir": [
-     -0.033026404678821564,
-     0.40581122040748596,
-     -0.9133599996566772
+     -0.005648450925946236,
+     0.3884333670139313,
+     -0.9214594960212708
     ],
     "source": "the backstrap down the palm (the wrist stands in for the heel: a check, not a target)"
    }

@@ -50,6 +50,14 @@ if os.path.exists(_be):
 rigs_file = os.path.join(OUT, "gunkit_rigs.json")
 json.dump(rigs, open(rigs_file, "w", encoding="utf-8"), indent=1)
 L = PL.Lab(rigs_file, OUT)
+# the skin as real tissue (the owner's Option A, 2026-10-22): a finger pad's give follows the grip force; at rest the
+# hand grips with 5 N, firing up to 40 N, 20 N if 40 clips ("when not firing use 5N, fight the recoil can go to 40N,
+# but when test if clipping too much then change to 20N")
+import contactlab as CL_                                        # noqa: E402
+REST_N = float(job.get("grip_rest_N", 5.0))
+FIRE_N = float(job.get("grip_fire_N", 40.0))
+FIRE_FALLBACK_N = float(job.get("grip_fire_fallback_N", 20.0))
+CL_.set_grip(REST_N)
 # The run's time budget (10 minutes unless the job says otherwise). Each phase gets a share and stops on time,
 # keeping its best so far: the stance search a quarter, the right hand to 55%, the left to 80%, the clips, the
 # checks and the render the rest. The timing file is written at every phase, so a stopped run still shows its
@@ -939,25 +947,48 @@ def touch_pairs(side):
     out = []
     if side == "r":
         at, n_ = onto(F @ Vector(hm["web_point"]))
+        SIDE_G = list(g((100.0, 0.0, 0.0)))                 # the gun's left, in its frame (unit)
+        UP_G = list(g((0.0, 0.0, 100.0)))
         out.append({"hand": "web_fold", "kind": "point", "center": True, "at": at, "normal": n_, "off_cm": GLOVE,
+                    "define": {"on_surface_cm": 0.02,
+                               "checks": [{"what": "in the crook under the grip safety (its middle, the slide's start)", "of": "at",
+                                           "ref": [0.0, 0.0, 0.0], "dir": SIDE_G, "min": -0.1, "max": 0.1}]},
                     "source": "FM 3-23.35: the web high on the backstrap, under the grip safety; the hand point is the "
                               "web's skin fold measured on the skin (no guessed depth), the glove's thickness on it"})
         if hm.get("guard_line"):
             gl = hm["guard_line"]
-            pd = (F.to_quaternion() @ Vector(FACE["r"])).normalized()
+            # the side rays come straight in from the firing side (the gun's right for the right hand), square to
+            # the gun's middle plane: line B lies on the frame's own side face (the owner, 2026-10-22: "B line not in
+            # the middle of trigger ring"; the palm's face direction, angled 37 degrees, slipped into the opening)
+            pd = (F.to_quaternion() @ g((-100.0, 0.0, 0.0))).normalized()
+            pd_l = Vector(g((-100.0, 0.0, 0.0))).normalized()     # the firing side, in the gun's frame
+            bvh_root = L._part_bvh_local("Root", "Root")           # the frame and body only: no trigger, hammer, ...
+
+            def frame_hit(q_g):
+                """The frame's own side face on the firing side of q_g (gun frame): a ray from 6 cm out straight
+                back toward q_g against the body's polygons only (the trigger sits in the opening: its hit is not
+                the frame's face), the hit on the firing side of q_g; its normal turned outward (toward the firing
+                side). None, None when it misses."""
+                h_ = bvh_root.ray_cast(q_g + pd_l * 0.06, -pd_l, 0.12) if bvh_root is not None else (None,)
+                if h_[0] is None or (h_[0] - q_g).dot(pd_l) <= 0.0:
+                    return None, None
+                n_h = h_[1] if h_[1].dot(pd_l) >= 0.0 else -h_[1]
+                return list(h_[0]), list(n_h.normalized())
+
             def side_hit_edge(p_g):
                 """the frame's side by the guard opening's top edge: on the edge a ray can pass through the opening,
-                so the point steps away from the opening's centre (0.05 cm a step, at most 0.5 cm) until it hits"""
-                h_ = side_hit(F @ Vector(p_g), pd)
+                so the point steps away from the opening's centre (0.05 cm a step, at most 0.5 cm) until it hits the
+                frame's own face"""
+                h_ = frame_hit(Vector(p_g))
                 if h_[0] is not None or not hm.get("guard_centre"):
                     return h_, 0.0
                 away = (Vector(p_g) - Vector(hm["guard_centre"]))
                 away = away.normalized() if away.length > 1e-9 else Vector((0.0, 0.0, 1.0))
                 for k_ in range(1, 11):
-                    h_ = side_hit(F @ (Vector(p_g) + away * 0.0005 * k_), pd)
+                    h_ = frame_hit(Vector(p_g) + away * 0.0005 * k_)
                     if h_[0] is not None:
                         return h_, 0.05 * k_
-                return h_, None
+                return (None, None), None
             (e0, n0), st0 = side_hit_edge(gl[0])
             (e1, _n1), st1 = side_hit_edge(gl[1])
             report.setdefault("line_b", {})["edge_step_cm"] = [st0, st1]
@@ -978,41 +1009,85 @@ def touch_pairs(side):
                 # middle is its open hole (side rays there pass through), so the frame's side is hit at the top edge
                 # and both ends move straight down (along the grip's side plane) by the edge middle's height above
                 # the ring's centre.
-                gm_ = (Vector(gl[0]) + Vector(gl[1])) * 0.5
-                dv_ = Vector(hm["guard_centre"]) - gm_
-                ld_ = (Vector(e1) - Vector(e0)).normalized()
+                # down the frame's face (the gun's up direction with the face's normal taken out) until the line's
+                # middle is at the ring's centre height; the line keeps the top edge's slant (agreed 2026-10-21)
                 nn_ = Vector(n0).normalized()
-                dv_ = dv_ - ld_ * dv_.dot(ld_) - nn_ * dv_.dot(nn_)    # down within the side plane only
+                upg_ = Vector(g((0.0, 0.0, 100.0))).normalized()
+                w_ = upg_ - nn_ * upg_.dot(nn_)
+                w_ = w_.normalized()
+                mid0_ = (Vector(e0) + Vector(e1)) * 0.5
+                h_ = (mid0_ - Vector(hm["guard_centre"])).dot(upg_)
+                dv_ = -w_ * (h_ / max(1e-9, w_.dot(upg_)))
                 e0, e1 = list(Vector(e0) + dv_), list(Vector(e1) + dv_)
-                report["line_b"] = {"down_cm": round(dv_.length * 100.0, 3), "ends_gun_frame": [e0, e1],
-                                    "how": "top-edge side hits moved down to the ring's centre height, in the side plane"}
+                # line B checked against its own definition before any hand is placed on it: its middle at the ring's
+                # middle height (within 0.05 cm; the line keeps the top edge's slant, as agreed 2026-10-21) and both
+                # ends on the firing side of the gun's middle plane (the frame's face)
+                gc_ = Vector(hm["guard_centre"])
+                up_ = Vector(g((0.0, 0.0, 100.0)))
+                sd_g = Vector(g((-100.0, 0.0, 0.0)))
+                if job.get("line_b_dir", "bore") == "bore":      # the owner, 2026-10-22: "parallel to the bore"
+                    # along the frame, parallel to the bore, through the same middle on the face (the owner's choice
+                    # between the ring's sloped top edge and the frame's line)
+                    mid0b_ = (Vector(e0) + Vector(e1)) * 0.5
+                    hl_ = (Vector(e1) - Vector(e0)).length / 2.0
+                    bd_ = Vector(g((0.0, 100.0, 0.0))).normalized()
+                    e0, e1 = list(mid0b_ - bd_ * hl_), list(mid0b_ + bd_ * hl_)
+                mid_ = (Vector(e0) + Vector(e1)) * 0.5
+                chk_ = {"middle_height_off_cm": round((mid_ - gc_).dot(up_) * 100.0, 3),
+                        "ends_height_off_cm": [round((Vector(e_) - gc_).dot(up_) * 100.0, 3) for e_ in (e0, e1)],
+                        "side_cm": [round((Vector(e_) - gc_).dot(sd_g) * 100.0, 3) for e_ in (e0, e1)]}
+                chk_["ok"] = abs(chk_["middle_height_off_cm"]) <= 0.05 and all(v_ > 0.2 for v_ in chk_["side_cm"])
+                report["line_b"] = {"down_cm": round(dv_.length * 100.0, 3), "ends_gun_frame": [e0, e1], "check": chk_,
+                                    "edge_step_cm": [st0, st1],
+                                    "how": "straight side rays on the frame's firing-side face at the ring's top edge, moved down "
+                                           "that face to the ring's centre height"}
             if e0 is None or e1 is None:
                 raise ValueError("touch_pairs: the frame's firing side by the guard was not found by its rays")
-            out.append({"hand": "index_pip_pad", "kind": "line", "at": e0, "normal": n0, "off_cm": GLOVE,
+            out.append({"hand": "index_pip_pad", "kind": "line", "at": e0, "normal": n0, "off_cm": GLOVE, "ends": [e0, e1],
+                        "define": {"checks": [
+                            {"what": "the line's middle at the trigger ring's middle height", "of": "middle",
+                             "ref": hm["guard_centre"], "dir": UP_G, "min": -0.05, "max": 0.05},
+                            {"what": "both ends on the firing side's face (the gun's right)", "of": "ends",
+                             "ref": hm["guard_centre"], "dir": [-x for x in SIDE_G], "min": 0.2}]},
                         "dir": list((Vector(e1) - Vector(e0)).normalized()), "top_edge": top_edge_ if job.get("pinky_height", True) else None,
                         "guard_bottom": guard_bottom_ if job.get("pinky_height", True) else None,
                         "source": "FM 3-23.35: the trigger finger along the frame, off the trigger (ready)"})
         at, n_ = onto(mark_world("grip"))
         out.append({"hand": "palm", "kind": "facing", "at": at, "normal": n_,
+                    "define": {"on_surface_cm": 0.02, "checks": [{"what": "on the firing side (the gun's right panel)", "of": "at",
+                                                                   "ref": [0.0, 0.0, 0.0], "dir": [-x for x in SIDE_G], "min": 0.2}]},
                     "source": "the palm wraps the grip, facing into the firing side's panel"})
         if "release" in facts["marks"] and "stop" in facts["marks"]:
             r0, rn = onto(mark_world("release"))
             r1, _sn = onto(mark_world("stop"))
             out.append({"hand": "thumb_tip", "kind": "band", "at": r0, "normal": rn, "band_cm": 1.5,
+                        "define": {"on_surface_cm": 0.02, "checks": [{"what": "on the other side (the gun's left)", "of": "at",
+                                                                       "ref": [0.0, 0.0, 0.0], "dir": SIDE_G, "min": 0.2}]},
                         "dir": list((Vector(r1) - Vector(r0)).normalized()),
                         "source": "FM 3-23.35: the firing thumb high on the frame's other side; the band runs from the "
                                   "magazine release to the slide stop, 1.5 cm either side (the owner: the thumb on the "
                                   "side opposite the index completes the grab)"})
-        out.append({"kind": "surface", "fingers": ["middle", "ring", "pinky"],
+        out.append({"kind": "surface", "fingers": ["middle", "ring", "pinky"], "define": {"note": "the gun's own surface: nothing to place"},
                     "source": "FM 3-23.35: the other fingers wrap the front strap (closed onto the gun's surface)"})
-        out.append({"line": ["web_fold", "wrist"], "kind": "direction", "check": True,
+        # the owner, 2026-10-23: "1. ... grip the back strap- straight back, deep into the webbing between the thumb &
+        # index finger. no gap." and the answer "Knuckle line along backstrap": the knuckle line (index knuckle to
+        # little knuckle) parallel to the backstrap line, down the grip. The gun's left rides along for step 2's forearm ("keep the forearm align with the gun")
+        out.append({"line": ["index_knuckle", "pinky_knuckle"], "kind": "direction", "role": "backstrap",
+                    "dir": list((Vector(ga["outer"]) - Vector(ga["inner"])).normalized()),
+                    "left": SIDE_G,                          # the bore: line B's direction (parallel to it, tip forward)
+                    "define": {"note": "a direction, not a place: the backstrap line (the grip run read along the well)"},
+                    "source": "the owner's chart (Sharp Shooting, backstrap placement) and photo 3: the knuckles stacked "
+                              "down the front strap"})
+        out.append({"line": ["web_fold", "wrist"], "kind": "direction", "check": True, "define": {"note": "a check, not a target"},
                     "dir": list((Vector(ga["outer"]) - Vector(ga["inner"])).normalized()),
                     "source": "the backstrap down the palm (the wrist stands in for the heel: a check, not a target)"})
     elif "support" in facts["marks"]:
         at, n_ = onto(mark_world("support"))
         out.append({"hand": "palm_skin", "kind": "point", "center": True, "at": at, "normal": n_, "off_cm": GLOVE,
+                    "define": {"on_surface_cm": 0.02, "checks": [{"what": "on the open side (the gun's left)", "of": "at",
+                                                                   "ref": [0.0, 0.0, 0.0], "dir": list(g((100.0, 0.0, 0.0))), "min": 0.2}]},
                     "source": "FM 3-23.35: the support palm fills the open side of the grip"})
-        out.append({"line": ["pinky_knuckle", "index_knuckle"], "kind": "direction",
+        out.append({"line": ["pinky_knuckle", "index_knuckle"], "kind": "direction", "define": {"note": "a direction, not a place"},
                     "dir": list((Vector(ga["inner"]) - Vector(ga["outer"])).normalized()),
                     "source": "FM 3-23.35: the support fingers over the firing fingers"})
     return out
@@ -1067,7 +1142,10 @@ def six_views(side, step=None):
     sc_.render.stamp_font_size = 16                          # the dev-view label readable on any background
     q = L._gun().to_quaternion()
     up, left, fwd = q @ Vector((0, 0, 1)), q @ Vector((1, 0, 0)), q @ Vector((0, -1, 0))
-    palm_c = L._anchor(side, "palm_skin")
+    if job.get("views_index_only"):
+        palm_c = Vector(list(L.index_pad_line(side)["centre"]))     # the pictures centred on the index finger
+    else:
+        palm_c = L._anchor(side, "palm_skin")
     gun_meshes = [o_ for o_ in sc_.objects if o_.type == "MESH" and o_ not in L.meshes]
     gb_ = [L.rifle_mesh.matrix_world @ Vector(c_) for c_ in L.rifle_mesh.bound_box]
     gun_c = sum(gb_, Vector()) / 8.0
@@ -1078,6 +1156,12 @@ def six_views(side, step=None):
     vg_ = skin_.vertex_groups.new(name="_six_hide")
     import numpy as _np6
     vg_.add([int(i) for i in _np6.nonzero(sidev_ == other_code)[0]], 1.0, "REPLACE")
+    if job.get("views_index_only"):
+        # the owner, 2026-10-22: "render the index finger only so I can check it": all of this hand's skin but the
+        # index finger hidden too
+        P0_, N0_ = L._skin_arrays()[:2]
+        i0_, l0_ = L._hand_label_arrays(side, P0_, N0_)
+        vg_.add([int(i) for i, l in zip(i0_, l0_) if not l.startswith("index")], 1.0, "REPLACE")
     # the clip map: each skin point of this hand coloured by its gap to the gun (exact near each colour's edge):
     # red past its give (a clip), orange pressing within its give, yellow touching (within 0.1 cm), else the glove
     import numpy as _np7
@@ -1088,8 +1172,7 @@ def six_views(side, step=None):
     D_ = Dg_.copy()
     if len(near_):
         D_[near_] = L.exact_signed(P_[idx_][near_])
-    from contactlab import SKIN_GIVE as _SG, _lab_key as _lk
-    give_ = _np7.array([_SG.get(_lk(l_), _SG["default"]) for l_ in lab_])
+    give_ = _np7.array([CL_.skin_give(l_) for l_ in lab_])
     clip_ = D_ < -give_
     press_ = (D_ < 0.0) & ~clip_
     touch_ = (D_ >= 0.0) & (D_ <= 0.1)
@@ -1106,7 +1189,10 @@ def six_views(side, step=None):
         e_ = by_part.setdefault(key_, [0, 0.0])
         e_[0] += 1
         e_[1] = max(e_[1], round(float(-D_[k_] - give_[k_]), 3))
-    clip_summary = {"clipping_points": int(clip_.sum()), "pressing_within_give": int(press_.sum()),
+    FLv_ = L._limits()[1]
+    fr_ = L._finger_report(side, FLv_)[0]
+    index_joints_ = {j_: {"curl_deg": fr_["index_%s" % j_][0], "out_of_plane_deg": fr_["index_%s" % j_][1]} for j_ in ("01", "02", "03")}
+    clip_summary = {"index_joints": index_joints_, "clipping_points": int(clip_.sum()), "pressing_within_give": int(press_.sum()),
                     "touching": int(touch_.sum()), "clipping_by_part": {k_: {"points": v_[0], "deepest_past_give_cm": v_[1]}
                                                                          for k_, v_ in sorted(by_part.items())}}
     sh_ = sc_.display.shading
@@ -1137,8 +1223,98 @@ def six_views(side, step=None):
                 a_.data.foreach_set("color", list(col_) * len(o_.data.vertices))
                 o_.data.color_attributes.active_color = a_
                 marks_.append(o_)
+    # touch points drawn for the owner (2026-10-23: "show me where is A point and where is the point on hand web
+    # you're matching"): bigger balls, each its own colour
+    for p3_, col_ in (getattr(L, "_touch_marks", None) or []):
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.0025, subdivisions=3, location=p3_)
+        o_ = bpy.context.active_object
+        a_ = o_.data.color_attributes.new("_clipmap", "FLOAT_COLOR", "POINT")
+        a_.data.foreach_set("color", list(col_) * len(o_.data.vertices))
+        o_.data.color_attributes.active_color = a_
+        marks_.append(o_)
     zoom_c = None
-    if step:
+    if job.get("views_index_only"):
+        # the owner, 2026-10-22: "only the index finger, no gun in this", "two view from up to down and from left to
+        # right"
+        views = [("no_gun_top_down", up, fwd, False), ("no_gun_left_to_right", left, up, False)]
+        # the owner, 2026-10-22: "this is what you called straight? make it a flat straight finger". The bones read
+        # straight, the skin did not: measure the skin's own centreline against the bone line, as posed, with the
+        # shape keys off, and with the index bones at their rest turn, to find what bends the skin
+        import json as _js
+        def _bow():
+            # the hiding mask off while reading: the read needs every skin point
+            mk_ = [(m_, m_.show_viewport) for m_ in skin_.modifiers if m_.type == "MASK"]
+            for m_, _ in mk_:
+                m_.show_viewport = False
+            bpy.context.view_layer.update()
+            Pq_, Nq_ = L._skin_arrays_read()[:2]
+            gq_ = L._index_skin_groups(side)
+            for m_, v_ in mk_:
+                m_.show_viewport = v_
+            bpy.context.view_layer.update()
+            iq_, lq_ = L._hand_label_arrays(side, Pq_, Nq_)
+            m_ = _np6.array([l.startswith("index") for l in lq_])
+            X_ = Pq_[iq_[m_]]
+            b0_ = _np6.array(L._bw(L._n("finger", side, "index", "01")).translation)
+            tp_ = _np6.array(L._finger_tip("index", side))
+            ax_ = (tp_ - b0_) / _np6.linalg.norm(tp_ - b0_)
+            sd_ = _np6.array(left) - ax_ * float(_np6.dot(left, ax_)); sd_ /= _np6.linalg.norm(sd_)
+            uv_ = _np6.cross(ax_, sd_)
+            t_ = (X_ - b0_) @ ax_
+            rows_ = []
+            for lo_ in _np6.arange(t_.min(), t_.max(), 0.004):
+                k_ = (t_ >= lo_) & (t_ < lo_ + 0.004)
+                if k_.sum() < 6:
+                    continue
+                c_ = X_[k_].mean(0) - b0_
+                rows_.append([round(float(lo_ + 0.002) * 100, 2), round(float(c_ @ sd_) * 100, 2), round(float(c_ @ uv_) * 100, 2)])
+            bones_ = []
+            for j_ in ("01", "02", "03"):
+                q_ = _np6.array(L._bw(L._n("finger", side, "index", j_)).translation) - b0_
+                bones_.append([j_, round(float(q_ @ ax_) * 100, 2), round(float(q_ @ sd_) * 100, 2), round(float(q_ @ uv_) * 100, 2)])
+            # the silhouette centres (as the pictures see them) and their offsets from their own best line
+            Cs_ = L._index_silhouette_centres(side, gq_, Pq_)
+            c0_ = Cs_.mean(0); v_ = _np6.linalg.svd(Cs_ - c0_, full_matrices=False)[2][0]
+            Rs_ = (Cs_ - c0_) - _np6.outer((Cs_ - c0_) @ v_, v_)
+            sil_ = [[round(float((c_ / 100.0 - b0_) @ ax_) * 100, 2), round(float(r_ @ sd_), 3), round(float(r_ @ uv_), 3)]
+                    for c_, r_ in zip(Cs_, Rs_)]
+            sdv_ = [r_[1] for r_ in rows_]; upv_ = [r_[2] for r_ in rows_]
+            return {"silhouette_off_own_line_cm [along, side, up]": sil_,
+                    "silhouette_off_own_line_max_cm": round(float(_np6.linalg.norm(Rs_, axis=1).max()), 3),
+                    "centreline_cm [along, side, up]": rows_, "bones_cm [joint, along, side, up]": bones_,
+                    "side_spread_cm": round(max(sdv_) - min(sdv_), 2), "up_spread_cm": round(max(upv_) - min(upv_), 2)}
+        diag_ = {"as_posed": _bow()}
+        kb_ = skin_.data.shape_keys.key_blocks if skin_.data.shape_keys else []
+        diag_["shape_keys_on"] = {k_.name: round(k_.value, 3) for k_ in kb_ if k_.value != 0 and not k_.mute and k_ != kb_[0]}
+        diag_["modifiers"] = [(m_.type, m_.name, m_.show_render) for m_ in skin_.modifiers]
+        mu_ = [(k_, k_.mute) for k_ in kb_]
+        for k_, _ in mu_:
+            k_.mute = True
+        bpy.context.view_layer.update()
+        diag_["shape_keys_off"] = _bow()
+        for k_, v_ in mu_:
+            k_.mute = v_
+        pb_ = [L.arm.pose.bones[L._n("finger", side, "index", j_)] for j_ in ("01", "02", "03")]
+        mb_ = [p_.matrix_basis.copy() for p_ in pb_]
+        for p_ in pb_:
+            p_.matrix_basis.identity()
+        bpy.context.view_layer.update()
+        diag_["index_bones_at_rest_turn"] = _bow()
+        for p_, m_ in zip(pb_, mb_):
+            p_.matrix_basis = m_
+        bpy.context.view_layer.update()
+        with open(os.path.join(d_, "index_shape.json"), "w") as f_:
+            _js.dump(diag_, f_, indent=1)
+    elif step and job.get("step_view_names"):
+        # the owner, 2026-10-22: "I need 3 views with gun: top down, left view, right view"
+        views = [v_ for v_ in views if v_[0] in job["step_view_names"]]
+        zdefs_ = {"zoom_top_down": (up, fwd), "zoom_left_to_right": (left, up), "zoom_right_to_left": (-left, up)}
+        zn_ = [n_ for n_ in job["step_view_names"] if n_ in zdefs_]
+        if zn_:
+            zc_ = getattr(L, "_zoom_c", None)
+            zoom_c = Vector(zc_) if zc_ else palm_c.copy()
+            views += [(n_, zdefs_[n_][0], zdefs_[n_][1], True) for n_ in zn_]
+    elif step:
         # the flow's step pictures: the firing side, below, and the hand alone
         views = [v_ for v_ in views if v_[0] in ("with_gun_left_to_right", "with_gun_bottom_up", "no_gun_left_to_right")]
         if True:
@@ -1154,7 +1330,7 @@ def six_views(side, step=None):
             for o_ in gun_meshes:
                 o_.display_type = "WIRE" if with_gun else "TEXTURED"   # the gun as lines: skin inside it shows
             centre = (palm_c + gun_c) * 0.5 if with_gun else palm_c
-            cam_d.ortho_scale = 0.40 if with_gun else 0.22
+            cam_d.ortho_scale = 0.40 if with_gun else (0.12 if job.get("views_index_only") else 0.22)
             sh_.show_xray, sh_.xray_alpha = (True, 0.35) if name_.startswith("zoom") else (False, sh_.xray_alpha)
             if name_.startswith("zoom"):
                 centre, cam_d.ortho_scale = zoom_c, 0.06
@@ -1228,6 +1404,17 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
         return GRASPS[key]
     L.snapshot("save", "before_grasp")
     hn = L._n("hand", side)
+    if POSE_ENGINE == "fakepose" and FP is not None:
+        # the hold from fakepose's preset on this mark (the market way), where the clips first use it
+        if start:
+            L.snapshot("load", start)
+        Hx_, fx_, ox_ = FP.grasp(side, mark, KIND.get((side, mark), "palm"))
+        if job.get("step_view_names"):
+            six_views(side, "fp_hold_" + mark)
+        rel = bone_world(mark_bone(mark, part)).inverted() @ Hx_
+        L.snapshot("load", "before_grasp")
+        GRASPS[key] = (rel, fx_, True)
+        return GRASPS[key]
     at = mark_world(mark, part, offset)
     plan = style_plan(side, mark) if STYLE and job.get("solver", True) else None
     con = ((STYLE or {}).get("hands", {}).get(side) or {}).get("contact", {})
@@ -1256,7 +1443,9 @@ def _grasp_solve(side, mark, part=None, offset=None, start=None):
         wr_ = {fi: ("straight" if fi == "index" and m.get("index") == "extended" else "wrap") for fi in ("index", "middle", "ring", "pinky")}
         tp_ = touch_pairs(side)
         keep_gun_measures(side, tp_)
-        h_ = L.direct_hold(side, MARKS, tp_, glove_cm=GLOVE, other=oth, wrap=wr_,
+        # the firing hand in the owner's grip order (2026-10-23, v0.14) when its backstrap pair is there
+        hold_fn_ = L.grip_hold if any(p_.get("role") == "backstrap" for p_ in (tp_ or [])) else L.direct_hold
+        h_ = hold_fn_(side, MARKS, tp_, glove_cm=GLOVE, other=oth, wrap=wr_,
                            gun_shift=_gun_shift if side == "r" else None,      # the firing hand is on the gun first
                            f_pref=FPREF, on_posed=six_views if job.get("six_views") else None,
                            on_step=(lambda s_, n_: six_views(s_, n_)) if job.get("step_views") else None)
@@ -1570,6 +1759,21 @@ if PUR:
 if PUR:
     gl_ = g(facts["marks"]["grip"])
     ri_ = min(range(len(runs_)), key=lambda i: min((Vector(s_["centre"]) - gl_).length for s_ in runs_[i]["sections"]))
+    # a gun's grip read along its magazine well's line (the owner, 2026-10-22: "use 1"): the well's line comes from
+    # the gun's facts (the drawing's printed well faces), so a step in the grip's back (a grip safety's lower end on
+    # its housing) no longer breaks the searched run and tilts the hand
+    mag_ = (facts.get("magazine") or {}).get("axis")
+    if mag_ and job.get("grip_from_well", True):
+        o_ = g((0.0, 0.0, 0.0))
+        up_ = (g([-x for x in mag_]) - o_).normalized()          # up the well, toward the slide
+        wr_ = L.run_along("Root", list(up_), near=list(gl_), inner_toward=list(o_))
+        if wr_:
+            runs_.insert(0, wr_)
+            ri_ = 0
+            report["grip_run_from_well"] = {"axis": wr_["axis"], "length_cm": wr_["length_cm"], "diameter_cm": wr_["diameter_cm"],
+                                            "openings": len(wr_["openings"]), "well_axis_facts": mag_}
+        else:
+            report["notes"].append("no run along the magazine well's line: the searched run is used")
     MARKS = []
     for sd_ in ("r", "l"):
         p_ = PUR.get(sd_)
@@ -1734,6 +1938,193 @@ if job.get("reference_pose"):
         GRASPS[(sd, mk, None, ())] = (bone_world(mark_bone(mk)).inverted() @ (bone_world("Root") @ rel_),
                                       {n: Quaternion(q) for n, q in h_["fingers"].items()}, True)
     report["reference_pose"] = job["reference_pose"]
+if job.get("experiment") == "index_B_aim":
+    # the owner's experiment, 2026-10-23: "keep the hand, the wrist and the finger, move the hand up so index finger
+    # is point straight to B line direction with the B line and the straight direction to the ground make a 90 degree
+    # angle, then bring the gun up so B line match the index finger line."
+    import numpy as _npx
+    ex_ = {"owner": "keep the hand, the wrist and the finger, move the hand up so index finger is point straight to B "
+                    "line direction with the B line and the straight direction to the ground make a 90 degree angle, "
+                    "then bring the gun up so B line match the index finger line"}
+    L.snapshot("load", start)
+    L.natural_open("r", index_extended=True)
+    L.measure_hand("r")
+    tp_x = touch_pairs("r")
+    U_ = _npx.array([0.0, 0.0, 1.0])
+    unit_ = lambda v: v / max(1e-12, _npx.linalg.norm(v))       # noqa: E731
+
+    def readings(tag):
+        pw_ = L._pairs_world(tp_x)
+        A_ = _npx.array(list(next(p for p in pw_ if p.get("center"))["T_w"]))
+        lp_ = next(p for p in pw_ if p["kind"] == "line")
+        B0_, dB_, nF_ = (_npx.array(list(lp_[k])) for k in ("T_w", "dir_w", "normal_w"))
+        uB_ = unit_(_npx.cross(nF_, dB_))
+        Li_ = L.index_pad_line("r")
+        web_ = _npx.array(list(L._anchor("r", "web_fold")))
+        ks_ = sorted(Li_["pads"])
+        fp_ = next(p for p in pw_ if p.get("hand") == "palm")
+        f_ = _npx.array(list(L._palm_facing("r")))
+        r_ = {"index line to the ground's plumb line (deg, 90 = level)": round(float(_npx.degrees(_npx.arccos(abs(Li_["dir"] @ U_)))), 2),
+              "line B to the plumb line (deg, 90 = level)": round(float(_npx.degrees(_npx.arccos(abs(dB_ @ U_)))), 2),
+              "index line vs line B (deg)": round(float(_npx.degrees(_npx.arccos(min(1.0, abs(float(Li_["dir"] @ dB_)))))), 2),
+              "index pads off line B in the face (cm)": [round(float((Li_["pads"][k] - B0_) @ uB_) * 100, 3) for k in ks_],
+              "index pads out past the face (cm, + outside)": [round(float((Li_["pads"][k] - B0_) @ nF_) * 100, 3) for k in ks_],
+              "web fold to A (cm)": round(float(_npx.linalg.norm(web_ - A_)) * 100, 3),
+              "web fold from A along line B / up the gun / out of the face (cm)": [round(float((web_ - A_) @ dB_) * 100, 2),
+                                                                                  round(float((web_ - A_) @ unit_(_npx.cross(dB_, nF_))) * 100, 2),
+                                                                                  round(float((web_ - A_) @ nF_) * 100, 2)],
+              "palm facing off the panel (deg)": round(float(_npx.degrees(_npx.arccos(max(-1.0, min(1.0, float(f_ @ -_npx.array(list(fp_["normal_w"])))))))), 1),
+              "walls (hand and arm)": {k: round(float(v), 2) for k, v in L.wall_faults("r", other=False).items()}}
+        ex_[tag] = r_
+        return Li_
+    readings("0_start")
+    if not job.get("exp_last_only"):
+        six_views("r", "exp_0_start")
+    # 1. the arm raised at the shoulder (the hand, the wrist and the fingers kept): the index line turned level, its
+    # heading kept (the least turn that makes it 90 degrees to the plumb line)
+    Li0 = L.index_pad_line("r")
+    d_ = unit_(_npx.array(Li0["dir"]))
+    t_ = unit_(d_ - U_ * (d_ @ U_))
+    ax_ = _npx.cross(d_, t_)
+    ang_ = float(_npx.degrees(_npx.arctan2(_npx.linalg.norm(ax_), d_ @ t_)))
+    up_n = L._n("upperarm", "r")
+    if _npx.linalg.norm(ax_) > 1e-9:
+        L._turn_about(up_n, Vector(list(unit_(ax_))), ang_, L._bw(up_n).translation.copy())
+    ex_["1_arm_raised_deg"] = round(ang_, 2)
+    Li1 = readings("1_raised")
+    if not job.get("exp_last_only"):
+        six_views("r", "exp_1_raised")
+    # 2. the gun brought up: turned so line B runs along the index line (the slide up, no cant), moved so line B lies on
+    # the index pads' line, slid along it so A comes nearest the web fold
+    pw_ = L._pairs_world(tp_x)
+    A_ = _npx.array(list(next(p for p in pw_ if p.get("center"))["T_w"]))
+    lp_ = next(p for p in pw_ if p["kind"] == "line")
+    B0_, dB_ = _npx.array(list(lp_["T_w"])), unit_(_npx.array(list(lp_["dir_w"])))
+    Fr_ = L._obj_frame("Root")
+    ug_ = _npx.array(list((Fr_.to_3x3() @ g((0.0, 0.0, 100.0))).normalized()))
+    t_ = unit_(_npx.array(Li1["dir"]))
+    if float(t_ @ dB_) < 0.0:
+        t_ = -t_
+    un_ = unit_(ug_ - dB_ * (ug_ @ dB_))
+    En_ = _npx.stack([dB_, un_, _npx.cross(dB_, un_)], 1)
+    zw_ = unit_(U_ - t_ * (U_ @ t_))
+    Ew_ = _npx.stack([t_, zw_, _npx.cross(t_, zw_)], 1)
+    Rd_ = Ew_ @ En_.T
+    c_ = _npx.array(Li1["centre"])
+    web_ = _npx.array(list(L._anchor("r", "web_fold")))
+    s_ = -float(t_ @ (Rd_ @ (A_ - B0_) + c_ - web_))
+    p_ = c_ + s_ * t_
+    D_ = Matrix.Translation(Vector(list(p_))) @ Matrix(Rd_.tolist()).to_4x4() @ Matrix.Translation(Vector(list(-B0_)))
+    L.rifle_rest = D_ @ L.rifle_rest
+    L._place_rifle()
+    _BVH.clear()
+    REST0 = L.rifle_rest.copy()
+    bpy.context.view_layer.update()
+    ex_["2_gun_moved"] = {"cm": round(float(_npx.linalg.norm(_npx.array(list(D_.translation)))) * 100, 2),
+                          "turned_deg": round(float(_npx.degrees(_npx.arccos(max(-1.0, min(1.0, (_npx.trace(Rd_) - 1) / 2))))), 2)}
+    readings("2_gun_up")
+    # A (cyan) and the hand's web fold point matched to it (white), and what clips at the web
+    pw2_ = L._pairs_world(tp_x)
+    A2_ = list(next(p for p in pw2_ if p.get("center"))["T_w"])
+    W2_ = list(L._anchor("r", "web_fold"))
+    L._touch_marks = [(A2_, (0.0, 1.0, 1.0, 1.0)), (W2_, (1.0, 1.0, 1.0, 1.0))]
+    L._zoom_c = [(a__ + b__) / 2.0 for a__, b__ in zip(A2_, W2_)]
+    ex_["2_web"] = {"A_world": [round(x, 4) for x in A2_], "web_fold_world": [round(x, 4) for x in W2_],
+                    "web_fold_define": "the web's skin fold between the thumb and the index, measured on the skin (measure_hand)",
+                    "web walls": L.walls_of("r", False, ("web",)), "web clipping by part": dict(L._walls_of_parts),
+                    "palm walls": L.walls_of("r", False, ("palm",)), "palm clipping by part": dict(L._walls_of_parts)}
+    six_views("r", "exp_2_gun_up")
+    if job.get("capture_preset"):
+        # the owner's approved experiment pose kept as an authored grip for fakepose (2026-10-23: "hand position is a
+        # hold"): the hand against the grip mark's bone, the fingers' turns (open: fakepose closes them to contact)
+        Gb_ = bone_world(mark_bone("grip"))
+        rel_ = Gb_.inverted() @ L._bw(L._n("hand", "r"))
+        cap_ = {"contract": "fakepose-captured/1", "gun": facts["name"], "side": "r", "mark": "grip",
+                "rel_to_mark_bone": [list(r__) for r__ in rel_],
+                "fingers": {nm: list(L.arm.pose.bones[nm].rotation_quaternion) for nm in FINGER_BONES["r"]},
+                "source": "the owner's approved experiment, 2026-10-23: the arm raised until the index is level, the gun "
+                          "brought up so line B lies on the index (0.01 deg); the owner: 'hand position is a hold'",
+                "readings": ex_.get("2_gun_up")}
+        os.makedirs(os.path.dirname(job["capture_preset"]), exist_ok=True)
+        json.dump(cap_, open(job["capture_preset"], "w", encoding="utf-8"), indent=1)
+        ex_["captured"] = job["capture_preset"]
+    report["experiment"] = ex_
+    json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
+    print("GUNKIT experiment " + json.dumps(ex_, default=str))
+    sys.exit(0)
+POSE_ENGINE = job.get("pose_engine", "fakepose")
+FP = None
+PULL = None
+KIND = {}
+report["pose_engine"] = POSE_ENGINE
+if POSE_ENGINE == "fakepose" and not job.get("experiment"):
+    # the hold made the way games make it (fakepose-mcp): the gun at aim, authored grips on its marks, the fingers
+    # closed to contact, the arms by IK; the clipping the first-person camera sees checked (the owner's rule (b))
+    if not job.get("fakepose"):
+        raise RuntimeError("pose_engine is fakepose but fakepose-mcp is not installed (pip install -e fakepose-mcp)")
+    sys.path.insert(0, job["fakepose"])
+    import fakepose as FPM
+
+    def _move_gun(D):
+        global REST0
+        L.rifle_rest = D @ L.rifle_rest
+        L._place_rifle()
+        _BVH.clear()
+        REST0 = L.rifle_rest.copy()
+        bpy.context.view_layer.update()
+    FP = FPM.FakePose(L, {"facts": facts, "g": g, "bone_world": bone_world, "mark_bone": mark_bone, "mark_world": mark_world,
+                          "move_gun": _move_gun, "finger_bones": FINGER_BONES, "glove_cm": GLOVE,
+                          "view": (PL.VIEW_RIGHT, PL.VIEW_FWD, PL.VIEW_UP), "fov": (PL.H_FOV, PL.ASPECT)})
+    if start:
+        L.snapshot("load", start)
+    FP.body_rest()
+    FP.set_eye()
+    FP.aim_place("r")
+    Hr_, fr_, rr_ = FP.grasp("r", "grip", "palm")
+    # the idle is the aim pulled in (the owner: "the idle position is just the aim position with a pull"); an "aim"
+    # clip (the idle's frames, not pulled) keeps the aim itself
+    PULL = FP.presets.get("idle_pull")
+    if PULL and "idle" in job["clips"] and "aim" not in job["clips"]:
+        import copy as _cp
+        job["clips"]["aim"] = _cp.deepcopy(job["clips"]["idle"])
+        job["clips"]["aim"]["clip"] = "aim"
+        if "idle" in job.get("tracks", {}):
+            job["tracks"]["aim"] = job["tracks"]["idle"]
+    # the grasp kind each hold is first used with in the clips (palm, cup, pinch): its preset
+    for _c in job["clips"].values():
+        for _f in _c["frames"]:
+            for _sd, _h in _f["hands"].items():
+                for _k in ("a", "b"):
+                    _t = _h.get(_k) or {}
+                    if _t.get("space") == "gun" and _t.get("name"):
+                        _mk = _t["name"] if _t["name"] in facts["marks"] else ("mag_grab" if _t["name"] in facts["parts"] and "mag_grab" in facts["marks"] else None)
+                        if _mk:
+                            KIND.setdefault((_sd, _mk), _h.get("grasp", "palm"))
+    if int(job.get("fakepose_phase", 3)) >= 2:
+        L.natural_open("l", index_extended=False)
+        L.measure_hand("l")
+        Hl_, fl_, rl_ = FP.grasp("l", "support", "palm")
+    FP.report["eye_clip"] = FP.eye_clip()
+    FP.report["eye_blockers"] = FP.eye_blockers()
+    FP.report["shoulder_r"] = [round(x, 4) for x in L._bw(L._n("upperarm", "r")).translation]
+    FP.report["hand_r"] = [round(x, 4) for x in L._bw(L._n("hand", "r")).translation]
+    report["fakepose"] = FP.report
+    if job.get("step_view_names"):
+        six_views("r", "fp_1_grip")
+        if int(job.get("fakepose_phase", 3)) >= 2:
+            six_views("l", "fp_2_support")
+    report["fakepose_pictures"] = L.render(views=("eye",), size=(1280, 720))
+    if int(job.get("fakepose_phase", 3)) >= 3:
+        # the home holds are fakepose's: Gun Kit's solve keeps them (its cache), every other hold goes to fakepose
+        GRASPS[("r", "grip", None, ())] = (bone_world(mark_bone("grip")).inverted() @ Hr_, fr_, True)
+        GRASPS[("l", "support", None, ())] = (bone_world(mark_bone("support")).inverted() @ Hl_, fl_, True)
+        L.snapshot("save", "place_best")
+        start = "place_best"
+    if int(job.get("fakepose_phase", 3)) <= 2:
+        # phases 1 and 2a of the plan (fakepose-mcp docs/PLAN.md): the aim place and the firing grip only
+        json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
+        print("GUNKIT fakepose phase 1 " + json.dumps(FP.report, default=str)[:3000])
+        sys.exit(0)
 L.steps.phase("home holds (both hands)")
 L._deadline = by(0.55)
 home_r = grasp("r", "grip", start=start)
@@ -1752,16 +2143,6 @@ if home_r and STYLE and "support" in facts["marks"]:
     for _n, _q in home_r[1].items():
         L.arm.pose.bones[_n].rotation_quaternion = _q
     bpy.context.view_layer.update()
-# the arms with their press morph targets, for the game to import as the arms mesh (the clips key their curves)
-if L.meshes[0].data.shape_keys and any(k.name.startswith("press_") for k in L.meshes[0].data.shape_keys.key_blocks):
-    for o_ in bpy.context.view_layer.objects:
-        o_.select_set(False)
-    L.arm.select_set(True)
-    L.meshes[0].select_set(True)
-    _mp = os.path.join(OUT, "Arms_press_morphs.fbx")
-    bpy.ops.export_scene.fbx(filepath=_mp, use_selection=True, object_types={"ARMATURE", "MESH"}, add_leaf_bones=False,
-                             bake_anim=False)
-    report["press_morphs_fbx"] = _mp
 # one hand at a time (the owner, 2026-10-21): the support hand is solved only after the firing hand's hold passes
 _r_ok = bool(home_r and home_r[2])
 if "support" in facts["marks"] and DIRECT and not _r_ok:
@@ -1800,12 +2181,53 @@ for side, gr in (("r", home_r), ("l", home_l)):
 bpy.context.view_layer.update()
 MEND_SIDES = tuple(job.get("mend_sides", ("l",)))
 TRIGGER = {}
-if STYLE and STYLE.get("trigger_clips") and (STYLE["hands"].get("r") or {}).get("trigger"):
+if STYLE and STYLE.get("trigger_clips") and (STYLE["hands"].get("r") or {}).get("trigger") and POSE_ENGINE != "fakepose":
     L.snapshot("save", "before_trigger")
     apply_style("r", trigger=True)
     TRIGGER = {n: L.arm.pose.bones[n].rotation_quaternion.copy() for n in FINGER_BONES["r"] if n.startswith("index")}
     L.snapshot("load", "before_trigger")
 L.snapshot("save", "hold")
+# the fire grip: from each passed home hold, the wrapping fingers close further as the hand squeezes to fight the
+# recoil, until each pad has sunk its give at FIRE_N (FIRE_FALLBACK_N if FIRE_N breaks a wall); every wall read at
+# that grip; the skin's press at that grip kept as its own morph (press_<side>_fire). A grip that breaks a wall at
+# both forces is not made: the fire clips keep the rest grip, and the report says so
+FIRE_FINGERS = {}
+report["fire_grip"] = {}
+if STYLE and FIRE_N > 0 and POSE_ENGINE != "fakepose":
+    for side, gr in (("r", home_r), ("l", home_l)):
+        if not gr or not gr[2]:
+            report["fire_grip"][side] = {"made": False, "why": "no passed home hold"}
+            continue
+        tried = []
+        for n_ in (FIRE_N, FIRE_FALLBACK_N):
+            L.snapshot("load", "hold")
+            CL_.set_grip(n_)
+            oth_ = side == "l"
+            res_ = L.conform_digits(side, ("middle", "ring", "pinky"), other=oth_)
+            bpy.context.view_layer.update()
+            walls_ = dict(L.wall_faults(side, oth_))
+            tried.append({"grip_N": n_, "walls": {k: round(float(v), 3) for k, v in walls_.items()},
+                          "closed_deg": {fi: (res_.get(fi) or {}).get("closed_deg") for fi in res_}})
+            if not walls_:
+                FIRE_FINGERS[side] = (n_, {nm: L.arm.pose.bones[nm].rotation_quaternion.copy() for nm in FINGER_BONES[side]})
+                tried[-1]["press"] = L.press_flatten(side, name="press_%s_fire" % side)
+                break
+        report["fire_grip"][side] = {"made": side in FIRE_FINGERS, "grip_N": FIRE_FINGERS[side][0] if side in FIRE_FINGERS else None,
+                                     "tried": tried}
+    CL_.set_grip(REST_N)
+    L.snapshot("load", "hold")
+FIRE_CLIPS = set(job.get("fire_clips", (STYLE or {}).get("trigger_clips", [])))
+# the arms with their press morph targets (rest and fire), for the game to import as the arms mesh (the clips key
+# their curves)
+if L.meshes[0].data.shape_keys and any(k.name.startswith("press_") for k in L.meshes[0].data.shape_keys.key_blocks):
+    for o_ in bpy.context.view_layer.objects:
+        o_.select_set(False)
+    L.arm.select_set(True)
+    L.meshes[0].select_set(True)
+    _mp = os.path.join(OUT, "Arms_press_morphs.fbx")
+    bpy.ops.export_scene.fbx(filepath=_mp, use_selection=True, object_types={"ARMATURE", "MESH"}, add_leaf_bones=False,
+                             bake_anim=False)
+    report["press_morphs_fbx"] = _mp
 GUN_BONE = L.names["gun"]
 G_HOLD = L._bw(GUN_BONE).copy()
 RA_HOLD = RA.matrix_world.copy()
@@ -1851,6 +2273,17 @@ if job.get("render") and T0 + BUDGET - _time.time() >= 45:
     report["hold_anatomy"] = L.anatomy("both")
     report["hold_marks_lab"] = {m: [round(x, 2) for x in lab_gun(mark_world(m))] for m in ("grip", "support", "muzzle")}
     report["hold_palm_r_lab"] = [round(x, 2) for x in lab_gun(palm_r())]
+
+
+def pulled(p, cid):
+    """fakepose's idle pull on a timeline gun pose: back, down and the muzzle down, except in the aim clips."""
+    if not PULL or cid in PULL.get("aim_clips", ()):
+        return p
+    q = dict(p)
+    mv = list(q.get("move", [0.0, 0.0, 0.0]))
+    q["move"] = [mv[0], mv[1] - float(PULL["back_cm"]), mv[2] - float(PULL["down_cm"])]
+    q["pitch"] = float(q.get("pitch", 0.0)) + float(PULL["pitch_deg"])
+    return q
 
 
 def gun_pose(p):
@@ -2070,7 +2503,7 @@ for (side, mk), (fr, cid_, _) in sorted(need.items()):
     L.snapshot("load", "hold")
     rest_parts()
     if job.get("solve_at_use", True):
-        gun_pose(fr["gun"])
+        gun_pose(pulled(fr["gun"], cid_))
         tr_ = job["tracks"].get(cid_) if cid_ else None
         if tr_ and not free_mark(mk):
             at_t = {round(f["t"], 5): f["bones"] for f in tr_["frames"]}.get(round(fr["t"], 5))
@@ -2094,12 +2527,19 @@ report["holds"] = {"%s:%s" % (k[0], k[1]): ("found" if v[2] else "laid") for k, 
 # --- the clips -------------------------------------------------------------------------------------------------
 L.steps.phase("clips")
 for cid, clip in job["clips"].items():
+    if T0 + BUDGET - _time.time() < 40:
+        # the run's time is spent: the clips not reached are reported, not left to the hard stop
+        report.setdefault("budget_cut", []).append("clip %s not made: under 40 s left" % cid)
+        continue
+    _tc0 = _time.time()
     L.steps.phase("clip " + cid, level=1)
     L.steps.phase("key the frames (hands placed, repaired, walls read)", level=2)
     tr = job["tracks"].get(cid)
     tframes = {round(f["t"], 5): f["bones"] for f in (tr["frames"] if tr else [])}
     name = job.get("prefix", "A_%s_Hands_" % facts["name"]) + cid
     L.snapshot("load", "hold")
+    FIRING = cid in FIRE_CLIPS
+    CL_.set_grip(max([FIRE_FINGERS[s_][0] for s_ in FIRE_FINGERS] or [REST_N]) if FIRING else REST_N)
     L.record_clip("start", name, fps=clip["fps"])
     carrying = {}            # part -> (hand, the part's bone against the hand)
     clip_contacts = []       # (t, side, contacts) on frames a hand is on its own contact
@@ -2107,10 +2547,11 @@ for cid, clip in job["clips"].items():
     repairs = []             # the frames the one repair mended
     moves = []               # each frame's hands as the player sees them, for the motion check
     walled = []              # frames where a hand is past a wall (the clip is then not written)
+    eye_frames = []          # fakepose: the clipping the eye sees, frame by frame
     for fr in clip["frames"]:
         L._cnt("frames")
         t = round(fr["t"], 5)
-        gun_pose(fr["gun"])
+        gun_pose(pulled(fr["gun"], cid))
         rest_parts()
         if t in tframes:
             pose_parts(tframes[t])
@@ -2141,7 +2582,7 @@ for cid, clip in job["clips"].items():
             mb = mark_of(h["b"])
             carrying_out = (on_gun and mb and free_mark(mb) and h["b"].get("point") is not None
                             and (Vector(h["b"]["point"]) - Vector(facts["marks"][mb])).length > 1.5)
-            if side in MEND_SIDES and (not resting or carrying_out):
+            if POSE_ENGINE != "fakepose" and side in MEND_SIDES and (not resting or carrying_out):
                 # a hand on its way between holds keeps the last hold's turn while the arm moves: the wrist back
                 # inside its range, turned toward the forearm's line (Pose Lab's mend keeps the hand's back out of
                 # the gun)
@@ -2171,7 +2612,10 @@ for cid, clip in job["clips"].items():
                 elif qa is not None:
                     L.arm.pose.bones[n].rotation_quaternion = qa
             on_home = bool(MARKS) and resting and mark_of(h["b"]) == ((PUR or {}).get(side) or {}).get("mark")
-            if STYLE and job.get("repair", True) and not on_home:
+            if FIRING and on_home and side in FIRE_FINGERS:
+                for n, q in FIRE_FINGERS[side][1].items():   # squeezing to fight the recoil: the fire grip's fingers
+                    L.arm.pose.bones[n].rotation_quaternion = q
+            if STYLE and job.get("repair", True) and not on_home and POSE_ENGINE != "fakepose":
                 # one repair, only where the frame needs it; a hand resting on its home hold is that hold (searched
                 # and gated on the contact model), so it is left as it is
                 rr_ = repair(side)
@@ -2213,7 +2657,7 @@ for cid, clip in job["clips"].items():
             mv[sd] = {"at": list(L._to(hands_now[sd].translation, "view")), "bends": bends}
         moves.append({"t": fr["t"], "hands": mv})
         # the contact rules of each hand on its own contact hold, measured on this frame
-        if STYLE and job.get("contact_checks", True):
+        if STYLE and job.get("contact_checks", True) and POSE_ENGINE != "fakepose":
             for side in ("r", "l"):
                 h = fr["hands"][side]
                 on = mark_of(h["b"]) if h["w"] >= 0.999 or h["a"] == h["b"] else (mark_of(h["a"]) if h["w"] <= 0.001 else None)
@@ -2222,12 +2666,25 @@ for cid, clip in job["clips"].items():
                     cn = contacts_now(side)
                     if cn:
                         clip_contacts.append((fr["t"], side, cn))
-        for sd in ("r", "l"):
-            w_ = L.wall_faults(sd, other=True)
-            if w_:
-                walled.append({"t": round(fr["t"], 3), "side": sd, "walls": {k: round(v, 2) for k, v in w_.items()}})
+        if POSE_ENGINE == "fakepose":
+            # the market's rule (the owner's choice (b)): the clipping the first-person camera sees, every Nth frame
+            if len(resolved) % int(job.get("eye_every", 6)) == 1:
+                ec_ = FP.eye_clip(res=tuple(job.get("eye_res_clips", (96, 54))))
+                eye_frames.append({"t": round(fr["t"], 3), "clip_pixels": ec_["clip_pixels"], "deepest_seen_cm": ec_["deepest_seen_cm"]})
+        else:
+            for sd in ("r", "l"):
+                w_ = L.wall_faults(sd, other=True)
+                if w_:
+                    walled.append({"t": round(fr["t"], 3), "side": sd, "walls": {k: round(v, 2) for k, v in w_.items()}})
         L.record_clip("key", seconds=fr["t"])
     L.record_clip("stop")
+    if POSE_ENGINE == "fakepose":
+        report.setdefault("fakepose_clips_eye", {})[cid] = {
+            "seconds": round(_time.time() - _tc0, 1), "frames": len(clip["frames"]),
+            "frames_checked": len(eye_frames), "frames_with_clip": sum(1 for e_ in eye_frames if e_["clip_pixels"]),
+            "most_pixels": max((e_["clip_pixels"] for e_ in eye_frames), default=0),
+            "deepest_seen_cm": max((e_["deepest_seen_cm"] for e_ in eye_frames), default=0.0),
+            "clipping_frames": [e_ for e_ in eye_frames if e_["clip_pixels"]][:20]}
     if walled:
         # the walls are a real body's limits and physics: a clip with any frame past one is not written, only reported
         report["clips"][cid] = {"clip": name, "written": [], "blocked": "frames past the walls: %d" % len(walled),
@@ -2235,31 +2692,43 @@ for cid, clip in job["clips"].items():
         print("GUNKIT HANDS: %s not written, %d frames past the walls" % (cid, len(walled)))
         continue
     L.steps.phase("save the clip", level=2)
-    # the palm's press (a morph target) follows the firing hand's hold: 1 while it holds its home grip, blended as it
-    # takes hold or lets go, 0 off it
-    morphs_ = None
+    # each hand's skin press (a morph target) follows its home hold: 1 while it holds its home, blended as it takes
+    # hold or lets go, 0 off it. A fire clip uses the fire grip's press (the harder squeeze) where that grip was made
+    morphs_ = {}
     _kb = L.meshes[0].data.shape_keys.key_blocks if L.meshes[0].data.shape_keys else {}
-    if "press_r" in _kb and clip.get("frames"):
-        _home = ((PUR or {}).get("r") or {}).get("mark", "grip")
+    for _sd in ("r", "l"):
+        _rest_k, _fire_k = "press_%s" % _sd, "press_%s_fire" % _sd
+        if _rest_k not in _kb or not clip.get("frames"):
+            continue
+        _home = ((PUR or {}).get(_sd) or {}).get("mark", "grip" if _sd == "r" else "support")
         _vals = []
         for f_ in clip["frames"]:
-            h_ = f_["hands"]["r"]
+            h_ = f_["hands"][_sd]
             w_ = float(h_.get("w", 1.0))
             a_on = mark_of(h_["a"]) == _home
             b_on = mark_of(h_["b"]) == _home
             _vals.append((1.0 - w_) * a_on + w_ * b_on)
-        morphs_ = {"press_r": _vals}
+        if FIRING and _fire_k in _kb:
+            morphs_[_fire_k] = _vals
+            morphs_[_rest_k] = [0.0] * len(_vals)
+        else:
+            morphs_[_rest_k] = _vals
+            if _fire_k in _kb:
+                morphs_[_fire_k] = [0.0] * len(_vals)
+    morphs_ = morphs_ or None
     saved = L.save_clip(name, formats=("pose.json", "fbx"), root_name="root", morphs=morphs_)
     L.steps.phase("check set", level=2)
     try:
         soft = [c["segment"] + "*" for c in (STYLE or {}).get("soft_contacts", [])]
         # the firing hand holds the gun on every frame of every clip: its palm on the grip, its thumb opposing its fingers
         firing = ("r" if (CHAR or {}).get("handed", "right") == "right" else "l",) if STYLE else ()
-        cs = L.check_set(name, ignore=["palm*"] + soft, sides="both", clearance_max_cm=max(0.0, 0.2 - GLOVE),
-                         hold_sides=firing)
+        # fakepose keeps the market's one check (the eye's clipping, frame by frame above), not Pose Lab's set
+        cs = ({"engine": "fakepose", "eye": (report.get("fakepose_clips_eye") or {}).get(cid)} if POSE_ENGINE == "fakepose" else
+              L.check_set(name, ignore=["palm*"] + soft, sides="both", clearance_max_cm=max(0.0, 0.2 - GLOVE),
+                          hold_sides=firing))
     except Exception as e:
         cs = {"error": str(e)[:300]}
-    if (STYLE or {}).get("soft_contacts"):
+    if (STYLE or {}).get("soft_contacts") and POSE_ENGINE != "fakepose":
         # the style's soft contacts, every 0.1 s: each one's deepest press against its own most
         worst = {c["segment"]: 0.0 for c in STYLE["soft_contacts"]}
         k = 0.0
@@ -2276,7 +2745,7 @@ for cid, clip in job["clips"].items():
     if clip_contacts and isinstance(cs, dict):
         cs["contacts"] = summarise_contacts(clip_contacts)
     L.steps.phase("verify: skin, view, motion, hold gate", level=2)
-    if isinstance(cs, dict) and job.get("verify", True):
+    if isinstance(cs, dict) and job.get("verify", True) and POSE_ENGINE != "fakepose":
         # the drawn skin, every verify_step s (the capsules test a body slightly thinner than the picture's)
         skin_rows, k = [], 0.0
         while k <= clip["seconds"] + 1e-6:
@@ -2343,7 +2812,7 @@ for cid, clip in job["clips"].items():
             t = (ts[0] + ts[1]) / 2.0
             L.pose_clip(name, t)
             fr = min(clip["frames"], key=lambda f: abs(f["t"] - t))
-            gun_pose(fr["gun"])
+            gun_pose(pulled(fr["gun"], cid))
             rest_parts()
             if round(fr["t"], 5) in tframes:
                 pose_parts(tframes[round(fr["t"], 5)])
@@ -2357,5 +2826,33 @@ for cid, clip in job["clips"].items():
 L.steps.end_all()
 report["steps"] = L.steps.write(os.path.join(OUT, "steps.json"), {"run": "gunkit hands", "gun": facts["name"],
                                                                    "clips": list(job["clips"])})["wall_s"]
+if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET - _time.time() > 60:
+    # the first-person camera on each written clip, at its start, middle and end: the evidence the eye check counts
+    import shutil as _sh
+    _ed = os.path.join(OUT, "fakepose_eye")
+    os.makedirs(_ed, exist_ok=True)
+    _pics = {}
+    for _cid, _clip in job["clips"].items():
+        _ce = report.get("clips", {}).get(_cid)
+        if not (isinstance(_ce, dict) and _ce.get("written")) or T0 + BUDGET - _time.time() < 30:
+            continue
+        _nm = job.get("prefix", "A_%s_Hands_" % facts["name"]) + _cid
+        _tr = job["tracks"].get(_cid)
+        _tf = {round(f["t"], 5): f["bones"] for f in (_tr["frames"] if _tr else [])}
+        for _k, _t in (("start", 0.0), ("mid", _clip["seconds"] / 2.0), ("end", _clip["seconds"])):
+            L.pose_clip(_nm, _t)
+            _fr = min(_clip["frames"], key=lambda f: abs(f["t"] - _t))
+            gun_pose(pulled(_fr["gun"], _cid))
+            rest_parts()
+            if round(_fr["t"], 5) in _tf:
+                pose_parts(_tf[round(_fr["t"], 5)])
+            bpy.context.view_layer.update()
+            _r = L.render(views=("eye",), size=(960, 540))
+            _src = _r["images"][0]["path"]
+            _dst = os.path.join(_ed, "%s_%s.png" % (_cid, _k))
+            _sh.copy(_src, _dst)
+            _pics.setdefault(_cid, {})[_k] = {"path": _dst, "t": round(_fr["t"], 3),
+                                              "eye_clip_pixels": FP.eye_clip(res=(96, 54))["clip_pixels"]}
+    report["fakepose_eye_pictures"] = _pics
 json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
 print("GUNKIT HANDS: %s, %d clips, hold %s" % (facts["name"], len(report["clips"]), report["hold"]))
