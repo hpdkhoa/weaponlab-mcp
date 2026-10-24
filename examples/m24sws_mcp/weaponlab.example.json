@@ -1,0 +1,4 @@
+{"_about": "a fresh project for the environment test: only Blender and the shared arms are given",
+ "blender": "D:/Blender/blender.exe",
+ "gunkit": {"arms": {"folder": "K:/epic/ToangTown/ToangTown/Saved/PoseLab/ar_slim", "arms": "Arms.fbx", "idle": "Arms_Idle.fbx", "eye": [0.0, -2.3, 162.6]},
+            "character": "nomex_full_gloves"}}
