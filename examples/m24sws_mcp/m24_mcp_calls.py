@@ -87,7 +87,7 @@ for pid, (ya, yb) in (("lop_rod_top", (202, 220)), ("lop_rod_bottom", (312, 330)
 call("blueprint_part", part_id="lop_wheel", role="body", finish="parkerized", kind="lathe", profile=[[Y(143), R(30)], [Y(146), R(42.5)], [Y(169), R(42.5)], [Y(172), R(30)]],
      axis=[0.0, Z(267.5)], profile_source=rd("the thumbwheel (143 to 172 px, 225 to 310 px)"), axis_source=rd("its middle line"), name="Length-of-pull wheel")
 # the action
-RSIDE = [[705, 121], [708, 118], [712, 117], [1025, 117], [1029, 118.5], [1030, 121], [1030, 173], [1029, 175.5], [1025, 177], [712, 177], [708, 176], [705, 173]]
+RSIDE = [[722, 121], [725, 118], [729, 117], [1025, 117], [1029, 118.5], [1030, 121], [1030, 173], [1029, 175.5], [1025, 177], [729, 177], [725, 176], [722, 173]]
 rtop = [[cm(x, y)[0], -(cm(x, y)[1] - Z(147))] for x, y in RSIDE]
 call("blueprint_loft", part_id="receiver", role="body", finish="blued", side_px=RSIDE, figure_id="usaf-right", top=rtop,
      sections=[{"y": Y(705), "outline": OVAL}, {"y": Y(1030), "outline": OVAL}], top_source={"derived": "round: its plan the same as its side"},
@@ -100,13 +100,13 @@ call("blueprint_part", part_id="bolt", role="bolt", finish="steel", kind="extrud
      motion={"kind": "slide", "axis": [0.0, -1.0, 0.0], "travel_cm": 11.0},
      motion_sources={"axis": {"derived": "drawn back along the bore"}, "travel_cm": guess("11 cm, a long action's bolt throw")})
 call("blueprint_shape_across", part_id="bolt", section="oval", source=guess("a bolt is round"))
-TURN = {"kind": "turn", "axis": [0.0, 1.0, 0.0], "turn_deg": -60.0, "pivot": [0.0, Y(711), 0.0]}
+TURN = {"kind": "turn", "axis": [0.0, 1.0, 0.0], "turn_deg": 60.0, "pivot": [0.0, Y(711), 0.0]}
 TSRC = {"axis": {"derived": "the bolt turns round the bore"}, "pivot": {"derived": "on the bore at the handle's root"},
         "turn_deg": guess("about 60 degrees on a Remington 700")}
 call("blueprint_part", part_id="bolt_handle", role="bolt_lift", finish="blued", kind="extrude", x=[-6.2, -1.0], x_source=guess("the handle stands out to its knob"),
      outline_px=[[700, 128], [722, 132], [714, 175], [706, 200], [692, 200], [697, 140]], figure_id="usaf-right",
      outline_note="the bolt handle (692 to 722 px, 128 to 200 px)", name="Bolt handle", motion=TURN, motion_sources=TSRC, parent="bolt", bevel_cm=0.1)
-call("blueprint_views", part_id="bolt_handle", front=[{"y": [Y(660), Y(725)], "outline": [[-1.0, 1.6], [-2.0, 1.6], [-5.0, -2.6], [-5.6, -3.0], [-5.2, -3.6], [-4.3, -3.0], [-1.0, 0.2]]}],
+call("blueprint_views", part_id="bolt_handle", front=[{"y": [Y(660), Y(725)], "outline": [[-0.977, -0.125], [-5.337, -2.773], [-4.922, -3.456], [-0.562, -0.809]]}],
      front_source=guess("seen from the front the handle sweeps out and down to its knob"))
 KNOB = [[686 + 17 * math.cos(2 * math.pi * k / 40), 210 + 17 * math.sin(2 * math.pi * k / 40)] for k in range(40)]
 KR, ky, kz = R(17), Y(686), Z(210)
@@ -141,7 +141,7 @@ call("blueprint_hole", part_id="scope", bore={"at": [0.0, Z(75)], "r": R(40), "y
 for pid, (xa, xb) in (("ring_rear", (757, 790)), ("ring_front", (967, 995))):
     call("blueprint_part", part_id=pid, role="body", finish="steel", kind="lathe", profile=[[Y(xa), R(30)], [Y(xb), R(30)]], axis=[0.0, Z(75)],
          profile_source=rd("a scope ring (%d to %d px)" % (xa, xb)), axis_source=rd("on the scope's line"), name="Scope ring")
-for pid, (xa, xb) in (("base_rear", (702, 790)), ("base_front", (938, 1030))):
+for pid, (xa, xb) in (("base_rear", (724, 790)), ("base_front", (938, 1030))):
     call("blueprint_part", part_id=pid, role="body", finish="blued", kind="extrude", x=[-0.7, 0.7], x_source=guess("a base 1.4 cm across"),
          outline_px=[[xa, 104], [xb, 104], [xb, 122], [xa, 122]], figure_id="usaf-right", outline_note="a scope base (%d to %d px)" % (xa, xb), name="Scope base")
     call("blueprint_round_corners", part_id=pid, radius_cm=0.15, source=guess("a machined base's corners about 0.15 cm round"))
