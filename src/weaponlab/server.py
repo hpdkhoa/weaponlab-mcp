@@ -1,6 +1,7 @@
 """Weapon Lab over MCP: one server, seven groups of tools (spec_, gate_, probe_, rig_, motion_, gunkit_, blueprint_) and the
 contract checks.
 Run: weaponlab-mcp (or python -m weaponlab serve)."""
+import json
 from typing import Annotated
 
 from mcp.server.mcpserver import MCPServer
@@ -334,7 +335,7 @@ def _bp():
 
 @mcp.tool()
 def blueprint_source_add(gun: str, file: str, source_id: str, kind: Annotated[str, Field(description="manual, patent, photo, drawing, book or web")],
-                         title: str, license_basis: Annotated[str, Field(description="us-government-work, public-domain-age, public-domain-mark, us-patent, cc0, cc-by, cc-by-sa or permission")],
+                         title: str, license_basis: Annotated[str, Field(description="us-government-work, public-domain-age, public-domain-mark, us-patent, cc0, cc-by, cc-by-sa, permission or facts-only (a maker's sheet used only for its measured dimensions and shapes)")],
                          publisher: str | None = None, year: int | None = None, url: str | None = None, credit: str | None = None,
                          distribution: Annotated[str | None, Field(description="a distribution marking printed on the source, quoted")] = None,
                          gun_title: str | None = None) -> dict:
@@ -496,9 +497,23 @@ def blueprint_part(gun: str, part_id: str, role: Annotated[str, Field(descriptio
                    profile_source: dict | None = None, axis_source: dict | None = None, bore_r: float | None = None,
                    motion: Annotated[dict | None, Field(description="{kind: slide, axis, travel_cm} | {kind: turn, axis, turn_deg, pivot} | {kind: free}")] = None,
                    motion_sources: Annotated[dict | None, Field(description="the source of each motion number (axis, travel_cm, turn_deg, pivot)")] = None,
-                   name: str | None = None, bevel_cm: float | None = None, parent: str | None = None) -> dict:
+                   name: str | None = None, bevel_cm: float | None = None, parent: str | None = None,
+                   outline_px: Annotated[list[list[float]] | None, Field(description="extrude: the side outline read by eye off a figure, in its pixels (with figure_id), instead of a kept trace")] = None,
+                   figure_id: Annotated[str | None, Field(description="extrude with outline_px: the figure it was read off")] = None,
+                   outline_note: Annotated[str | None, Field(description="extrude with outline_px: what was read and where (px ranges)")] = None) -> dict:
     """Sets one part of the blueprint. Every number needs its source; the check fails a part without one."""
     BP = _bp()[4]
+    if kind == "extrude" and outline_px:
+        if not figure_id:
+            raise ToolError("outline_px needs the figure_id it was read off")
+        BF = _bp()[2]
+        f = _err(BF.figure, gun, figure_id)
+        if "scale" not in f or "frame" not in f:
+            raise ToolError("figure %s has no scale and frame yet (blueprint_calibrate, blueprint_frame)" % figure_id)
+        out_cm = [[round(u, 3), round(v, 3)] for u, v in BF.to_gun(f, outline_px)]
+        return _err(BP.extrude, gun, part_id, role, finish, None, x, x_source, name=name, motion=motion, motion_sources=motion_sources,
+                    bevel_cm=bevel_cm, parent=parent, outline=out_cm,
+                    outline_source={"figure": figure_id, "method": "read", "note": outline_note or "read off the figure with pixel rulers"})
     if kind == "extrude":
         return _err(BP.extrude, gun, part_id, role, finish, trace, x, x_source, [tuple(c) for c in (clips or [])], name, motion, motion_sources, bevel_cm, parent)
     if kind == "lathe":
@@ -533,6 +548,82 @@ def blueprint_views(gun: str, part_id: str,
     """The detail pass: a part shaped by three views (its side outline, front sections, a top outline), each with
     its source."""
     return _err(_bp()[4].views, gun, part_id, front, front_source, top, top_source)
+
+
+@mcp.tool()
+def blueprint_loft(gun: str, part_id: str, role: Annotated[str, Field(description="body, or a part role of the action")], finish: str,
+                   top: Annotated[list[list[float]], Field(description="the top outline [[y, x], ...] in cm: the part's width along its length")],
+                   sections: Annotated[list[dict], Field(description="key cross-sections [{y, outline: [[x, z], ...]}] or [{y, trace: a kept trace of a section drawing}]: each is fitted to the box the side and top outlines give at its station, and blended between stations")],
+                   top_source: dict, sections_source: dict,
+                   side: Annotated[list[list[float]] | None, Field(description="the side outline [[y, z], ...] in cm (or side_px with figure_id, or side_trace)")] = None,
+                   side_px: Annotated[list[list[float]] | None, Field(description="the side outline read off a figure, in its pixels")] = None,
+                   figure_id: str | None = None, side_trace: Annotated[str | None, Field(description="a kept trace for the side outline")] = None,
+                   side_source: dict | None = None, name: str | None = None, motion: dict | None = None, motion_sources: dict | None = None,
+                   parent: str | None = None, step_cm: float | None = None, ring_points: int | None = None) -> dict:
+    """The detail pass: a part skinned through its cross-sections (a stock that is oval at the butt, round at the
+    wrist and U-shaped at the forend). Its side follows the side outline exactly, its width the top outline, its
+    shape the key sections, blended smoothly. Every view needs its source."""
+    BF, BP = _bp()[2], _bp()[4]
+    if side is None and side_px is not None:
+        if not figure_id:
+            raise ToolError("side_px needs the figure_id it was read off")
+        f = _err(BF.figure, gun, figure_id)
+        side = [[round(u, 3), round(v, 3)] for u, v in BF.to_gun(f, side_px)]
+        side_source = side_source or {"figure": figure_id, "method": "read", "note": "read off the figure with pixel rulers"}
+    elif side is None and side_trace:
+        t = _err(BP.trace, gun, side_trace)
+        side = t["outline_cm"]
+        side_source = side_source or {"figure": t.get("figure"), "method": "traced", "note": "kept trace %s" % side_trace}
+    if side is None or not side_source:
+        raise ToolError("a loft needs its side outline (side, side_px with figure_id, or side_trace) and its source")
+    secs = []
+    for sec in sections:
+        if "trace" in sec:            # a section traced off a section drawing: its pixels, image y down, as (x, z); no scale needed
+            tp = _bp()[7].folder(gun, "figures") / ("%s.trace.json" % sec["trace"])
+            if not tp.exists():
+                raise ToolError("no kept trace %s (blueprint_trace with keep_as)" % sec["trace"])
+            t = json.loads(tp.read_text(encoding="utf-8"))
+            secs.append({"y": float(sec["y"]), "outline": [[u, -v] for u, v in t["outline_px"]]})
+        else:
+            secs.append({"y": float(sec["y"]), "outline": sec["outline"]})
+    sections = secs
+    return _err(BP.loft, gun, part_id, role, finish, side, top, sections, side_source, top_source, sections_source, name=name,
+                motion=motion, motion_sources=motion_sources, parent=parent, step_cm=step_cm, ring_points=ring_points)
+
+
+@mcp.tool()
+def blueprint_follow_part(gun: str, part_id: str, figure_id: str,
+                          radius_px: Annotated[int, Field(description="how far a point may move: small (6) for a careful reading, larger (16) for a rough one")] = 16,
+                          max_area_change: Annotated[float, Field(description="refuse a follow that changes the part's area by more than this share")] = 0.12) -> dict:
+    """The detail pass: a part's side outline laid onto the figure's lines as one line (OCR Lab's follower). Kept
+    as it was when following does not bring it closer, or changes its area too much (it collapsed or ran off). Gives
+    the fit before and after and a picture."""
+    from .blueprint import detail as D
+    return _err(D.follow, gun, figure_id, part_id, radius_px=radius_px, max_area_change=max_area_change)
+
+
+@mcp.tool()
+def blueprint_shape_across(gun: str, part_id: str, section: Annotated[str, Field(description="rr (a box with rounded corners) or oval")],
+                           source: dict, radius_cm: Annotated[float, Field(description="rr: the corner radius across, cm")] = 0.3) -> dict:
+    """The detail pass: a part shaped across its width: its side kept, its front a rounded box or an ellipse over
+    its full height and width (three views)."""
+    from .blueprint import detail as D
+    return _err(D.soft, gun, part_id, radius_cm, source, section=section)
+
+
+@mcp.tool()
+def blueprint_round_corners(gun: str, part_id: str, radius_cm: float, source: dict) -> dict:
+    """The detail pass: a part's side outline with its corners rounded to radius_cm (machined and moulded parts have
+    radiused corners)."""
+    from .blueprint import detail as D
+    return {"part": part_id, "points": _err(D.round_corners, gun, part_id, radius_cm, source)}
+
+
+@mcp.tool()
+def blueprint_bevel(gun: str, part_id: str, bevel_cm: float, source: dict) -> dict:
+    """The detail pass: a part's edges rounded to bevel_cm."""
+    from .blueprint import detail as D
+    return _err(D.bevel, gun, part_id, bevel_cm, source)
 
 
 @mcp.tool()
@@ -571,14 +662,20 @@ def blueprint_check(gun: str, reference: Annotated[str | None, Field(description
 
 
 @mcp.tool()
-def blueprint_build(gun: str, render: bool = True) -> dict:
-    """Step 6 in Blender: the model (one object a part) and its parts map for Gun Kit; with render, labelled
-    pictures of it from both sides and three quarters."""
+def blueprint_build(gun: str, render: bool = True, segments: Annotated[int, Field(description="points round a turned part")] = 64) -> dict:
+    """Step 6 in Blender: the model (one object a part, each with its mesh health) and its parts map for Gun Kit;
+    with render, labelled pictures of it from both sides and three quarters."""
     BB = _bp()[6]
-    out = _err(BB.build, gun)
+    out = _err(BB.build, gun, segments)
     if render:
         out["views"] = _err(BB.render, gun)
     return out
+
+
+@mcp.tool()
+def blueprint_render(gun: str, look: Annotated[str, Field(description="workbench (flat studio shading) or material (EEVEE with the finishes' shine and textures, to hold beside a photo)")] = "material") -> dict:
+    """Pictures of the built model from both sides and three quarters, labelled as model views (not game views)."""
+    return _err(_bp()[6].render, gun, look=look)
 
 
 @mcp.tool()

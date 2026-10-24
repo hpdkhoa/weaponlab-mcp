@@ -15,9 +15,9 @@ blueprint names its source.
 | 3. Figures | `blueprint_figure_add`, `blueprint_grid`, `blueprint_calibrate`, `blueprint_frame`, `blueprint_align` | cuts a figure from a page, stands it upright, scales it, places it in gun space |
 | 3. Readings | `blueprint_trace`, `blueprint_measure` | outlines (silhouette, region, follow, snap, blob), ink spans, scale bar ticks, faint marks' count and pitch (peaks), distances |
 | 4. Blueprint | `blueprint_new`, `blueprint_part`, `blueprint_hole`, `blueprint_mark`, `blueprint_read` | writes the parts (extrude or lathe, clipped where neighbours meet), cuts, marks |
-| Detail | `blueprint_views`, `blueprint_feature`, `blueprint_parts_list`, `blueprint_numbers` | shapes parts by three views, adds grooves, screws and textures, holds every visible listed part to a blueprint part |
+| Detail | `blueprint_views`, `blueprint_loft`, `blueprint_follow_part`, `blueprint_shape_across`, `blueprint_round_corners`, `blueprint_bevel`, `blueprint_feature`, `blueprint_parts_list`, `blueprint_numbers` | shapes parts by three views or skins them through cross-sections (loft), lays outlines onto the figure's lines, rounds sections, corners and edges, adds grooves, screws and textures, holds every visible listed part to a blueprint part |
 | 5. Check | `blueprint_check` | contract, outline overlap with the reference, length and weight sums, the finish gate, each part's miss off its figure's lines, overlay pictures |
-| 6. Model | `blueprint_build`, `blueprint_showcase` | the model in Blender, one object a part, its parts map, labelled pictures; a GIF and MP4 showcase |
+| 6. Model | `blueprint_build`, `blueprint_render`, `blueprint_showcase` | the model in Blender, one object a part (each with its mesh health), its parts map, labelled pictures (flat, or with the finishes' materials); a GIF and MP4 showcase |
 | 7. Motion | `blueprint_to_gunkit` | Gun Kit: rig, hand clips, gun clips, read-back; refused until the finish gate passes |
 
 A gun's files are in `<work>/digitize/<gun>/` (or under `WEAPONLAB_DIGITIZE`): `sources.json`, `blueprint.json`,
@@ -44,6 +44,10 @@ bore under the traced sight. The bolt face is the muzzle less the barrel's lengt
   outline where a neighbour starts. A clip is a level line (`y` or `z`) or any line (`line`), and each says why.
 - **lathe:** a profile (y, r) turned round a line parallel to the bore, with an optional bore along it.
 - **views:** a side outline cut against front sections and a top outline: a part whose width changes.
+- **loft:** a part skinned through key cross-sections. At every station along y the side outline gives its bottom
+  and top, the top outline its two sides, and the nearest two sections (each fitted to that box) its shape, blended
+  by a smooth step. A stock is oval at the butt, round at the wrist and U-shaped at the forend, and its silhouette is
+  the read side outline exactly. A section can be a kept trace of a section drawing (a maker's forend shape).
 - **relief:** a side outline with a flat inner face and an outer face arched across its width, from `edge_cm` at the
   rim to full thickness in the middle (`both` makes the mirrored pair). Grip panels, as their drawing's sections show.
 - **outline corners:** any outline point may carry a third number, the drawing's corner radius in cm. The corner
