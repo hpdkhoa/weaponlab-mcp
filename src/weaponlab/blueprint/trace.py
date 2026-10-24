@@ -341,6 +341,7 @@ def follow(gun, fig_id, rough_px, name=None, **kw):
         for k in ("fit_before", "fit_after"):
             r[k]["p95_cm"] = round(r[k]["p95_px"] * f["scale"]["cm_per_px"], 3)
     r["figure"] = f["id"]
+    r["method"] = "follow"
     return r
 
 
