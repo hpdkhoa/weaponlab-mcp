@@ -2275,8 +2275,17 @@ if job.get("render") and T0 + BUDGET - _time.time() >= 45:
     report["hold_palm_r_lab"] = [round(x, 2) for x in lab_gun(palm_r())]
 
 
+VIEW_SHIFT = {}           # fakepose: per clip, the loading view's extra move and roll at the clip's own fullest pose
+
+
+def _pose_size(p):
+    return abs(p.get("roll", 0.0)) + abs(p.get("pitch", 0.0)) + abs(p.get("yaw", 0.0)) + sum(abs(v) for v in p.get("move", [0.0, 0.0, 0.0]))
+
+
 def pulled(p, cid):
-    """fakepose's idle pull on a timeline gun pose: back, down and the muzzle down, except in the aim clips."""
+    """fakepose's idle pull on a timeline gun pose: back, down and the muzzle down, except in the aim clips. In a
+    loading clip (the preset's load_view) the gun also takes the loading view's move and roll, in step with the
+    clip's own reload pose (none at the idle, all of it at the clip's fullest)."""
     if not PULL or cid in PULL.get("aim_clips", ()):
         return p
     q = dict(p)
@@ -2284,7 +2293,97 @@ def pulled(p, cid):
     # Gun Kit's view: +x the player's left; a pull to the right moves x down
     q["move"] = [mv[0] - float(PULL.get("right_cm", 0.0)), mv[1] - float(PULL["back_cm"]), mv[2] - float(PULL["down_cm"])]
     q["pitch"] = float(q.get("pitch", 0.0)) + float(PULL["pitch_deg"])
+    vs = VIEW_SHIFT.get(cid)
+    if vs and vs["peak"] > 1e-6:
+        w = min(1.0, _pose_size(p) / vs["peak"])
+        q["move"] = [q["move"][i] + w * vs["move"][i] for i in range(3)]
+        q["roll"] = float(q.get("roll", 0.0)) + w * vs["roll_add"]
     return q
+
+
+def _fix_summary(rows):
+    out = {"frames": 0, "sides": {}, "opened_deg_max": {}, "opened_frames": {}, "moved_cm_max": {}, "seen_before_fix_max": 0, "times": []}
+    for r_ in rows:
+        mv_ = r_.get("moved_cm")
+        if not mv_:
+            continue
+        out["frames"] += 1
+        out["seen_before_fix_max"] = max(out["seen_before_fix_max"], r_.get("seen_before_fix", 0))
+        out["times"].append(r_["t"])
+        for sd_ in r_.get("sides") or []:
+            out["sides"][sd_] = out["sides"].get(sd_, 0) + 1
+        for k_, v_ in mv_.items():
+            if k_ == "opened":
+                for dg_, deg_ in v_.items():
+                    out["opened_frames"][dg_] = out["opened_frames"].get(dg_, 0) + 1
+                    out["opened_deg_max"][dg_] = max(out["opened_deg_max"].get(dg_, 0.0), deg_)
+            else:
+                out["moved_cm_max"][k_] = max(out["moved_cm_max"].get(k_, 0.0), v_)
+    if out["times"]:
+        out["times"] = [min(out["times"]), max(out["times"])]
+    return out
+
+
+def solve_load_view(LV):
+    """The loading view (the owner, 2026-10-24: "fix the reload view": the rifle raised and brought in so the port sits
+    in the lower third of the first-person view, rolled toward the eye). For each loading clip, at the clip's fullest
+    pose: the roll that turns the face mark's facing most toward the eye (within max_roll_deg in all), then the move
+    that puts the loading mark on the target screen point at the target depth, solved from the move's measured effect
+    (1 cm on each axis), not from any axis convention."""
+    out = {}
+    t_ = math.tan(math.radians(PL.H_FOV / 2.0))
+    for cid_, clip_ in job["clips"].items():
+        if cid_ not in LV["clips"] or LV["mark"] not in facts["marks"]:
+            continue
+        peak = max(clip_["frames"], key=lambda f: _pose_size(f["gun"]))["gun"]
+        base = pulled(peak, cid_)
+
+        def place(extra_move, roll_add):
+            q = dict(base)
+            q["move"] = [base["move"][i] + extra_move[i] for i in range(3)]
+            q["roll"] = float(base.get("roll", 0.0)) + roll_add
+            gun_pose(q)
+            bpy.context.view_layer.update()
+            return Vector(L._to(mark_world(LV["mark"]), "view"))
+        # the roll: the face mark's facing toward the eye
+        fm = LV.get("face_mark")
+        best_roll = 0.0
+        if fm and fm in facts["marks"] and (facts.get("normals") or {}).get(fm):
+            nrm = facts["normals"][fm]
+            best = -2.0
+            r0 = float(base.get("roll", 0.0))
+            for ra in range(-30, 31, 5):
+                if abs(r0 + ra) > float(LV.get("max_roll_deg", 45.0)):
+                    continue
+                q = dict(base)
+                q["roll"] = r0 + ra
+                gun_pose(q)
+                bpy.context.view_layer.update()
+                P = mark_world(fm)
+                Nw = (mark_world(fm, offset=nrm) - P).normalized()
+                face = Nw.dot((L.eye - P).normalized())
+                if face > best:
+                    best, best_roll = face, float(ra)
+        # the move: the loading mark onto the target screen point at the target depth
+        sx, sy = LV["screen"]
+        d = float(LV["depth_cm"])
+        P0 = place([0.0, 0.0, 0.0], best_roll)
+        tgt = Vector(((2.0 * sx - 1.0) * d * t_, d, (1.0 - 2.0 * sy) * d * t_ / PL.ASPECT))
+        J = []
+        for i in range(3):
+            e = [0.0, 0.0, 0.0]
+            e[i] = 1.0
+            J.append(place(e, best_roll) - P0)
+        Jm = Matrix((J[0], J[1], J[2])).transposed()
+        try:
+            dm = Jm.inverted() @ (tgt - P0)
+        except ValueError:
+            continue
+        P1 = place(list(dm), best_roll)
+        out[cid_] = {"move": [round(v, 2) for v in dm], "roll_add": best_roll, "peak": _pose_size(peak),
+                     "mark_view_cm": [round(v, 2) for v in P1],
+                     "screen": {"x_share": round((P1.x / P1.y / t_ + 1.0) / 2.0, 3), "y_share_from_top": round((1.0 - P1.z / P1.y / (t_ / PL.ASPECT)) / 2.0, 3)}}
+    return out
 
 
 def gun_pose(p):
@@ -2482,6 +2581,10 @@ def mark_of(tg):
     return n if n in facts["marks"] else ("mag_grab" if n in facts["parts"] and "mag_grab" in facts["marks"] else None)
 
 
+if POSE_ENGINE == "fakepose" and PULL and PULL.get("load_view"):
+    VIEW_SHIFT.update(solve_load_view(PULL["load_view"]))
+    report["fakepose_load_view"] = {k: {kk: v[kk] for kk in ("move", "roll_add", "mark_view_cm", "screen")} for k, v in VIEW_SHIFT.items()}
+    L.snapshot("load", "hold")
 need = {}
 for cid_, clip in job["clips"].items():
     stays = {}
@@ -2698,7 +2801,10 @@ for cid, clip in job["clips"].items():
             "frames_checked": len(eye_frames), "frames_with_clip": sum(1 for e_ in eye_frames if e_["clip_pixels"]),
             "most_pixels": max((e_["clip_pixels"] for e_ in eye_frames), default=0),
             "deepest_seen_cm": max((e_["deepest_seen_cm"] for e_ in eye_frames), default=0.0),
-            "clipping_frames": [e_ for e_ in eye_frames if e_["clip_pixels"]][:20]}
+            "clipping_frames": [e_ for e_ in eye_frames if e_["clip_pixels"]][:20],
+            # what the fix did, frame by frame summed: which hand, which digits it opened (degrees), how far it set a hand
+            # back (cm): a fix seen on many frames is a pose that wants mending, not hiding
+            "fixes": _fix_summary(eye_frames)}
     if walled:
         # the walls are a real body's limits and physics: a clip with any frame past one is not written, only reported
         report["clips"][cid] = {"clip": name, "written": [], "blocked": "frames past the walls: %d" % len(walled),
@@ -2858,6 +2964,9 @@ if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET -
                        key=lambda f: -f["clip_pixels"])[:int(job.get("eye_clip_pictures", 3))]
         _when = [("start", 0.0), ("mid", _clip["seconds"] / 2.0), ("end", _clip["seconds"])]
         _when += [("clip_%.3f" % f["t"], f["t"]) for f in _left]
+        _step = float(job.get("eye_picture_step_s") or 0.0)       # a picture every step through the clip, to judge it whole
+        if _step > 0.0 and _cid in (job.get("eye_picture_clips") or [_cid]):
+            _when += [("t_%.2f" % (_k * _step), _k * _step) for _k in range(1, int(_clip["seconds"] / _step) + 1)]
         for _k, _t in _when:
             L.pose_clip(_nm, _t)
             _fr = min(_clip["frames"], key=lambda f: abs(f["t"] - _t))
