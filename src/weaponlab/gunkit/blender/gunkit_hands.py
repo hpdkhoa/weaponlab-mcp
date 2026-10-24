@@ -2983,5 +2983,35 @@ if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET -
             _pics.setdefault(_cid, {})[_k] = {"path": _dst, "t": round(_fr["t"], 3), "eye_clip_pixels": _ec["clip_pixels"],
                                               "where": _ec["where"], "parts": _ec.get("parts")}
     report["fakepose_eye_pictures"] = _pics
+    # the animation: every frame of the chosen clips, from the eye (and any outside view), for a video to watch
+    for _cid, _views in (job.get("anim_clips") or {}).items():
+        _clip = job["clips"].get(_cid)
+        _ce = report.get("clips", {}).get(_cid)
+        if not _clip or not (isinstance(_ce, dict) and _ce.get("written")):
+            continue
+        _ad = os.path.join(OUT, "fakepose_anim", _cid)
+        os.makedirs(_ad, exist_ok=True)
+        _nm = job.get("prefix", "A_%s_Hands_" % facts["name"]) + _cid
+        _tr = job["tracks"].get(_cid)
+        _tf = {round(f["t"], 5): f["bones"] for f in (_tr["frames"] if _tr else [])}
+        _frames = []
+        for _i, _fr in enumerate(_clip["frames"]):
+            if T0 + BUDGET - _time.time() < 20:
+                report.setdefault("budget_cut", []).append("animation %s stopped at frame %d" % (_cid, _i))
+                break
+            L.pose_clip(_nm, _fr["t"])
+            gun_pose(pulled(_fr["gun"], _cid))
+            rest_parts()
+            if round(_fr["t"], 5) in _tf:
+                pose_parts(_tf[round(_fr["t"], 5)])
+            bpy.context.view_layer.update()
+            _r = L.render(views=tuple(_views), size=tuple(job.get("anim_size", (960, 540))))
+            _row = {"t": round(_fr["t"], 4)}
+            for _im in _r["images"]:
+                _dst = os.path.join(_ad, "%s_%04d.png" % (_im["view"], _i))
+                _sh.copy(_im["path"], _dst)
+                _row[_im["view"]] = _dst
+            _frames.append(_row)
+        report.setdefault("fakepose_animations", {})[_cid] = {"fps": _clip["fps"], "frames": _frames, "folder": _ad}
 json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
 print("GUNKIT HANDS: %s, %d clips, hold %s" % (facts["name"], len(report["clips"]), report["hold"]))
