@@ -2367,7 +2367,9 @@ def arc(a, b, w):
         return None
     if na is None or nb is None:
         return (na or nb).normalized() * (ARC_CM / 100.0) * math.sin(math.pi * w)
-    d = na + nb
+    # the lift's direction turns from the first hold's facing to the second's over the way, so the hand leaves along
+    # one and arrives along the other (under a handguard: from below), not at a slant into it
+    d = na * (1.0 - w) + nb * w
     if d.length < 1e-6:
         d = na
     return d.normalized() * (ARC_CM / 100.0) * math.sin(math.pi * w)
@@ -2672,8 +2674,9 @@ for cid, clip in job["clips"].items():
                     if cn:
                         clip_contacts.append((fr["t"], side, cn))
         if POSE_ENGINE == "fakepose":
-            # the market's rule (the owner's choice (b)): the clipping the first-person camera sees, every Nth frame
-            if len(resolved) % int(job.get("eye_every", 2)) == 1:
+            # the market's rule (the owner's choice (b)): the clipping the first-person camera sees, on every frame
+            # (eye_every > 1 skips frames for a quick look only)
+            if (len(resolved) - 1) % max(1, int(job.get("eye_every", 1))) == 0:
                 ec_ = FP.eye_clip(res=tuple(job.get("eye_res_clips", (96, 54))))
                 row_ = {"t": round(fr["t"], 3), "seen_before_fix": ec_["clip_pixels"], "sides": ec_.get("sides")}
                 if ec_["clip_pixels"]:
@@ -2850,7 +2853,12 @@ if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET -
         _nm = job.get("prefix", "A_%s_Hands_" % facts["name"]) + _cid
         _tr = job["tracks"].get(_cid)
         _tf = {round(f["t"], 5): f["bones"] for f in (_tr["frames"] if _tr else [])}
-        for _k, _t in (("start", 0.0), ("mid", _clip["seconds"] / 2.0), ("end", _clip["seconds"])):
+        # and the frames that still clip after the fix (the worst 3), so a miss is seen, not only counted
+        _left = sorted((f for f in (report.get("fakepose_clips_eye", {}).get(_cid, {}).get("clipping_frames") or []) if f.get("clip_pixels")),
+                       key=lambda f: -f["clip_pixels"])[:int(job.get("eye_clip_pictures", 3))]
+        _when = [("start", 0.0), ("mid", _clip["seconds"] / 2.0), ("end", _clip["seconds"])]
+        _when += [("clip_%.3f" % f["t"], f["t"]) for f in _left]
+        for _k, _t in _when:
             L.pose_clip(_nm, _t)
             _fr = min(_clip["frames"], key=lambda f: abs(f["t"] - _t))
             gun_pose(pulled(_fr["gun"], _cid))
@@ -2862,8 +2870,9 @@ if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET -
             _src = _r["images"][0]["path"]
             _dst = os.path.join(_ed, "%s_%s.png" % (_cid, _k))
             _sh.copy(_src, _dst)
-            _pics.setdefault(_cid, {})[_k] = {"path": _dst, "t": round(_fr["t"], 3),
-                                              "eye_clip_pixels": FP.eye_clip(res=(96, 54))["clip_pixels"]}
+            _ec = FP.eye_clip(res=(96, 54))
+            _pics.setdefault(_cid, {})[_k] = {"path": _dst, "t": round(_fr["t"], 3), "eye_clip_pixels": _ec["clip_pixels"],
+                                              "where": _ec["where"], "parts": _ec.get("parts")}
     report["fakepose_eye_pictures"] = _pics
 json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
 print("GUNKIT HANDS: %s, %d clips, hold %s" % (facts["name"], len(report["clips"]), report["hold"]))

@@ -199,6 +199,24 @@ FINISH = {"small_cm": 3.0, "min_points": 24, "long_cm": 5.0, "flat_round_cm": 0.
 INSIDE = {"carrier", "bolt"}                         # parts inside the gun: the eye meets them only through a port
 
 
+def _crossings(pts):
+    """How many times a closed outline crosses itself (segment pairs that cross away from their shared ends)."""
+    def cross(a, b, c, d):
+        r, q = (b[0] - a[0], b[1] - a[1]), (d[0] - c[0], d[1] - c[1])
+        den = r[0] * q[1] - r[1] * q[0]
+        if abs(den) < 1e-12:
+            return False
+        t = ((c[0] - a[0]) * q[1] - (c[1] - a[1]) * q[0]) / den
+        u = ((c[0] - a[0]) * r[1] - (c[1] - a[1]) * r[0]) / den
+        return 1e-9 < t < 1 - 1e-9 and 1e-9 < u < 1 - 1e-9
+    n, c = len(pts), 0
+    for i in range(n):
+        for j in range(i + 2, n):
+            if not (i == 0 and j == n - 1) and cross(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n]):
+                c += 1
+    return c
+
+
 def finish(bp):
     """The full detail pass, the end result by default (the owner, 2026-10-24: "I want the default of lab mcp end
     result is the full detail pass, not a low poly half ass"). Every visible part bigger than FINISH["small_cm"] is
@@ -231,8 +249,18 @@ def finish(bp):
         rect = len(side) == 4 and len({round(q[0], 3) for q in side}) == 2 and len({round(q[1], 3) for q in side}) == 2
         if by_eye and size >= FINISH["long_cm"] and len(side) < FINISH["min_points"] and not rect and not (curved and len(side) == 4):
             sparse.append("%s (%d points)" % (pid, len(side)))     # a few points read by eye: a crude outline
-    ok = not (flat or no_bevel or sparse)
-    return {"ok": ok, "flat_slabs": flat, "no_round_edges": no_bevel, "sparse_outlines": sparse, "rules": dict(FINISH),
+    # an outline that crosses itself makes a broken solid (its cap and every cut after it): never finished
+    tangled = []
+    for pid, p in bp["parts"].items():
+        sh = p["shape"]
+        views = [("side", sh.get("outline") or sh.get("side"))] + [("front %d" % k, f["outline"]) for k, f in enumerate(sh.get("front") or [])]
+        if sh.get("top"):
+            views.append(("top", sh["top"]))
+        for nm, pts in views:
+            if pts and sh["kind"] != "lathe" and _crossings([q[:2] for q in pts]):
+                tangled.append("%s (%s)" % (pid, nm))
+    ok = not (flat or no_bevel or sparse or tangled)
+    return {"ok": ok, "flat_slabs": flat, "no_round_edges": no_bevel, "sparse_outlines": sparse, "self_crossing": tangled, "rules": dict(FINISH),
             "why": "the full detail pass is the end result by default: a flat slab, a sharp edge or a sparse outline is low poly"}
 
 

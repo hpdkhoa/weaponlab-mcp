@@ -128,6 +128,12 @@ def to_gunkit(gun, grip_steps=3):
     if not fin["ok"]:
         # the full detail pass is the end result (the owner, 2026-10-24): a low poly gun does not go on to the game
         return {"stopped": "the detail pass is not done", "finish": fin}
+    rep = store.folder(gun, "model") / "build.json"
+    parts = (json.loads(rep.read_text(encoding="utf-8")).get("parts") or {}) if rep.exists() else {}
+    broken = {k: v["mesh"] for k, v in parts.items() if v.get("mesh") and not v["mesh"].get("sound")}
+    if broken:
+        # a broken solid (an open edge, faces turned in) shades wrong and cannot be cut or checked: not done
+        return {"stopped": "parts with broken meshes", "broken": broken}
     rigged = R.rig(str(pm))
     if rigged["problems"]:
         return {"rigged": rigged, "stopped": "the facts do not fit the action"}

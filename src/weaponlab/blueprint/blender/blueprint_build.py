@@ -637,7 +637,14 @@ for pid, p in bp["parts"].items():
     ob.data.validate()
     lo = Vector((min(v.co.x for v in ob.data.vertices), min(v.co.y for v in ob.data.vertices), min(v.co.z for v in ob.data.vertices)))
     hi = Vector((max(v.co.x for v in ob.data.vertices), max(v.co.y for v in ob.data.vertices), max(v.co.z for v in ob.data.vertices)))
-    report["parts"][pid] = {"role": p["role"], "vertices": len(ob.data.vertices), "faces": len(ob.data.polygons),
+    _bm = bmesh.new()
+    _bm.from_mesh(ob.data)
+    _health = {"nonmanifold_edges": sum(1 for e in _bm.edges if not e.is_manifold),
+               "signed_volume_cm3": round(_bm.calc_volume(signed=True) * 1e6, 3)}
+    _bm.free()
+    # a sound solid: every edge on two faces, its faces turned out (a positive volume)
+    _health["sound"] = _health["nonmanifold_edges"] == 0 and _health["signed_volume_cm3"] > 0
+    report["parts"][pid] = {"role": p["role"], "vertices": len(ob.data.vertices), "faces": len(ob.data.polygons), "mesh": _health,
                             "bounds_cm": {"x": [round(lo.x * 100, 3), round(hi.x * 100, 3)], "y": [round(-hi.y * 100, 3), round(-lo.y * 100, 3)],
                                           "z": [round(lo.z * 100, 3), round(hi.z * 100, 3)]}}
 blend = os.path.join(OUT, "%s%s.blend" % (bp["name"], "_plain" if PLAIN else ""))
