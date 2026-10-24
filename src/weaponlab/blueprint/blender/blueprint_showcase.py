@@ -6,6 +6,7 @@ job: {"out": folder, "size": [w, h], "fps": 15, "turn_frames": 60,
       "clips": [{"action": "A_<name>_fire", "slow": 6, "view": "right", "repeat": 2, "loaded": "always",
                  "free": {"Magazine": [[x, y, z] cm a frame]}, "free_fps": 60}, ...],
       "round": {"profile": [[y, r] cm], "case_y_cm": [0, 2.28]} | null, "slide_bone": "Slide"}
+a clip's "look" (Blender metres) is the point its camera looks at, for a long gun's action seen close.
 views: right (the gun's right side, three quarters), left, top_right, port (behind and above the right side, close on
 the breech: the gap the slide opens). A clip's free tracks replace its free bones' keys (a gun-only view: the part the
 arms would carry plays along their way); loaded shows the round in the chamber: always, when_home (the slide home),
@@ -207,7 +208,7 @@ for c in job.get("clips", []):
     secs = (f1 - f0) / src_fps
     frames = max(2, int(round(secs * c.get("slow", 1) * FPS)))
     az, el = VIEWS.get(c.get("view", "right"), VIEWS["right"])
-    aim(az, el, DIST * c.get("zoom", 1.0), LOOK.get(c.get("view")))
+    aim(az, el, DIST * c.get("zoom", 1.0), Vector(c["look"]) if c.get("look") else LOOK.get(c.get("view")))
     slide = arm.pose.bones.get(job.get("slide_bone") or "Slide")
     for rep in range(c.get("repeat", 1)):
         was_away = False

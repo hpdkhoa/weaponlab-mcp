@@ -221,6 +221,8 @@ def free_path(action, facts, clip_id, fps=FPS):
     for role, p in action["parts"].items():
         if p["kind"] != "free":
             continue
+        if not (role in facts.get("parts", {}) or (role in ("magazine", "cell") and facts.get("magazine"))):
+            continue                      # a free part this gun does not carry (a stripper clip, a loose shell)
         grasp = facts["marks"].get("mag_grab") or _add(facts["magazine"]["lips"], [0.0, 0.0, -10.0])
         away = _add(well(facts, "clear"), well(facts, 50.0))
         track, last, carried = [], [0.0, 0.0, 0.0], False

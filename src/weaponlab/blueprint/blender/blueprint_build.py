@@ -750,6 +750,15 @@ for pid, p in bp["parts"].items():
         ob.select_set(False)
     except Exception as e_:                       # an older Blender without the operator: smooth shading only
         print("BLUEPRINT NOTE auto smooth: %s" % e_)
+    # a flat face keeps its own normal (weighted by face area): a large flat side split into long triangles beside a
+    # rounded edge no longer shades in streaks; the rounded edges still shade round
+    try:
+        wn = ob.modifiers.new("WeightedNormal", 'WEIGHTED_NORMAL')
+        wn.mode, wn.keep_sharp, wn.weight = 'FACE_AREA', True, 100
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.modifier_apply(modifier=wn.name)
+    except Exception as e_:
+        print("BLUEPRINT NOTE weighted normals: %s" % e_)
     ob.data.materials.clear()                     # the cuts bring their cutters' empty slots: one finish a part
     tx = next((ft for ft in p.get("features", []) if ft["kind"] == "texture" and ft["pattern"] in ("stippling", "knurling", "checkering")), None)
     ob.data.materials.append(material_textured(p["finish"], tx["pattern"], float(tx.get("pitch_cm") or 0.08)) if tx and not PLAIN else material(p["finish"]))

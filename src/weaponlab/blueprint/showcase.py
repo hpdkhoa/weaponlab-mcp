@@ -18,6 +18,16 @@ CLIPS = [  # action suffix, label, slow, view, repeat, zoom (the camera's distan
     ("check_chamber", "Chamber check: the slide eased back, the round's case shows at the port (2x slow)", 2, "port", 1, 0.45, "always"),
     ("check_mag", "Magazine check: released, drawn out, looked at, seated again", 1, "left", 1, 1.5, "always"),
 ]
+# a long gun: the whole gun for the reloads, the camera close on its action (the port mark) for the rest. {w} names
+# the part that runs (the action's first moving part the gun has)
+LONG_CLIPS = [
+    ("fire", "Firing: the {w} cycles (4x slow)", 4, "right_close", 2, 0.4, "when_home", True),
+    ("cycle", "Working the {w}: lifted, drawn back, pushed home, turned down (2x slow)", 2, "right_close", 1, 0.4, "always", True),
+    ("reload_empty", "Empty reload: the {w} opened, loaded, closed (1.5x slow)", 1.5, "right", 1, 0.75, "after_home", False),
+    ("check_chamber", "Chamber check: the {w} eased back, the chamber shows at the port (2x slow)", 2, "port", 1, 0.4, "always", True),
+    ("check_mag", "Magazine check: released, drawn out, looked at, seated again", 1, "left", 1, 0.75, "always", False),
+]
+RUNS = (("slide", "slide"), ("carrier", "bolt carrier"), ("bolt", "bolt"), ("pump", "slide"), ("lever", "lever"))
 # loaded: when the chamber holds a round. always; when_home: only while the slide is home (firing: the case leaves
 # with the slide, the next round goes in as it closes); after_home: empty until the slide closes at the clip's end
 # (an empty reload). The arms are not drawn, so a part a hand carries (the magazine) is played along the hand clip's
@@ -91,21 +101,30 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
     facts = json.loads((Path(R.folder(gun)) / "gunfacts.json").read_text(encoding="utf-8"))
     action = A.load(facts["action"])
     clips = []
-    for a, lab, s, v, r, z, loaded in CLIPS:
+    run = next(((p_, w_) for p_, w_ in RUNS if p_ in facts["parts"]), ("slide", "slide"))
+    long_gun = run[0] != "slide"
+    port = facts["marks"].get("port")
+    look = [port[0] / 100.0, -port[1] / 100.0, port[2] / 100.0] if long_gun and port else None
+    plan = [(a, lab.format(w=run[1]), s, v, r, z, ld, look if close else None) for a, lab, s, v, r, z, ld, close in LONG_CLIPS] if long_gun         else [c + (None,) for c in CLIPS]
+    if long_gun and "cycle" in action.get("gun_clips", {}):
+        plan[0] = ("fire", "Firing: the trigger breaks (4x slow)") + plan[0][2:]
+    for a, lab, s, v, r, z, loaded, at in plan:
+        if a not in action.get("gun_clips", {}):
+            continue
         free = {}
         for role, track in T.free_path(action, facts, a).items():
             bone = (facts.get("magazine") or {}).get("bone") if role in ("magazine", "cell") else facts["parts"].get(role, {}).get("bone")
             if bone:
                 free[bone] = track
         clips.append({"action": "A_%s_%s" % (gun, a), "label": lab, "slow": s, "view": v, "repeat": r, "zoom": z, "loaded": loaded,
-                      "free": free, "free_fps": T.FPS})
+                      "free": free, "free_fps": T.FPS, "look": at})
     # the round in the chamber, where the gun has one (<gun>/round.json: a turned profile in gun cm), and the marks the
     # port view looks at
     rnd = store.root() / gun / "round.json"
     jf = out / "showcase.job.json"
     jf.write_text(json.dumps({"out": str(frames_dir), "size": list(size), "fps": fps, "turn_frames": turn_frames, "clips": clips,
                               "round": json.loads(rnd.read_text(encoding="utf-8")) if rnd.exists() else None,
-                              "slide_bone": facts["parts"].get("slide", {}).get("bone"),
+                              "slide_bone": facts["parts"].get(run[0], {}).get("bone"),
                               "port": facts["marks"].get("port")}), encoding="utf-8")
     p = subprocess.run([str(project().blender()), "-b", str(clips_blend), "-P", str(HERE / "blueprint_showcase.py"), "--", str(jf)],
                        capture_output=True, text=True, timeout=timeout)
