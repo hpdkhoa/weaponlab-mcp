@@ -135,8 +135,10 @@
                 "cc0",
                 "cc-by",
                 "cc-by-sa",
-                "permission"
-              ]
+                "permission",
+                "facts-only"
+              ],
+              "description": "facts-only: a copyrighted page (a maker's spec sheet) used only for the dimensions and shapes measured from it; nothing of it is copied or shipped"
             },
             "credit": {
               "type": "string",

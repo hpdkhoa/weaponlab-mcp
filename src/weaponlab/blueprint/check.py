@@ -34,7 +34,7 @@ def silhouette(bp, include=None):
         sh = p["shape"]
         if sh["kind"] == "extrude":
             polys.append(sh["outline"])
-        elif sh["kind"] in ("views", "relief"):
+        elif sh["kind"] in ("views", "relief", "loft"):
             polys.append(sh["side"])
         else:
             z0 = sh["axis"][1]
@@ -103,7 +103,7 @@ def detail(bp, src):
     kinds = {}
     for pid, p in bp["parts"].items():
         sh = p["shape"]
-        k = "lathe" if sh["kind"] == "lathe" else ("shaped" if (sh["kind"] == "views" and ("front" in sh or "top" in sh)) or sh["kind"] == "relief" else "slab")
+        k = "lathe" if sh["kind"] == "lathe" else ("shaped" if (sh["kind"] == "views" and ("front" in sh or "top" in sh)) or sh["kind"] in ("relief", "loft") else "slab")
         kinds.setdefault(k, []).append(pid)
     feats = [f["kind"] for p in bp["parts"].values() for f in p.get("features", [])]
     return {"listed": len(listed), "visible": len(visible), "missing": missing,
@@ -116,7 +116,7 @@ def volume_cm3(p):
     sh = p["shape"]
     if sh["kind"] == "relief":                      # no larger than its side times its thickness (a pair: twice)
         return Pl.area(sh["side"]) * abs(sh["x"][1] - sh["x"][0]) * (2 if sh.get("both") else 1)
-    if sh["kind"] in ("extrude", "views"):          # a shaped part is no larger than its side times its width
+    if sh["kind"] in ("extrude", "views", "loft"):  # a shaped part is no larger than its side times its width
         v = Pl.area(sh["outline"] if sh["kind"] == "extrude" else sh["side"]) * (sh["x"][1] - sh["x"][0])
         for h in p.get("holes", []):
             if h["kind"] == "bore":
@@ -154,7 +154,7 @@ def lines(gun, bp, fig):
     out = {}
     for pid, p in bp["parts"].items():
         sh = p["shape"]
-        key = "outline" if sh["kind"] == "extrude" else "side" if sh["kind"] == "views" else None
+        key = "outline" if sh["kind"] == "extrude" else "side" if sh["kind"] in ("views", "loft") else None
         src = (p.get("sources", {}).get(key) or {}) if key else {}
         fid = src.get("figure")
         if not fid and src.get("trace"):
@@ -241,19 +241,20 @@ def finish(bp):
         if kind == "extrude" and bev < FINISH["flat_round_cm"]:
             flat.append(pid)                # flat sides are real (a slide, a frame); flat sides with sharp edges are not
         fronts = sh.get("front") or []
-        curved = any(len(fr.get("outline", [])) >= 16 for fr in fronts) or kind == "relief"
+        curved = any(len(fr.get("outline", [])) >= 16 for fr in fronts) or kind in ("relief", "loft")
         if not bev and not curved:
             no_bevel.append(pid)            # a round section needs no bevel: it has no edge along its length
         src = (p.get("sources") or {}).get("outline") or (p.get("sources") or {}).get("side") or {}
         by_eye = src.get("method") in ("read", "traced") and not any(w in str(src.get("note", "")) for w in ("snapped", "followed"))
         rect = len(side) == 4 and len({round(q[0], 3) for q in side}) == 2 and len({round(q[1], 3) for q in side}) == 2
-        if by_eye and size >= FINISH["long_cm"] and len(side) < FINISH["min_points"] and not rect and not (curved and len(side) == 4):
+        if by_eye and kind != "loft" and size >= FINISH["long_cm"] and len(side) < FINISH["min_points"] and not rect and not (curved and len(side) == 4):
             sparse.append("%s (%d points)" % (pid, len(side)))     # a few points read by eye: a crude outline
     # an outline that crosses itself makes a broken solid (its cap and every cut after it): never finished
     tangled = []
     for pid, p in bp["parts"].items():
         sh = p["shape"]
         views = [("side", sh.get("outline") or sh.get("side"))] + [("front %d" % k, f["outline"]) for k, f in enumerate(sh.get("front") or [])]
+        views += [("section %d" % k, f["outline"]) for k, f in enumerate(sh.get("sections") or [])]
         if sh.get("top"):
             views.append(("top", sh["top"]))
         for nm, pts in views:

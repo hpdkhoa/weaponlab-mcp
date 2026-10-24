@@ -34,6 +34,29 @@ FINISH = {"blued": ((0.05, 0.055, 0.065), 1.0, 0.35), "parkerized": ((0.11, 0.11
           "polymer": ((0.04, 0.04, 0.04), 0.0, 0.6), "rubber": ((0.03, 0.03, 0.03), 0.0, 0.85)}
 
 
+def material_textured(finish, pattern, pitch_cm):
+    """The finish with a surface pattern too fine for the mesh shown in its shading: stippling as a fine noise bump
+    (a moulded stock's texture), knurling and checkering as a finer one; the colour and the shine kept."""
+    name = "M_%s_%s_%.3f" % (finish, pattern, pitch_cm)
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+    m = material(finish).copy()
+    m.name = name
+    nt = m.node_tree
+    b = nt.nodes.get("Principled BSDF")
+    tex = nt.nodes.new("ShaderNodeTexNoise")
+    tex.inputs["Scale"].default_value = 100.0 / max(pitch_cm, 0.02)      # one grain each pitch (the model is in metres)
+    tex.inputs["Detail"].default_value = 4.0
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.35
+    bump.inputs["Distance"].default_value = pitch_cm / 400.0
+    nt.links.new(tex.outputs["Fac"], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], b.inputs["Normal"])
+    b.inputs["Roughness"].default_value = min(1.0, b.inputs["Roughness"].default_value + 0.15)
+    m["pattern"] = pattern
+    return m
+
+
 def g(x, y, z):
     return Vector((x, -y, z)) / 100.0
 
@@ -295,6 +318,91 @@ def relief(name, side, x, edge_cm, axis, grid_cm=0.08):
         cur = nxt[cur]
     bm.faces.new([bot_by[i] for i in reversed(loop)])
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+def _span(outline, y):
+    """Where the line at y crosses a closed outline (y, v): the lowest and highest v, or None."""
+    vs = []
+    n = len(outline)
+    for i in range(n):
+        (y0, v0), (y1, v1) = outline[i][:2], outline[(i + 1) % n][:2]
+        if (y0 - y) * (y1 - y) <= 0 and y0 != y1:
+            vs.append(v0 + (v1 - v0) * (y - y0) / (y1 - y0))
+    return (min(vs), max(vs)) if len(vs) >= 2 else None
+
+
+def _ring(outline, n):
+    """A section outline (x, z) as n points evenly spaced along it, counter-clockwise, starting at its lowest point
+    nearest its middle, in its own box: u from -1 to 1 across, v from 0 to 1 up."""
+    pts = [tuple(q[:2]) for q in outline]
+    area = sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(pts, pts[1:] + pts[:1]))
+    if area < 0:
+        pts.reverse()
+    xs, zs = [q[0] for q in pts], [q[1] for q in pts]
+    x0, x1, z0, z1 = min(xs), max(xs), min(zs), max(zs)
+    xm = (x0 + x1) / 2.0
+    k0 = min(range(len(pts)), key=lambda i: (round(pts[i][1] - z0, 4) > 0.05 * (z1 - z0), abs(pts[i][0] - xm)))
+    pts = pts[k0:] + pts[:k0]
+    seg = [math.dist(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
+    L = sum(seg)
+    out, acc, i = [], 0.0, 0
+    for k in range(n):
+        t = L * k / n
+        while acc + seg[i] < t:
+            acc += seg[i]
+            i += 1
+        f = (t - acc) / seg[i] if seg[i] else 0.0
+        a, b = pts[i], pts[(i + 1) % len(pts)]
+        x, z = a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
+        out.append(((x - xm) / ((x1 - x0) / 2.0), (z - z0) / (z1 - z0)))
+    return out
+
+
+def loft(name, sh):
+    """A part skinned through its cross-sections: at every station along y (every step_cm) the side outline gives
+    its bottom and top, the top outline its two sides, and the key sections (each in its own box) its shape, blended
+    between the two nearest by a smooth step. Rings of ring_points points, joined by quads, the two ends closed."""
+    n = int(sh.get("ring_points", 72))
+    step = float(sh.get("step_cm", 0.3))
+    keys = sorted(((float(s_["y"]), _ring(s_["outline"], n)) for s_ in sh["sections"]), key=lambda t: t[0])
+    ys = [q[0] for q in sh["side"]]
+    y_lo, y_hi = min(ys), max(ys)
+    m = max(2, int(math.ceil((y_hi - y_lo) / step)) + 1)
+    stations = [y_lo + (y_hi - y_lo) * k / (m - 1) for k in range(m)]
+    stations[0] += 1e-4
+    stations[-1] -= 1e-4
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    rings = []
+    for y in stations:
+        zz = _span(sh["side"], y)
+        xx = _span(sh["top"], y)
+        if not zz or not xx:
+            continue
+        if y <= keys[0][0]:
+            shape = keys[0][1]
+        elif y >= keys[-1][0]:
+            shape = keys[-1][1]
+        else:
+            j = max(i for i in range(len(keys)) if keys[i][0] <= y)
+            (ya, A), (yb, B) = keys[j], keys[j + 1]
+            t = (y - ya) / (yb - ya)
+            t = t * t * (3.0 - 2.0 * t)
+            shape = [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for a, b in zip(A, B)]
+        xm, hw = (xx[0] + xx[1]) / 2.0, (xx[1] - xx[0]) / 2.0
+        rings.append([bm.verts.new(g(xm + u * hw, y, zz[0] + v * (zz[1] - zz[0]))) for u, v in shape])
+    for r0, r1 in zip(rings, rings[1:]):
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new([r0[i], r0[j], r1[j], r1[i]])
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
@@ -575,6 +683,20 @@ for pid, p in bp["parts"].items():
                 (y, z), r = h["at"], h["r"]
                 cut = prism("%s_hole%d" % (pid, k), [[y + r * math.cos(2 * math.pi * t / SEG), z + r * math.sin(2 * math.pi * t / SEG)] for t in range(SEG)], hx[0], hx[1])
             boolean(ob, cut)
+    elif sh["kind"] == "loft":
+        ob = loft(pid, sh)
+        x0, x1 = sorted(sh["x"])
+        print("BLUEPRINT STEP %s (loft): %d vertices, %d faces" % (pid, len(ob.data.vertices), len(ob.data.polygons)))
+        for k, h in enumerate(p.get("holes", [])):
+            hx = h.get("x") or [x0 - 1.0, x1 + 1.0]
+            if h["kind"] == "polygon":
+                cut = prism("%s_hole%d" % (pid, k), h["outline"], hx[0], hx[1])
+            elif h["kind"] == "bore":
+                cut = lathe("%s_hole%d" % (pid, k), [[h["y"][0], h["r"]], [h["y"][1], h["r"]]], h["at"][0], h["at"][1])
+            else:
+                (y, z), r = h["at"], h["r"]
+                cut = prism("%s_hole%d" % (pid, k), [[y + r * math.cos(2 * math.pi * t_ / SEG), z + r * math.sin(2 * math.pi * t_ / SEG)] for t_ in range(SEG)], hx[0], hx[1])
+            boolean(ob, cut)
     elif sh["kind"] == "relief":
         grid_ = max(sh.get("grid_cm", 0.08), 0.08) if PLAIN else sh.get("grid_cm", 0.08)
         ob = relief(pid, sh["side"], sh["x"], sh["edge_cm"], sh["axis"], grid_)
@@ -629,7 +751,8 @@ for pid, p in bp["parts"].items():
     except Exception as e_:                       # an older Blender without the operator: smooth shading only
         print("BLUEPRINT NOTE auto smooth: %s" % e_)
     ob.data.materials.clear()                     # the cuts bring their cutters' empty slots: one finish a part
-    ob.data.materials.append(material(p["finish"]))
+    tx = next((ft for ft in p.get("features", []) if ft["kind"] == "texture" and ft["pattern"] in ("stippling", "knurling", "checkering")), None)
+    ob.data.materials.append(material_textured(p["finish"], tx["pattern"], float(tx.get("pitch_cm") or 0.08)) if tx and not PLAIN else material(p["finish"]))
     for poly in ob.data.polygons:
         poly.material_index = 0
     ob["role"] = p["role"]

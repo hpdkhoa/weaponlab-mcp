@@ -150,26 +150,27 @@ def to_gunkit(gun, grip_steps=3):
 RENDER = Path(__file__).resolve().parent / "blender" / "blueprint_render.py"
 
 
-def render(gun, cm_per_px=0.03, timeout=600):
+def render(gun, cm_per_px=0.03, timeout=600, look="workbench"):
     """The built model seen from its left and right sides square on (at cm_per_px) and from three quarters; each
-    picture labelled as a Blueprint Lab model view, not a game view."""
+    picture labelled as a Blueprint Lab model view, not a game view. look: "workbench" (flat studio shading, the
+    default) or "material" (EEVEE with the finishes' shine and textures, to hold beside a photo)."""
     import cv2
     out = store.folder(gun, "model", "views")
     blend = store.folder(gun, "model") / ("%s.blend" % gun)
     if not blend.exists():
         raise FileNotFoundError("build the model first")
     jf = out / "render.job.json"
-    jf.write_text(json.dumps({"out": str(out), "cm_per_px": cm_per_px}), encoding="utf-8")
+    jf.write_text(json.dumps({"out": str(out), "cm_per_px": cm_per_px, "look": look}), encoding="utf-8")
     p = subprocess.run([str(project().blender()), "-b", str(blend), "-P", str(RENDER), "--", str(jf)],
                        capture_output=True, text=True, timeout=timeout)
     (out / "render.log").write_text((p.stdout or "") + "\n" + (p.stderr or ""), encoding="utf-8", errors="replace")
     if p.returncode != 0 or "BLUEPRINT RENDER" not in (p.stdout or ""):
         tail = [l for l in ((p.stdout or "") + (p.stderr or "")).splitlines() if l.strip()][-15:]
         raise RuntimeError("the render failed (see %s):\n%s" % (out / "render.log", "\n".join(tail)))
-    rep = json.loads((out / "render.json").read_text(encoding="utf-8"))
+    rep = json.loads((out / ("render.json" if look == "workbench" else "render_%s.json" % look)).read_text(encoding="utf-8"))
     for name, v in rep["views"].items():
         img = cv2.imread(v["file"])
-        label = "BLUEPRINT LAB MODEL %s, %s (not a game view)" % (gun, name.replace("view_", "").replace("_", " "))
+        label = "BLUEPRINT LAB MODEL %s, %s (not a game view)" % (gun, name.replace("view_", "").replace("_", " ") + ("" if look == "workbench" else ""))
         cv2.rectangle(img, (0, 0), (min(img.shape[1], 12 + 9 * len(label)), 26), (255, 255, 255), -1)
         cv2.putText(img, label, (6, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
         cv2.imwrite(v["file"], img)

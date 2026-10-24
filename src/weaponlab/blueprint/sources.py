@@ -38,7 +38,8 @@ def new(gun, title=None):
 def add(gun, file, source_id, kind, title, license_basis, publisher=None, year=None, url=None, credit=None,
         distribution=None, note=None, gun_title=None):
     """Registers a file as a source of the gun. license_basis: us-government-work, public-domain-age,
-    public-domain-mark, us-patent, cc0, cc-by, cc-by-sa or permission."""
+    public-domain-mark, us-patent, cc0, cc-by, cc-by-sa, permission or facts-only (a copyrighted page used only for the
+    dimensions and shapes measured from it, nothing of it copied or shipped)."""
     path = Path(file)
     if not path.exists():
         raise FileNotFoundError(file)

@@ -21,15 +21,36 @@ lo = Vector((min(min((o.matrix_world @ v.co)[i] for v in o.data.vertices) for o 
 hi = Vector((max(max((o.matrix_world @ v.co)[i] for v in o.data.vertices) for o in obs) for i in range(3)))
 mid = (lo + hi) / 2.0
 size = hi - lo
-sc.render.engine = 'BLENDER_WORKBENCH'
-sc.display.shading.light = 'STUDIO'
-sc.display.shading.color_type = 'MATERIAL'
-sc.display.shading.show_cavity = True
-sc.display.shading.show_object_outline = True
+LOOK = job.get("look", "workbench")
+SUFFIX = "" if LOOK == "workbench" else "_" + LOOK
 sc.render.film_transparent = False
 sc.world = sc.world or bpy.data.worlds.new("W")
-sc.world.color = (1.0, 1.0, 1.0)
-sc.display.shading.background_type = 'WORLD'
+if LOOK == "workbench":
+    sc.render.engine = 'BLENDER_WORKBENCH'
+    sc.display.shading.light = 'STUDIO'
+    sc.display.shading.color_type = 'MATERIAL'
+    sc.display.shading.show_cavity = True
+    sc.display.shading.show_object_outline = True
+    sc.world.color = (1.0, 1.0, 1.0)
+    sc.display.shading.background_type = 'WORLD'
+else:
+    # the materials as a studio photo shows them: EEVEE, a soft grey-white world and three area lights (key, fill,
+    # rim) round the gun, so a polymer's grain and a blued steel's shine read as on the source photo
+    sc.render.engine = 'BLENDER_EEVEE'
+    sc.world.use_nodes = True
+    bg_ = sc.world.node_tree.nodes.get("Background")
+    bg_.inputs["Color"].default_value = (0.92, 0.92, 0.93, 1.0)
+    bg_.inputs["Strength"].default_value = 0.25
+    span = max(size)
+    for nm, off, power in (("Key", Vector((-0.6, -0.4, 0.9)), 30.0), ("Fill", Vector((0.7, -0.2, 0.4)), 12.0), ("Rim", Vector((0.0, 0.8, 0.6)), 18.0)):
+        ld = bpy.data.lights.new(nm, 'AREA')
+        ld.energy = power * span * span
+        ld.size = span * 0.8
+        lo_ = bpy.data.objects.new(nm, ld)
+        sc.collection.objects.link(lo_)
+        lo_.location = mid + off * span * 1.4
+        lo_.rotation_euler = (mid - lo_.location).normalized().to_track_quat('-Z', 'Y').to_euler()
+    sc.view_settings.view_transform = 'AgX'
 cam_data = bpy.data.cameras.new("Cam")
 cam = bpy.data.objects.new("Cam", cam_data)
 sc.collection.objects.link(cam)
@@ -52,9 +73,9 @@ def shoot(name, loc, look, ortho=True, pad=1.15):
         cam_data.type = 'PERSP'
         cam_data.lens = 50
         sc.render.resolution_x, sc.render.resolution_y = 1400, 900
-    sc.render.filepath = os.path.join(OUT, "%s.png" % name)
+    sc.render.filepath = os.path.join(OUT, "%s%s.png" % (name, SUFFIX))
     bpy.ops.render.render(write_still=True)
-    out["views"][name] = {"file": sc.render.filepath, "px": [sc.render.resolution_x, sc.render.resolution_y], "ortho": ortho,
+    out["views"][name + SUFFIX] = {"file": sc.render.filepath, "px": [sc.render.resolution_x, sc.render.resolution_y], "ortho": ortho,
                           "cm_per_px": S if ortho else None}
 
 
@@ -63,6 +84,6 @@ far = max(size) * 4 + 1.0
 shoot("view_left", mid + Vector((far, 0, 0)), mid)
 shoot("view_right", mid + Vector((-far, 0, 0)), mid)
 shoot("view_three_quarter", mid + Vector((far * 0.45, -far * 0.35, far * 0.25)) * 0.35 + mid * 0.65, mid, ortho=False)
-with open(os.path.join(OUT, "render.json"), "w", encoding="utf-8") as f:
+with open(os.path.join(OUT, "render%s.json" % SUFFIX), "w", encoding="utf-8") as f:
     json.dump(out, f, indent=1)
 print("BLUEPRINT RENDER " + json.dumps(list(out["views"])))

@@ -212,6 +212,22 @@ def lathe(gun, part_id, role, finish, profile, axis_xz, profile_source, axis_sou
     return part(gun, part_id, role, finish, shape, sources, name=name, motion=motion, parent=parent)
 
 
+def loft(gun, part_id, role, finish, side, top, sections, side_source, top_source, sections_source, name=None, motion=None,
+         motion_sources=None, bevel_cm=None, parent=None, step_cm=None, ring_points=None):
+    """A part skinned through its cross-sections: side outline (y, z), top outline (y, x) and key sections
+    [{"y": y, "outline": [[x, z], ...]}], each section fitted at every station to the box the two outlines give there,
+    blended between the nearest two (a stock: oval at the butt, round at the wrist, U-shaped at the forend)."""
+    xs = [q[1] for q in top]
+    shape = {"kind": "loft", "side": side, "x": [min(xs), max(xs)], "top": top, "sections": sorted(sections, key=lambda s_: s_["y"])}
+    if step_cm:
+        shape["step_cm"] = float(step_cm)
+    if ring_points:
+        shape["ring_points"] = int(ring_points)
+    sources = {"side": side_source, "top": top_source, "sections": sections_source}
+    sources.update(motion_sources or {})
+    return part(gun, part_id, role, finish, shape, sources, name=name, motion=motion, bevel_cm=bevel_cm, parent=parent)
+
+
 def hole(gun, part_id, trace_name=None, circle=None, source=None, x=None, bore=None):
     """A cut across the part: a kept trace's outline (a trigger guard's opening) or a circle {"at": [y, z], "r": cm};
     or a bore along y: {"at": [x, z], "r": cm, "y": [y0, y1]}."""
