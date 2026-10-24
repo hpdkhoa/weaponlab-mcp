@@ -21,7 +21,7 @@ import bpy
 from mathutils import Matrix, Vector
 
 job = json.load(open(sys.argv[sys.argv.index("--") + 1], encoding="utf-8"))
-sys.path.insert(0, job["pkg"])
+sys.path.append(job["pkg"])   # last: Blender's own numpy first (an installed package sits in a site-packages built for another Python)
 from weaponlab.gunkit import rigplan as R  # noqa: E402
 
 pm = job["partsmap"] if isinstance(job["partsmap"], dict) else json.load(open(job["partsmap"], encoding="utf-8"))

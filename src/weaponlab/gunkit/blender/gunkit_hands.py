@@ -25,7 +25,7 @@ import sys
 import bpy
 from mathutils import Matrix, Quaternion, Vector
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))   # last: Blender's own numpy first (an installed package sits in a site-packages built for another Python)
 from weaponlab.gunkit import motion as MO  # noqa: E402
 from weaponlab.gunkit import reference as REFH  # noqa: E402
 

@@ -17,7 +17,7 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))   # last: Blender's own numpy first (an installed package sits in a site-packages built for another Python)
 from weaponlab.gunkit import reference as REF  # noqa: E402
 
 job = json.load(open(sys.argv[sys.argv.index("--") + 1], encoding="utf-8"))
