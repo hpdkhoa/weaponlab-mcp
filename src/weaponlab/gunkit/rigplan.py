@@ -56,6 +56,8 @@ def plan(partsmap, centres, model=None):
              "sources": list(partsmap.get("sources", []))}
     if facts["magazine"] is None:
         facts.pop("magazine")
+    if partsmap.get("sights"):
+        facts["sights"] = partsmap["sights"]          # the sight's sourced numbers (an eye relief), for the hands
     return facts
 
 

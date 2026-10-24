@@ -73,6 +73,12 @@ def partsmap(bp, blend):
           "marks": {m: x["at"] for m, x in bp["marks"].items()}, "mark_parts": mark_parts,
           "normals": {m: x["normal"] for m, x in bp["marks"].items() if "normal" in x},
           "blueprint": str(Path(store.root() / bp["name"] / "blueprint.json").resolve())}
+    from . import specs as Sp
+    fx = Sp.facts(bp["name"])
+    if "eye_relief_min" in fx and "eye_relief_max" in fx:
+        # the sight's eye relief from the gun's facts (the middle of its printed range), for the hands' cheek weld
+        pm["sights"] = {"eye_relief_cm": round((fx["eye_relief_min"]["value"] + fx["eye_relief_max"]["value"]) / 2.0, 2),
+                        "source": "facts eye_relief_min and eye_relief_max"}
     if bp.get("magazine_lips"):
         pm["magazine"] = {"lips": bp["magazine_lips"]["at"]}
         mag = next((p for p in bp["parts"].values() if p["role"] in ("magazine", "cell")), None)
