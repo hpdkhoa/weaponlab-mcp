@@ -84,7 +84,7 @@ def partsmap(bp, blend):
     return pm
 
 
-def build(gun, segments=32, timeout=900):
+def build(gun, segments=64, timeout=900):
     """Builds the model and writes model/<gun>.blend, model/build.json and model/partsmap.json. Refuses a blueprint
     that fails its contract."""
     bp = store.load(gun, "blueprint")
@@ -123,6 +123,11 @@ def to_gunkit(gun, grip_steps=3):
     pm = store.folder(gun, "model") / "partsmap.json"
     if not pm.exists():
         raise FileNotFoundError("build the model first")
+    from . import check as Ck
+    fin = Ck.finish(store.load(gun, "blueprint"))
+    if not fin["ok"]:
+        # the full detail pass is the end result (the owner, 2026-10-24): a low poly gun does not go on to the game
+        return {"stopped": "the detail pass is not done", "finish": fin}
     rigged = R.rig(str(pm))
     if rigged["problems"]:
         return {"rigged": rigged, "stopped": "the facts do not fit the action"}

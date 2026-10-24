@@ -431,30 +431,33 @@ def blueprint_align(gun: str, figure_id: str, reference_figure: str, trace_here:
 
 
 @mcp.tool()
-def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(description="silhouette, region, snap or blob")],
+def blueprint_trace(gun: str, figure_id: str, method: Annotated[str, Field(description="silhouette, region, follow, snap or blob")],
                     keep_as: Annotated[str, Field(description="the name the trace is kept under, for the plan")],
                     region: Annotated[list[float] | None, Field(description="silhouette: [x0, y0, x1, y1] px to look in")] = None,
                     seed: Annotated[list[float] | None, Field(description="region: a px point inside the area")] = None,
-                    rough: Annotated[list[list[float]] | None, Field(description="snap: a rough outline in px")] = None,
+                    rough: Annotated[list[list[float]] | None, Field(description="follow or snap: a rough outline in px")] = None,
                     box: Annotated[list[float] | None, Field(description="blob: [x0, y0, x1, y1] px round the patch (with seed inside)")] = None,
                     light: bool = True,
                     close_px: int = 7, gap_px: int = 2, radius_px: int = 10, eps_px: float = 1.5,
                     smooth_px: Annotated[int, Field(description="take out edge noise (a halftone's dots): average runs between corners over this many px (0: off)")] = 0,
                     corner_deg: Annotated[float, Field(description="with smooth_px: turns this sharp or sharper stay corners")] = 40.0) -> dict:
     """An outline from a figure, kept for the plan: the whole silhouette, a closed area round a seed, a rough
-    outline snapped onto the ink, or a patch in a halftone. Look at the picture it writes."""
+    outline laid onto the figure's lines as one line (follow: OCR Lab's follower, with its fit before and after; snap:
+    the older point by point snap), or a patch in a halftone. Look at the picture it writes."""
     BR = _bp()[3]
     BR.smoothing(smooth_px, corner_deg)
     if method == "silhouette":
         r = _err(BR.silhouette, gun, figure_id, region, close_px, eps_px)
     elif method == "region":
         r = _err(BR.region, gun, figure_id, seed, gap_px, eps_px, None, keep_as)
+    elif method == "follow":
+        r = _err(BR.follow, gun, figure_id, rough, keep_as, radius_px=radius_px)
     elif method == "snap":
         r = _err(BR.snap, gun, figure_id, rough, radius_px, 4, eps_px, None, keep_as)
     elif method == "blob":
         r = _err(BR.blob, gun, figure_id, box, seed, light, 3, eps_px, keep_as)
     else:
-        raise ToolError("method: silhouette, region, snap or blob")
+        raise ToolError("method: silhouette, region, follow, snap or blob")
     BR.smoothing(0)
     BR.save(gun, keep_as, r)
     return {k: v for k, v in r.items() if k not in ("outline_px", "outline_cm")} | {"kept": keep_as}

@@ -13,12 +13,12 @@ blueprint names its source.
 | 1. Sources | `blueprint_source_add`, `blueprint_scan`, `blueprint_page`, `blueprint_text` | registers a file with its license, sorts its pages (text, table, figure), draws pages to read |
 | 2. Facts | `blueprint_specs`, `blueprint_fact_add` | finds the data table's quantities, records each one in cm or kg with its page and quote |
 | 3. Figures | `blueprint_figure_add`, `blueprint_grid`, `blueprint_calibrate`, `blueprint_frame`, `blueprint_align` | cuts a figure from a page, stands it upright, scales it, places it in gun space |
-| 3. Readings | `blueprint_trace`, `blueprint_measure` | outlines (silhouette, region, snap, blob), ink spans, scale bar ticks, faint marks' count and pitch (peaks), distances |
+| 3. Readings | `blueprint_trace`, `blueprint_measure` | outlines (silhouette, region, follow, snap, blob), ink spans, scale bar ticks, faint marks' count and pitch (peaks), distances |
 | 4. Blueprint | `blueprint_new`, `blueprint_part`, `blueprint_hole`, `blueprint_mark`, `blueprint_read` | writes the parts (extrude or lathe, clipped where neighbours meet), cuts, marks |
 | Detail | `blueprint_views`, `blueprint_feature`, `blueprint_parts_list`, `blueprint_numbers` | shapes parts by three views, adds grooves, screws and textures, holds every visible listed part to a blueprint part |
-| 5. Check | `blueprint_check` | contract, outline overlap with the reference, length and weight sums, overlay pictures |
+| 5. Check | `blueprint_check` | contract, outline overlap with the reference, length and weight sums, the finish gate, each part's miss off its figure's lines, overlay pictures |
 | 6. Model | `blueprint_build`, `blueprint_showcase` | the model in Blender, one object a part, its parts map, labelled pictures; a GIF and MP4 showcase |
-| 7. Motion | `blueprint_to_gunkit` | Gun Kit: rig, hand clips, gun clips, read-back |
+| 7. Motion | `blueprint_to_gunkit` | Gun Kit: rig, hand clips, gun clips, read-back; refused until the finish gate passes |
 
 A gun's files are in `<work>/digitize/<gun>/` (or under `WEAPONLAB_DIGITIZE`): `sources.json`, `blueprint.json`,
 `pages/`, `figures/`, `check/`, `model/`.
@@ -81,6 +81,43 @@ like the gun.
 The check's `detail` result gives the listed and visible parts, the missing ones, how many parts are shaped, slabs
 or round, and the features by kind.
 
+## The finish gate: the full detail pass is the end result
+
+The owner's rule (2026-10-24): "I want the default of lab mcp end result is the full detail pass, not a low poly half
+ass". A gun is not done, and `blueprint_to_gunkit` refuses it, until every part passes the finish gate
+(`check.finish`, part of `blueprint_check`):
+
+| Rule | Fails |
+|---|---|
+| no flat slab | an extruded part longer than 3 cm with edges rounded less than 0.1 cm (give it three views, or a bevel) |
+| rounded edges | a part with no bevel and no curved section (a front section of 16 or more points, or a relief) |
+| dense outline | a part 5 cm or longer read by eye in fewer than 24 points (follow it onto its lines, or round its corners); an exact rectangle is straight, not sparse |
+
+`blueprint_build` builds round parts at 64 segments. The build reports each part's face count in `build.json`.
+
+## Reading lines: follow and fit (OCR Lab)
+
+Reading pictures belongs to OCR Lab (`ocrlab-mcp`, the `lines` extra). `blueprint_trace` with `follow` and the check's
+line report call it.
+
+- **follow** lays a rough outline onto the figure's lines as one line. Each point moves only along its own normal,
+  and all the moves are chosen together by dynamic programming round the closed outline: each point on a line's
+  middle, neighbours moving alike. The outline cannot jump from a part's edge to an inner line and back, or slide
+  along a line. A place more than 12 px from any line costs no more than 12 px, so a stretch with no line in reach
+  stays where it was read. A sub-pixel step ends it. Its picture colours each point green on a line, red off it.
+- **Line art** is read at the ink's middle (the ridge of its distance map). **Photos** are read at their strong
+  edges: Canny on the gradient, its high threshold at the 94th percentile, weak edges kept where they join a strong
+  one, so floor grain and concrete spots mostly drop out.
+- **fit** gives an outline's miss: each point's distance to the nearest line, every 1 px (mean, 95th percentile,
+  largest, share within 1.5 px). `blueprint_check` reports it for every part read off a framed figure.
+- **Limits.** A hidden edge (a magazine's top in its well) or an edge a photo does not show (a dark part on its own
+  shadow) reads as a miss. Then read the part at full size by eye, follow it with a small search (6 px) or not at
+  all, and check the overlay picture. The detail kit keeps a reading when following changes its area by more than
+  12 percent (it collapsed onto an inner line).
+
+Measured on the M16A2 line art: seven parts read by eye sat 7 to 21 px off their lines (95th percentile); followed,
+1 to 5 px. On the M82A2 photo: 7 to 24 px before, 1 to 6 px after.
+
 ## Edge noise
 
 A photo printed as a halftone, or a grainy scan, gives a traced outline a chipped edge: the tracer follows the dots.
@@ -109,6 +146,8 @@ The MP4 is H.264 from Blender's encoder, so no ffmpeg is needed. The files are i
 | outline | IoU at least 0.95 and a mean edge gap at most 0.15 cm against the reference silhouette |
 | length | within 1 percent of the overall length fact |
 | weight | warns only: the copy is solid where the gun is hollow |
+| finish | the full detail pass: no flat slab, rounded edges, dense outlines (above) |
+| lines | reports only: each part's miss off its figure's lines (OCR Lab fit), in px and cm |
 
 ## From engineering drawings
 

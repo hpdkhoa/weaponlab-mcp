@@ -60,6 +60,9 @@ def partsmap(build_folder):
              "grip": [round(grip[0][0], 3), _mid(grip, 1), _mid(grip, 2)] if grip else at("grip_r"),
              "mag_grab": [round(mag[1][0], 3), _mid(mag, 1), round(mag[0][2] + (mag[1][2] - mag[0][2]) * 0.3, 3)] if mag else at("mag_lips"),
              "handle": [round(wing[1][0], 3), _mid(wing, 1), _mid(wing, 2)] if wing else at("charging_handle")}
+    for name in ("rear_sight", "front_sight"):
+        if name in mk:
+            marks[name] = at(name)                  # the sight line (a hand step's aim)
     for name, shape, side in (("catch", "BoltCatch", 1), ("release", "MagRelease", 0), ("assist", "ForwardAssist", 0)):
         b = _box(sb, shape)
         if b:

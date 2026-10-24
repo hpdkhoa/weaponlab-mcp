@@ -321,3 +321,34 @@ def blob(gun, fig_id, box, seed, light=True, blur_px=5, eps_px=1.0, name=None):
     full[y0:y1, x0:x1] = patch
     poly, a = _outline(full, eps_px)
     return _result(gun, f, poly, a, "blob", name)
+
+
+
+def follow(gun, fig_id, rough_px, name=None, **kw):
+    """A rough outline (px) laid onto the figure's lines as one line, by OCR Lab's line reader (ocrlab.lines.follow:
+    each point along its normal, all moves chosen together, so it cannot jump to an inner line). Gives the outline in
+    px and cm, its fit to the lines before and after, and a picture with each point coloured by its miss."""
+    from ocrlab import lines as L
+    f = Fg.figure(gun, fig_id)
+    pic = store.folder(gun, "figures") / ("%s_follow%s.png" % (f["id"], "_" + name if name else ""))
+    r = L.follow(Fg.image(gun, f), rough_px, picture=pic,
+                 label="SOURCE FIGURE %s, FOLLOW TRACE %s (not a model view)" % (f["id"], name or ""), **kw)
+    if "scale" in f and "frame" in f:
+        g = Fg.to_gun(f, r["outline_px"])
+        r["outline_cm"] = [[round(y, 3), round(z, 3)] for y, z in g]
+        r["bounds_cm"] = {"y": [min(p[0] for p in g), max(p[0] for p in g)], "z": [min(p[1] for p in g), max(p[1] for p in g)]}
+        r["area_cm2"] = round(r["area_px"] * f["scale"]["cm_per_px"] ** 2, 3)
+        for k in ("fit_before", "fit_after"):
+            r[k]["p95_cm"] = round(r[k]["p95_px"] * f["scale"]["cm_per_px"], 3)
+    r["figure"] = f["id"]
+    return r
+
+
+def fit(gun, fig_id, outline_px, **kw):
+    """How far an outline (px) sits off the figure's lines (ocrlab.lines.fit), in px and cm."""
+    from ocrlab import lines as L
+    f = Fg.figure(gun, fig_id)
+    r = L.fit(Fg.image(gun, f), outline_px, **kw)
+    if "scale" in f:
+        r["p95_cm"] = round(r["p95_px"] * f["scale"]["cm_per_px"], 3)
+    return r

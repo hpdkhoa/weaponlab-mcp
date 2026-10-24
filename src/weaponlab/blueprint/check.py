@@ -142,6 +142,33 @@ def density(finish):
     return 7.85
 
 
+def lines(gun, bp, fig):
+    """How far each part read off this figure sits off the figure's lines (OCR Lab's fit): the 95th percentile miss in
+    px and cm, and the share within 1.5 px. A report, not a pass: a hidden edge (a magazine's top in its well) or an
+    edge the photo does not show (a dark part on its own shadow) reads as a miss; look at the follow picture."""
+    try:
+        from ocrlab import lines as L
+    except ImportError:
+        return {"skipped": "OCR Lab (ocrlab-mcp) is not installed"}
+    cost, mode = L.line_map(Fg.image(gun, fig))
+    out = {}
+    for pid, p in bp["parts"].items():
+        sh = p["shape"]
+        key = "outline" if sh["kind"] == "extrude" else "side" if sh["kind"] == "views" else None
+        src = (p.get("sources", {}).get(key) or {}) if key else {}
+        fid = src.get("figure")
+        if not fid and src.get("trace"):
+            try:
+                fid = Pl.trace(gun, src["trace"]).get("figure")
+            except (FileNotFoundError, ValueError):
+                fid = None
+        if fid != fig["id"]:
+            continue
+        r = L.fit(None, Fg.to_px(fig, sh[key]), cost=cost)
+        out[pid] = {"p95_px": r["p95_px"], "p95_cm": round(r["p95_px"] * fig["scale"]["cm_per_px"], 3), "on_share": r["on_share"]}
+    return {"mode": mode, "parts": out}
+
+
 def overlay(gun, bp, fig):
     import cv2
     import numpy as np
@@ -168,6 +195,47 @@ def overlay(gun, bp, fig):
     return str(out)
 
 
+FINISH = {"small_cm": 3.0, "min_points": 24, "long_cm": 5.0, "flat_round_cm": 0.1}
+INSIDE = {"carrier", "bolt"}                         # parts inside the gun: the eye meets them only through a port
+
+
+def finish(bp):
+    """The full detail pass, the end result by default (the owner, 2026-10-24: "I want the default of lab mcp end
+    result is the full detail pass, not a low poly half ass"). Every visible part bigger than FINISH["small_cm"] is
+    shaped across (three views, a relief or a turned part, never a flat slab), has its edges rounded (bevel_cm), and a
+    long part's side outline has at least FINISH["min_points"] points. A gun that fails is not done."""
+    flat, no_bevel, sparse = [], [], []
+    for pid, p in bp["parts"].items():
+        if p.get("role") in INSIDE:
+            continue
+        sh = p["shape"]
+        kind = sh["kind"]
+        if kind == "lathe":
+            continue
+        side = sh.get("outline") or sh.get("side") or []
+        if not side:
+            continue
+        ys, zs = [q[0] for q in side], [q[1] for q in side]
+        size = max(max(ys) - min(ys), max(zs) - min(zs))
+        if size < FINISH["small_cm"]:
+            continue
+        bev = float(p.get("bevel_cm") or 0.0)
+        if kind == "extrude" and bev < FINISH["flat_round_cm"]:
+            flat.append(pid)                # flat sides are real (a slide, a frame); flat sides with sharp edges are not
+        fronts = sh.get("front") or []
+        curved = any(len(fr.get("outline", [])) >= 16 for fr in fronts) or kind == "relief"
+        if not bev and not curved:
+            no_bevel.append(pid)            # a round section needs no bevel: it has no edge along its length
+        src = (p.get("sources") or {}).get("outline") or (p.get("sources") or {}).get("side") or {}
+        by_eye = src.get("method") in ("read", "traced") and not any(w in str(src.get("note", "")) for w in ("snapped", "followed"))
+        rect = len(side) == 4 and len({round(q[0], 3) for q in side}) == 2 and len({round(q[1], 3) for q in side}) == 2
+        if by_eye and size >= FINISH["long_cm"] and len(side) < FINISH["min_points"] and not rect and not (curved and len(side) == 4):
+            sparse.append("%s (%d points)" % (pid, len(side)))     # a few points read by eye: a crude outline
+    ok = not (flat or no_bevel or sparse)
+    return {"ok": ok, "flat_slabs": flat, "no_round_edges": no_bevel, "sparse_outlines": sparse, "rules": dict(FINISH),
+            "why": "the full detail pass is the end result by default: a flat slab, a sharp edge or a sparse outline is low poly"}
+
+
 def run(gun, reference=None, reference_holes=(), length_fact="overall_length", weight_fact="weight"):
     """Every check. reference: the name of a kept silhouette trace the side outline is held to; reference_holes:
     kept traces of its openings (a trigger guard)."""
@@ -192,13 +260,16 @@ def run(gun, reference=None, reference_holes=(), length_fact="overall_length", w
         o["ok"] = o["iou"] >= PASS["iou"] and o["gap_mean_cm"] <= PASS["gap_mean_cm"]
         out["outline"] = o
     out["detail"] = detail(bp, src)
+    out["finish"] = finish(bp)
     kg = sum(volume_cm3(p) * density(p["finish"]) for p in bp["parts"].values()) / 1000.0
     out["weight"] = {"kg": round(kg, 3)}
     if weight_fact in facts:
         out["weight"].update({"fact_kg": facts[weight_fact]["value"], "ratio": round(kg / facts[weight_fact]["value"], 3),
                               "note": "warning only: the copy is solid where the gun is hollow"})
-    out["overlays"] = [overlay(gun, bp, f) for f in src.get("figures", []) if "scale" in f and "frame" in f]
-    out["ok"] = not out["contract"] and all(out[k].get("ok", True) for k in ("length", "outline", "detail") if k in out)
+    framed = [f for f in src.get("figures", []) if "scale" in f and "frame" in f]
+    out["lines"] = {f["id"]: lines(gun, bp, f) for f in framed}
+    out["overlays"] = [overlay(gun, bp, f) for f in framed]
+    out["ok"] = not out["contract"] and all(out[k].get("ok", True) for k in ("length", "outline", "detail", "finish") if k in out)
     bp["checks"] = {k: v for k, v in out.items() if k != "overlays"}
     store.save(gun, "blueprint", bp, strict=False)
     (store.folder(gun, "check") / "check.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
