@@ -197,6 +197,8 @@ def _pose(clip, t):
             pose[k] += (g.get(k, 0.0) - pose[k]) * e
         mv = g.get("move", [0.0, 0.0, 0.0])
         pose["move"] = [pose["move"][i] + (mv[i] - pose["move"][i]) * e for i in range(3)]
+        if g.get("pivot"):
+            pose["pivot"] = g["pivot"]       # the turn's pivot: grip (default), bore, or a mark; kept until the next beat names one
     return pose
 
 

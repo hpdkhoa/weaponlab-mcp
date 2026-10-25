@@ -659,14 +659,15 @@
     {
      "from": 0.05,
      "to": 0.3,
-     "roll": 10.0,
-     "pitch": 5.0,
+     "roll": 60.0,
+     "pitch": 0.0,
      "move": [
       0.0,
-      -2.0,
-      2.0
+      0.0,
+      0.0
      ],
-     "ease": "inout"
+     "ease": "inout",
+     "pivot": "bore"
     },
     {
      "from": 0.95,
@@ -734,7 +735,8 @@
       "l": "support"
      }
     }
-   ]
+   ],
+   "gun_source": "the owner, 2026-10-25: the game's AR-15 clips are the bar (fakepose-mcp/docs/POSE_RULES.md): the check and the charge roll the gun 60 degrees in place (the port to the eye), no raise, no pitch; measured with Pose Lab on the shipped clips; the roll turns about the bore line over the grip (the game's check keeps the receiver in place: its handle moved 1 cm), not about the grip"
   },
   "check_chamber": {
    "seconds": 2.0,
@@ -743,13 +745,14 @@
      "from": 0.1,
      "to": 0.45,
      "roll": 60.0,
-     "pitch": 8.0,
+     "pitch": 0.0,
      "move": [
       0.0,
-      -3.0,
-      3.0
+      0.0,
+      0.0
      ],
-     "ease": "inout"
+     "ease": "inout",
+     "pivot": "bore"
     },
     {
      "from": 1.6,
@@ -814,7 +817,8 @@
       "l": "support"
      }
     }
-   ]
+   ],
+   "gun_source": "the owner, 2026-10-25: the game's AR-15 clips are the bar (fakepose-mcp/docs/POSE_RULES.md): the check and the charge roll the gun 60 degrees in place (the port to the eye), no raise, no pitch; measured with Pose Lab on the shipped clips; the roll turns about the bore line over the grip (the game's check keeps the receiver in place: its handle moved 1 cm), not about the grip"
   },
   "check_mag": {
    "seconds": 2.2,

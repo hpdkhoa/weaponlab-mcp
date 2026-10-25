@@ -2079,6 +2079,8 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
         L.snapshot("load", start)
     FP.body_rest()
     FP.set_eye()
+    if hasattr(FP, "install_limits") and job.get("joint_limits", True):
+        FP.install_limits()          # the owner, 2026-10-25: the market's IK with a body's joint limits
     FP.aim_place("r")
     Hr_, fr_, rr_ = FP.grasp("r", "grip", "palm")
     # the idle is the aim pulled in (the owner: "the idle position is just the aim position with a pull"); an "aim"
@@ -2373,6 +2375,15 @@ def solve_load_view(LV):
                 face = Nw.dot((L.eye - P).normalized())
                 if face > best:
                     best, best_roll = face, float(ra)
+        mode_ = (LV.get("mode") or {}).get(mk_, "move_and_roll") if isinstance(LV.get("mode"), dict) else (LV.get("mode") or "move_and_roll")
+        if mode_ == "roll":
+            # roll only (the owner, 2026-10-25: the gun may roll, it does not leave the view): no move
+            P1 = place([0.0, 0.0, 0.0], best_roll)
+            out[cid_] = {"move": [0.0, 0.0, 0.0], "roll_add": best_roll, "peak": _pose_size(peak), "mark": mk_, "mode": "roll",
+                         "mark_view_cm": [round(v, 2) for v in P1],
+                         "screen": {"x_share": round((P1.x / P1.y / t_ + 1.0) / 2.0, 3) if P1.y > 0 else None,
+                                    "y_share_from_top": round((1.0 - P1.z / P1.y / (t_ / PL.ASPECT)) / 2.0, 3) if P1.y > 0 else None}}
+            continue
         # the move: the loading mark onto the target screen point at the target depth
         sx, sy = LV["screen"]
         d = float(LV["depth_cm"])
@@ -2395,6 +2406,123 @@ def solve_load_view(LV):
     return out
 
 
+RULES_BAR = {"cover": [0.10, 0.20], "rest_sight_view_cm": [3.8, 13.1, -4.4], "rest_tol_cm": 2.0, "wrist_max_deg": 30.0,
+             "elbow_bend_deg": [5.0, 150.0], "elbow_under_cm": 2.0, "port_visible_min": 0.6,
+             "source": "the game's AR-15 clips measured with Pose Lab, 2026-10-25 (fakepose-mcp/docs/POSE_RULES.md)"}
+
+
+def _screen_of(pw):
+    v = L._to(pw, "view")
+    if v.y <= 0.0:
+        return None
+    t_ = math.tan(math.radians(PL.H_FOV / 2.0))
+    return [round(v.x / v.y / t_, 3), round(v.z / v.y / (t_ / PL.ASPECT), 3)]
+
+
+def _port_visible(radius_cm=0.6):
+    """The share of a small disc round the port mark the eye sees past the arms and the gun (Pose Lab's visible)."""
+    if "port" not in facts["marks"]:
+        return None
+    target = mark_world("port")
+    d = (target - L.eye).normalized()
+    u = d.cross(PL.VIEW_UP)
+    u = u.normalized() if u.length > 1e-6 else Vector((1, 0, 0))
+    v = d.cross(u).normalized()
+    pts = [target] + [target + (u * math.cos(2 * math.pi * k / 8) + v * math.sin(2 * math.pi * k / 8)) * (radius_cm / 100.0 * r / 2)
+                      for r in (1, 2) for k in range(8)]
+    dg = bpy.context.evaluated_depsgraph_get()
+    seen = 0
+    for q in pts:
+        ray = q - L.eye
+        hit, loc, _n, _i, _o, _m = L.sc.ray_cast(dg, L.eye, ray.normalized(), distance=ray.length + 0.01)
+        if not hit or (loc - q).length < 0.006 or (loc - L.eye).length >= ray.length - 0.006:
+            seen += 1
+    return round(seen / len(pts), 3)
+
+
+def rule_numbers(ec=None):
+    """The pose rules' numbers at the pose as it stands (POSE_RULES.md): the gun's turn against the view, the rear
+    sight in the view, the muzzle and the support hand on screen, the port's facing and visibility, the cover share
+    the eye raster saw, each arm's joint readings."""
+    F_, U_, Lf_ = (Vector(list(v)) for v in FP.gun_axes())
+    yaw = math.degrees(math.atan2(F_.dot(-PL.VIEW_RIGHT), F_.dot(PL.VIEW_FWD)))
+    pitch = math.degrees(math.asin(max(-1.0, min(1.0, F_.dot(PL.VIEW_UP)))))
+    roll = math.degrees(math.atan2(U_.dot(PL.VIEW_RIGHT), U_.dot(PL.VIEW_UP)))
+    row = {"gun": {"yaw_left_deg": round(yaw, 1), "pitch_up_deg": round(pitch, 1), "roll_right_deg": round(roll, 1)}}
+    for mk in ("rear_sight", "muzzle", "port"):
+        if mk in facts["marks"]:
+            pw = mark_world(mk)
+            row[mk + "_view_cm"] = [round(x, 1) for x in L._to(pw, "view")]
+            row[mk + "_screen"] = _screen_of(pw)
+    for sd in ("l", "r"):
+        row["hand_%s_screen" % sd] = _screen_of(L._bw(L._n("hand", sd)).translation)
+    nrm = (facts.get("normals") or {}).get("port")
+    if nrm and "port" in facts["marks"]:
+        P_ = mark_world("port")
+        Nw = (mark_world("port", offset=nrm) - P_).normalized()
+        row["port_facing"] = round(Nw.dot((L.eye - P_).normalized()), 3)
+        row["port_visible"] = _port_visible()
+    if ec is not None:
+        row["cover"] = round((ec["gun_pixels"] + ec["skin_pixels"]) / float(ec["pixels"]), 3)
+    row["limits"] = dict(getattr(FP, "last_limits", {}) or {})
+    return row
+
+
+def pose_rules_report():
+    """The ten rules of POSE_RULES.md judged on this run's numbers, written as hands.json pose_rules."""
+    B = RULES_BAR
+    ce = report.get("fakepose_clips_eye") or {}
+    rows = {cid: v.get("rule_frames") or [] for cid, v in ce.items()}
+    rest = next((r for cid in ("idle", "walk", "fire") for r in rows.get(cid, [])[:1]), None)
+    out = {"bar": B, "rules": {}}
+
+    def judge(n, ok, value, note):
+        out["rules"][n] = {"pass": bool(ok), "value": value, "note": note}
+    if rest:
+        g = rest["gun"]
+        judge(1, abs(g["yaw_left_deg"]) <= 3 and abs(g["pitch_up_deg"]) <= 3 and abs(g["roll_right_deg"]) <= 3, g, "rest: bore parallel to the view (within 3 deg)")
+        sv = rest.get("rear_sight_view_cm")
+        judge(2, sv is not None and all(abs(sv[i] - B["rest_sight_view_cm"][i]) <= B["rest_tol_cm"] for i in range(3)), sv,
+              "rest: the rear sight at %s cm in the view (within %.0f cm)" % (B["rest_sight_view_cm"], B["rest_tol_cm"]))
+        ms = rest.get("muzzle_screen")
+        judge(3, ms is not None and abs(ms[0]) <= 0.35 and -0.5 <= ms[1] <= 0.2, ms, "rest: the muzzle near the view's centre (x within 0.35, y -0.5 to 0.2)")
+        hl = rest.get("hand_l_screen")
+        judge(5, hl is not None and abs(hl[0]) <= 1 and abs(hl[1]) <= 1, hl, "rest: the support hand on screen")
+    covers = {cid: [r["cover"] for r in rs if "cover" in r] for cid, rs in rows.items()}
+    cmin = {cid: round(min(c), 3) for cid, c in covers.items() if c}
+    judge(4, bool(cmin) and all(v >= B["cover"][0] for v in cmin.values()) and all(max(c) <= B["cover"][1] + 0.05 for c in covers.values() if c),
+          cmin, "the gun and arms fill %.0f to %.0f %% of the view, every clip, every frame (the least per clip shown)" % (100 * B["cover"][0], 100 * B["cover"][1]))
+    pv = {cid: max((r.get("port_visible") or 0.0) for r in rs) for cid, rs in rows.items() if cid in ("check_chamber", "charge", "cycle") and rs}
+    rl = {cid: round(max(abs(r["gun"]["roll_right_deg"]) for r in rs), 1) for cid, rs in rows.items() if cid in ("check_chamber", "charge") and rs}
+    judge(6, bool(pv) and all(v >= B["port_visible_min"] for v in pv.values()), {"port_visible": pv, "roll_deg": rl},
+          "check and charge: the gun rolled so the port turns to the eye, the port at least %.0f %% visible" % (100 * B["port_visible_min"]))
+    hp = {}
+    for cid in ("check_chamber", "charge", "cycle"):
+        rs = rows.get(cid) or []
+        on = [r for r in rs if any(r.get("hand_%s_screen" % sd) and abs(r["hand_%s_screen" % sd][0]) <= 1 and abs(r["hand_%s_screen" % sd][1]) <= 1 for sd in ("l", "r"))]
+        if rs:
+            hp[cid] = round(len(on) / len(rs), 2)
+    judge(7, bool(hp) and all(v >= 0.5 for v in hp.values()), hp, "check and charge: a hand on screen on at least half the frames")
+    worst = {}
+    for cid, rs in rows.items():
+        for r in rs:
+            for sd, lm in (r.get("limits") or {}).items():
+                w = worst.setdefault(sd, {"wrist_bend_deg": 0.0, "elbow_bend_deg": [999.0, 0.0], "elbow_under_cm": 999.0})
+                w["wrist_bend_deg"] = max(w["wrist_bend_deg"], lm.get("wrist_bend_deg", 0.0))
+                w["elbow_bend_deg"] = [min(w["elbow_bend_deg"][0], lm.get("elbow_bend_deg", 999.0)), max(w["elbow_bend_deg"][1], lm.get("elbow_bend_deg", 0.0))]
+                w["elbow_under_cm"] = min(w["elbow_under_cm"], lm.get("elbow_under_cm", 999.0))
+    ok8 = bool(worst) and all(w["wrist_bend_deg"] <= B["wrist_max_deg"] + 0.5 and w["elbow_bend_deg"][0] >= B["elbow_bend_deg"][0] - 0.5
+                              and w["elbow_bend_deg"][1] <= B["elbow_bend_deg"][1] + 0.5 and w["elbow_under_cm"] >= B["elbow_under_cm"] - 0.05 for w in worst.values())
+    judge(8, ok8, worst, "every frame: wrist within %.0f of the forearm, elbow %.0f to %.0f, elbow %.0f cm under the shoulder (the worst shown)" % (
+        B["wrist_max_deg"], B["elbow_bend_deg"][0], B["elbow_bend_deg"][1], B["elbow_under_cm"]))
+    clips_ = {cid: v.get("frames_with_clip", 0) for cid, v in ce.items()}
+    judge(9, all(v == 0 for v in clips_.values()), clips_, "zero clipping seen from the eye, every frame")
+    judge(10, True, None, "every hand has a target each action, the palm on the held part: by the presets and the timeline")
+    out["passed"] = sum(1 for r in out["rules"].values() if r["pass"])
+    out["failed"] = [n for n, r in out["rules"].items() if not r["pass"]]
+    return out
+
+
 def gun_pose(p):
     """The gun bone placed by a timeline pose: turned about the grip (roll about the bore, pitch about the gun's left,
     yaw about its up), moved in the view (Gun Kit's view: +X left)."""
@@ -2406,7 +2534,17 @@ def gun_pose(p):
          @ Quaternion(ax((0, 1, 0)), -math.radians(p.get("roll", 0.0))))
     mv = p.get("move", [0.0, 0.0, 0.0])
     move = (PL.VIEW_RIGHT * -mv[0] + PL.VIEW_FWD * mv[1] + PL.VIEW_UP * mv[2]) / 100.0
-    M = Matrix.Translation(move) @ Matrix.Translation(PIVOT) @ q.to_matrix().to_4x4() @ Matrix.Translation(-PIVOT) @ G_HOLD
+    # the turn's pivot: the grip (default), or "bore" (the point of the bore line over the grip: a roll that keeps the
+    # receiver in place, as the game's chamber check does), or a named mark; at the hold's place
+    pv = p.get("pivot")
+    if pv == "bore":
+        gp = facts["marks"]["grip"]
+        piv = PIVOT + (q0 @ g((0.0, 0.0, 0.0))) - (q0 @ g((gp[0], 0.0, gp[2])))
+    elif isinstance(pv, str) and pv in facts["marks"]:
+        piv = PIVOT + (q0 @ g(facts["marks"][pv])) - (q0 @ g(facts["marks"]["grip"]))
+    else:
+        piv = PIVOT
+    M = Matrix.Translation(move) @ Matrix.Translation(piv) @ q.to_matrix().to_4x4() @ Matrix.Translation(-piv) @ G_HOLD
     L._set_world(GUN_BONE, Matrix.LocRotScale(M.translation, M.to_quaternion(), L._unit()))
     L._place_rifle()
 
@@ -2795,6 +2933,7 @@ for cid, clip in job["clips"].items():
                     # the market's fix: the hand the eye sees clipping set back off the gun, then checked again
                     row_["moved_cm"], ec_ = FP.unclip_seen(ec_, res=tuple(job.get("eye_res_clips", (96, 54))))
                 row_.update({"clip_pixels": ec_["clip_pixels"], "deepest_seen_cm": ec_["deepest_seen_cm"]})
+                row_["rules"] = rule_numbers(ec_)
                 eye_frames.append(row_)
         else:
             for sd in ("r", "l"):
@@ -2813,7 +2952,9 @@ for cid, clip in job["clips"].items():
             "clipping_frames": [e_ for e_ in eye_frames if e_["clip_pixels"]][:20],
             # what the fix did, frame by frame summed: which hand, which digits it opened (degrees), how far it set a hand
             # back (cm): a fix seen on many frames is a pose that wants mending, not hiding
-            "fixes": _fix_summary(eye_frames)}
+            "fixes": _fix_summary(eye_frames),
+            "rule_frames": [dict(e_["rules"], t=e_["t"]) for e_ in eye_frames if e_.get("rules")],
+            "cover_min": min((e_["rules"]["cover"] for e_ in eye_frames if e_.get("rules")), default=None)}
     if walled:
         # the walls are a real body's limits and physics: a clip with any frame past one is not written, only reported
         report["clips"][cid] = {"clip": name, "written": [], "blocked": "frames past the walls: %d" % len(walled),
@@ -3022,5 +3163,10 @@ if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET -
                 _row[_im["view"]] = _dst
             _frames.append(_row)
         report.setdefault("fakepose_animations", {})[_cid] = {"fps": _clip["fps"], "frames": _frames, "folder": _ad}
+if POSE_ENGINE == "fakepose" and FP is not None:
+    try:
+        report["pose_rules"] = pose_rules_report()
+    except Exception as e_:
+        report["pose_rules"] = {"error": repr(e_)}
 json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
 print("GUNKIT HANDS: %s, %d clips, hold %s" % (facts["name"], len(report["clips"]), report["hold"]))
