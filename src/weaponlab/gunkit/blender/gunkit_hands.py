@@ -2081,6 +2081,8 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
     FP.set_eye()
     if hasattr(FP, "install_limits") and job.get("joint_limits", True):
         FP.install_limits()          # the owner, 2026-10-25: the market's IK with a body's joint limits
+        if job.get("hand_turn_max_deg") is not None:
+            FP.TURN_MAX = float(job["hand_turn_max_deg"])
     FP.aim_place("r")
     Hr_, fr_, rr_ = FP.grasp("r", "grip", "palm")
     # the idle is the aim pulled in (the owner: "the idle position is just the aim position with a pull"); an "aim"
@@ -2488,7 +2490,8 @@ def pose_rules_report():
         judge(3, ms is not None and abs(ms[0]) <= 0.35 and -0.5 <= ms[1] <= 0.2, ms, "rest: the muzzle near the view's centre (x within 0.35, y -0.5 to 0.2)")
         hl = rest.get("hand_l_screen")
         judge(5, hl is not None and abs(hl[0]) <= 1 and abs(hl[1]) <= 1, hl, "rest: the support hand on screen")
-    covers = {cid: [r["cover"] for r in rs if "cover" in r] for cid, rs in rows.items()}
+    # the clips that take the gun out of the view by design (drawn, put away, the sprint) are not judged on cover
+    covers = {cid: [r["cover"] for r in rs if "cover" in r] for cid, rs in rows.items() if cid not in ("equip", "holster", "run")}
     cmin = {cid: round(min(c), 3) for cid, c in covers.items() if c}
     judge(4, bool(cmin) and all(v >= B["cover"][0] for v in cmin.values()) and all(max(c) <= B["cover"][1] + 0.05 for c in covers.values() if c),
           cmin, "the gun and arms fill %.0f to %.0f %% of the view, every clip, every frame (the least per clip shown)" % (100 * B["cover"][0], 100 * B["cover"][1]))

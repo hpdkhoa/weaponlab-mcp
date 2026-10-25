@@ -781,16 +781,6 @@
     },
     {
      "hand": "l",
-     "from": 1.45,
-     "to": 1.55,
-     "go": {
-      "mark": "assist"
-     },
-     "grasp": "palm",
-     "why": "the palm on the forward assist"
-    },
-    {
-     "hand": "l",
      "from": 1.7,
      "to": 1.95,
      "go": {
@@ -818,7 +808,8 @@
      }
     }
    ],
-   "gun_source": "the owner, 2026-10-25: the game's AR-15 clips are the bar (fakepose-mcp/docs/POSE_RULES.md): the check and the charge roll the gun 60 degrees in place (the port to the eye), no raise, no pitch; measured with Pose Lab on the shipped clips; the roll turns about the bore line over the grip (the game's check keeps the receiver in place: its handle moved 1 cm), not about the grip"
+   "gun_source": "the owner, 2026-10-25: the game's AR-15 clips are the bar (fakepose-mcp/docs/POSE_RULES.md): the check and the charge roll the gun 60 degrees in place (the port to the eye), no raise, no pitch; measured with Pose Lab on the shipped clips; the roll turns about the bore line over the grip (the game's check keeps the receiver in place: its handle moved 1 cm), not about the grip",
+   "source_note": "the forward-assist tap dropped 2026-10-26: the bar (the game's AR-15 check) goes handle then handguard; with the template body the assist reach bent the left wrist 114 degrees"
   },
   "check_mag": {
    "seconds": 2.2,

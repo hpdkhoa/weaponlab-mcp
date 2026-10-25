@@ -231,6 +231,8 @@ def hands(facts_path, clips=None, grip_steps=3, render=False, style=None, charac
     # the owner's rule: a run takes 10 minutes at most. The hard stop is at 10 minutes; the run plans its work to 9
     # (time_budget_s), so it ends on its own before the stop
     job.setdefault("time_budget_s", 540)
+    out = Path(job["out"])           # an option may send the run to its own folder: the report is read from there
+    out.mkdir(parents=True, exist_ok=True)
     _blender("gunkit_hands.py", job, out, timeout=600)
     return json.loads((out / "hands.json").read_text(encoding="utf-8"))
 
