@@ -679,6 +679,18 @@ def blueprint_render(gun: str, look: Annotated[str, Field(description="workbench
 
 
 @mcp.tool()
+def blueprint_photomap(gun: str, figure: Annotated[str, Field(description="a framed and scaled side photo of the gun")],
+                       strength: Annotated[float, Field(description="the relief the photo's detail stands for: 1 = about 1 mm")] = 1.0,
+                       fine_cm: float = 0.08, coarse_cm: float = 2.5) -> dict:
+    """The photo detail layer: surface maps (normal, albedo and roughness multipliers, mask) baked from the photo's
+    brightness and projected onto the parts' sides at the next build, so flat plates carry the pins, seams, markings
+    and wear the photo shows. A derived guess of relief from shading, recorded as one; the other side takes the maps
+    mirrored. Build and render again to see it."""
+    from .blueprint import photomap as PM
+    return _err(PM.bake, gun, figure, strength=strength, fine_cm=fine_cm, coarse_cm=coarse_cm)
+
+
+@mcp.tool()
 def blueprint_showcase(gun: str, title: str | None = None, source_note: str | None = None,
                        compare_figure: Annotated[str | None, Field(description="a source figure shown beside the copy")] = None) -> dict:
     """A showcase of a built gun that has been through Gun Kit (minutes in Blender): a title card, the source beside

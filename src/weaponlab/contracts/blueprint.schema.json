@@ -69,6 +69,16 @@
       "type": "object",
       "description": "the check step's last results (written by check)"
     },
+    "photo_detail": {
+      "type": "object",
+      "required": [
+        "figure",
+        "box_cm",
+        "files",
+        "source"
+      ],
+      "description": "the photo detail layer (photomap.bake): surface maps baked from a side photo's brightness (normal, albedo and roughness multipliers, a mask of the parts), a derived guess of relief from shading, projected onto the parts' sides"
+    },
     "magazine_line": {
       "type": "object",
       "required": [

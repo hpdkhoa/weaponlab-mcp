@@ -1,0 +1,822 @@
+{
+ "contract": "weaponlab-action/1",
+ "id": "barrett_handle",
+ "name": "Barrett recoil-operated rifle: magazine change by the support hand, the charging handle on the right pulled by the firing hand",
+ "extends": "_long_gun",
+ "guns": [
+  "Barrett M82A1",
+  "Barrett M107"
+ ],
+ "manuals": [
+  {
+   "title": "a public-domain operator's manual for the AK family (a US Army foreign weapons handbook)",
+   "covers": "loading, the magazine's rock-in, the safety lever, clearing",
+   "status": "to find"
+  },
+  {
+   "title": "FM 23-8, M14 and M14A1 Rifles and Rifle Marksmanship (US Army, 1965)",
+   "covers": "the M14's loading, the operating rod handle, the bolt lock",
+   "status": "to read"
+  }
+ ],
+ "parts": {
+  "carrier": {
+   "kind": "slide",
+   "what": "the carrier or operating rod with its handle, back along the bore",
+   "travel_cm": 12.0
+  },
+  "lock": {
+   "kind": "slide",
+   "what": "a bolt lock or hold-open where the gun has one (the M14)",
+   "travel_cm": 0.5,
+   "required": false
+  },
+  "release": {
+   "kind": "turn",
+   "what": "the magazine catch paddle behind the well, pushed forward",
+   "required": false
+  },
+  "safety": {
+   "kind": "turn",
+   "what": "the safety lever on the right",
+   "required": false
+  },
+  "trigger": {
+   "kind": "turn",
+   "what": "the trigger",
+   "required": false
+  },
+  "magazine": {
+   "kind": "free",
+   "what": "the magazine: hooked in at the front, rocked back to lock"
+  }
+ },
+ "marks": [
+  "grip",
+  "support",
+  "mag_well",
+  "mag_grab",
+  "mag_lips",
+  "handle",
+  "port",
+  "release"
+ ],
+ "sources": [
+  "the carrier's stroke on the AK about 12 cm (an estimate from the receiver cover's port; measure on the model)",
+  "a cycle at about 600 rounds a minute takes 0.1 s (the AK-47's cyclic rate, about 600 a minute: Wikipedia, AK-47)",
+  "the magazine rocks in: its front lug into the well first, then the rear up until the catch clicks",
+  "the owner, 2026-10-25: \"the reload of M107 is a mag change and bolt charge with right hand\" (the support hand reaching under the gun to the handle crossed the scope)"
+ ],
+ "gun_clips": {
+  "fire": {
+   "seconds": 0.25,
+   "beats": [
+    {
+     "part": "trigger",
+     "from": 0.0,
+     "to": 0.02,
+     "value": 1.0,
+     "ease": "in",
+     "why": "the shot breaks"
+    },
+    {
+     "part": "carrier",
+     "from": 0.02,
+     "to": 0.065,
+     "value": 1.0,
+     "ease": "out",
+     "why": "the gas piston drives the carrier and its handle back"
+    },
+    {
+     "part": "carrier",
+     "from": 0.065,
+     "to": 0.12,
+     "value": 0.0,
+     "ease": "in",
+     "why": "the recoil spring returns it: a cycle of about 0.1 s"
+    },
+    {
+     "part": "trigger",
+     "from": 0.12,
+     "to": 0.2,
+     "value": 0.0,
+     "ease": "inout",
+     "why": "the trigger let out"
+    }
+   ]
+  },
+  "fire_last": {
+   "seconds": 0.25,
+   "beats": [
+    {
+     "part": "trigger",
+     "from": 0.0,
+     "to": 0.02,
+     "value": 1.0,
+     "ease": "in",
+     "why": "the last shot"
+    },
+    {
+     "part": "carrier",
+     "from": 0.02,
+     "to": 0.065,
+     "value": 1.0,
+     "ease": "out",
+     "why": "back"
+    },
+    {
+     "part": "lock",
+     "from": 0.06,
+     "to": 0.07,
+     "value": 1.0,
+     "ease": "out",
+     "why": "a gun with a hold-open holds it here (the M14); without one the lock part is absent"
+    },
+    {
+     "part": "carrier",
+     "from": 0.065,
+     "to": 0.12,
+     "value": 0.0,
+     "ease": "in",
+     "why": "without a hold-open it closes on the empty chamber"
+    },
+    {
+     "part": "trigger",
+     "from": 0.12,
+     "to": 0.2,
+     "value": 0.0,
+     "ease": "inout",
+     "why": "the trigger let out"
+    }
+   ]
+  },
+  "reload": {
+   "seconds": 2.6,
+   "beats": [
+    {
+     "part": "release",
+     "from": 0.4,
+     "to": 0.45,
+     "value": 1.0,
+     "ease": "out",
+     "why": "the thumb pushes the paddle forward"
+    },
+    {
+     "part": "release",
+     "from": 0.6,
+     "to": 0.65,
+     "value": 0.0,
+     "ease": "in",
+     "why": "the paddle springs back"
+    },
+    {
+     "part": "magazine",
+     "from": 0.45,
+     "to": 0.6,
+     "offset": [
+      0.0,
+      3.0,
+      -4.0
+     ],
+     "ease": "out",
+     "why": "rocked forward and down out of the well"
+    }
+   ]
+  },
+  "reload_empty": {
+   "seconds": 3.3,
+   "beats": [
+    {
+     "part": "release",
+     "from": 0.4,
+     "to": 0.45,
+     "value": 1.0,
+     "ease": "out",
+     "why": "the paddle pushed"
+    },
+    {
+     "part": "release",
+     "from": 0.6,
+     "to": 0.65,
+     "value": 0.0,
+     "ease": "in",
+     "why": "it springs back"
+    },
+    {
+     "part": "magazine",
+     "from": 0.45,
+     "to": 0.6,
+     "offset": [
+      0.0,
+      3.0,
+      -4.0
+     ],
+     "ease": "out",
+     "why": "rocked out into the hand"
+    },
+    {
+     "part": "carrier",
+     "from": 2.2,
+     "to": 2.45,
+     "value": 1.0,
+     "ease": "out",
+     "why": "the handle pulled all the way back: no hold-open to release"
+    },
+    {
+     "part": "carrier",
+     "from": 2.5,
+     "to": 2.56,
+     "value": 0.0,
+     "ease": "in",
+     "why": "let go: it strips the top round and chambers it"
+    }
+   ]
+  },
+  "charge": {
+   "seconds": 1.3,
+   "beats": [
+    {
+     "part": "carrier",
+     "from": 0.45,
+     "to": 0.7,
+     "value": 1.0,
+     "ease": "out",
+     "why": "the handle drawn to the rear"
+    },
+    {
+     "part": "carrier",
+     "from": 0.78,
+     "to": 0.84,
+     "value": 0.0,
+     "ease": "in",
+     "why": "let go, never ridden home"
+    }
+   ]
+  },
+  "check_chamber": {
+   "seconds": 2.0,
+   "beats": [
+    {
+     "part": "carrier",
+     "from": 0.55,
+     "to": 0.85,
+     "value": 0.25,
+     "ease": "inout",
+     "why": "the handle drawn about 3 cm: the case rim shows at the port"
+    },
+    {
+     "part": "carrier",
+     "from": 1.25,
+     "to": 1.35,
+     "value": 0.0,
+     "ease": "in",
+     "why": "let it go home"
+    }
+   ]
+  },
+  "check_mag": {
+   "seconds": 2.4,
+   "beats": [
+    {
+     "part": "release",
+     "from": 0.45,
+     "to": 0.5,
+     "value": 1.0,
+     "ease": "out",
+     "why": "the paddle pushed"
+    },
+    {
+     "part": "release",
+     "from": 0.65,
+     "to": 0.7,
+     "value": 0.0,
+     "ease": "in",
+     "why": "it springs back"
+    }
+   ]
+  }
+ },
+ "hand_clips": {
+  "reload": {
+   "seconds": 2.6,
+   "gun": [
+    {
+     "from": 0.1,
+     "to": 0.4,
+     "roll": 20.0,
+     "pitch": 10.0,
+     "move": [
+      0.0,
+      -4.0,
+      4.0
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 2.2,
+     "to": 2.6,
+     "roll": 0.0,
+     "pitch": 0.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "l",
+     "from": 0.1,
+     "to": 0.4,
+     "go": {
+      "part": "magazine",
+      "mark": "mag_grab"
+     },
+     "grasp": "cup",
+     "why": "the support hand takes the magazine, the thumb on the paddle"
+    },
+    {
+     "hand": "l",
+     "from": 0.45,
+     "to": 0.8,
+     "go": {
+      "place": "pouch_l"
+     },
+     "carry": "magazine",
+     "why": "rocked out and to the pouch, kept"
+    },
+    {
+     "hand": "l",
+     "from": 0.8,
+     "to": 1.0,
+     "go": {
+      "place": "pouch_l",
+      "offset": [
+       0.0,
+       0.0,
+       -2.0
+      ]
+     },
+     "why": "stowed, a full one drawn"
+    },
+    {
+     "hand": "l",
+     "from": 1.0,
+     "to": 1.45,
+     "go": {
+      "mark": "mag_grab",
+      "offset": [
+       0.0,
+       3.0,
+       -4.0
+      ]
+     },
+     "why": "the front lug hooked into the well"
+    },
+    {
+     "hand": "l",
+     "from": 1.45,
+     "to": 1.65,
+     "go": {
+      "mark": "mag_grab"
+     },
+     "seat": "magazine",
+     "ease": "out",
+     "why": "rocked back until the catch clicks"
+    },
+    {
+     "hand": "l",
+     "from": 1.75,
+     "to": 2.1,
+     "go": {
+      "mark": "support"
+     },
+     "why": "back to the handguard"
+    }
+   ],
+   "expect": [
+    {
+     "at": 1.65,
+     "seated": "magazine"
+    },
+    {
+     "at": [
+      2.2,
+      2.6
+     ],
+     "on": {
+      "r": "grip",
+      "l": "support"
+     }
+    }
+   ]
+  },
+  "reload_empty": {
+   "seconds": 3.3,
+   "gun": [
+    {
+     "from": 0.1,
+     "to": 0.4,
+     "roll": 20.0,
+     "pitch": 10.0,
+     "move": [
+      0.0,
+      -4.0,
+      4.0
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 1.9,
+     "to": 2.2,
+     "roll": -15.0,
+     "pitch": 5.0,
+     "move": [
+      0.0,
+      -3.0,
+      2.0
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 2.9,
+     "to": 3.3,
+     "roll": 0.0,
+     "pitch": 0.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "l",
+     "from": 0.1,
+     "to": 0.4,
+     "go": {
+      "part": "magazine",
+      "mark": "mag_grab"
+     },
+     "grasp": "cup",
+     "why": "the support hand takes the empty magazine"
+    },
+    {
+     "hand": "l",
+     "from": 0.45,
+     "to": 0.8,
+     "go": {
+      "place": "dump"
+     },
+     "carry": "magazine",
+     "why": "the empty one into the dump pouch"
+    },
+    {
+     "hand": "l",
+     "from": 0.8,
+     "to": 1.05,
+     "go": {
+      "place": "pouch_l",
+      "offset": [
+       0.0,
+       0.0,
+       -2.0
+      ]
+     },
+     "why": "a full one drawn"
+    },
+    {
+     "hand": "l",
+     "from": 1.05,
+     "to": 1.45,
+     "go": {
+      "mark": "mag_grab",
+      "offset": [
+       0.0,
+       3.0,
+       -4.0
+      ]
+     },
+     "why": "hooked in"
+    },
+    {
+     "hand": "l",
+     "from": 1.45,
+     "to": 1.65,
+     "go": {
+      "mark": "mag_grab"
+     },
+     "seat": "magazine",
+     "ease": "out",
+     "why": "rocked home"
+    },
+    {
+     "hand": "l",
+     "from": 1.7,
+     "to": 2.0,
+     "go": {
+      "mark": "support"
+     },
+     "why": "the support hand back under the gun"
+    },
+    {
+     "hand": "r",
+     "from": 1.8,
+     "to": 2.15,
+     "go": {
+      "part": "carrier",
+      "mark": "handle"
+     },
+     "grasp": "pinch",
+     "why": "the firing hand off the grip to the handle on the right"
+    },
+    {
+     "hand": "r",
+     "from": 2.5,
+     "to": 2.52,
+     "go": {
+      "part": "carrier",
+      "mark": "handle",
+      "value": 1.0
+     },
+     "why": "drawn to the rear and let go: the carrier flies home"
+    },
+    {
+     "hand": "r",
+     "from": 2.6,
+     "to": 2.95,
+     "go": {
+      "mark": "grip"
+     },
+     "why": "back to the pistol grip"
+    }
+   ],
+   "expect": [
+    {
+     "at": 1.65,
+     "seated": "magazine"
+    },
+    {
+     "at": [
+      2.2,
+      2.45
+     ],
+     "on": {
+      "r": "handle"
+     }
+    },
+    {
+     "at": [
+      3.0,
+      3.3
+     ],
+     "on": {
+      "r": "grip",
+      "l": "support"
+     }
+    }
+   ]
+  },
+  "charge": {
+   "seconds": 1.3,
+   "gun": [
+    {
+     "from": 0.05,
+     "to": 0.35,
+     "roll": -15.0,
+     "pitch": 5.0,
+     "move": [
+      0.0,
+      -3.0,
+      2.0
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 0.95,
+     "to": 1.3,
+     "roll": 0.0,
+     "pitch": 0.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.1,
+     "to": 0.45,
+     "go": {
+      "part": "carrier",
+      "mark": "handle"
+     },
+     "grasp": "pinch",
+     "why": "the firing hand off the grip to the handle on the right"
+    },
+    {
+     "hand": "r",
+     "from": 0.78,
+     "to": 0.8,
+     "go": {
+      "part": "carrier",
+      "mark": "handle",
+      "value": 1.0
+     },
+     "why": "drawn to the rear and let go: the carrier flies home"
+    },
+    {
+     "hand": "r",
+     "from": 0.85,
+     "to": 1.2,
+     "go": {
+      "mark": "grip"
+     },
+     "why": "back to the pistol grip"
+    }
+   ],
+   "expect": [
+    {
+     "at": [
+      0.45,
+      0.7
+     ],
+     "on": {
+      "r": "handle"
+     }
+    }
+   ]
+  },
+  "check_chamber": {
+   "seconds": 2.0,
+   "gun": [
+    {
+     "from": 0.1,
+     "to": 0.45,
+     "roll": 40.0,
+     "pitch": 8.0,
+     "move": [
+      0.0,
+      -6.0,
+      6.0
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 1.6,
+     "to": 2.0,
+     "roll": 0.0,
+     "pitch": 0.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "r",
+     "from": 0.15,
+     "to": 0.53,
+     "go": {
+      "part": "carrier",
+      "mark": "handle"
+     },
+     "grasp": "pinch",
+     "why": "the firing hand over the top to the handle"
+    },
+    {
+     "hand": "r",
+     "from": 1.4,
+     "to": 1.75,
+     "go": {
+      "mark": "grip"
+     },
+     "why": "back to the handguard"
+    }
+   ],
+   "expect": [
+    {
+     "at": [
+      0.9,
+      1.2
+     ],
+     "visible": "port"
+    }
+   ]
+  },
+  "check_mag": {
+   "seconds": 2.4,
+   "gun": [
+    {
+     "from": 0.1,
+     "to": 0.4,
+     "roll": 25.0,
+     "pitch": 10.0,
+     "move": [
+      0.0,
+      -4.0,
+      5.0
+     ],
+     "ease": "inout"
+    },
+    {
+     "from": 2.0,
+     "to": 2.4,
+     "roll": 0.0,
+     "pitch": 0.0,
+     "move": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "ease": "inout"
+    }
+   ],
+   "events": [
+    {
+     "hand": "l",
+     "from": 0.15,
+     "to": 0.45,
+     "go": {
+      "part": "magazine",
+      "mark": "mag_grab"
+     },
+     "grasp": "cup",
+     "why": "the support hand takes the magazine, the thumb on the paddle"
+    },
+    {
+     "hand": "l",
+     "from": 0.5,
+     "to": 0.9,
+     "go": {
+      "mark": "mag_grab",
+      "offset": [
+       2.0,
+       2.0,
+       -14.0
+      ]
+     },
+     "carry": "magazine",
+     "why": "rocked out and tipped toward the eye"
+    },
+    {
+     "hand": "l",
+     "from": 1.35,
+     "to": 1.6,
+     "go": {
+      "mark": "mag_grab",
+      "offset": [
+       0.0,
+       3.0,
+       -4.0
+      ]
+     },
+     "why": "hooked in again"
+    },
+    {
+     "hand": "l",
+     "from": 1.6,
+     "to": 1.75,
+     "go": {
+      "mark": "mag_grab"
+     },
+     "seat": "magazine",
+     "ease": "out",
+     "why": "rocked home"
+    },
+    {
+     "hand": "l",
+     "from": 1.8,
+     "to": 2.1,
+     "go": {
+      "mark": "support"
+     },
+     "why": "back to the handguard"
+    }
+   ],
+   "expect": [
+    {
+     "at": [
+      0.95,
+      1.3
+     ],
+     "visible": "mag_lips"
+    },
+    {
+     "at": 1.75,
+     "seated": "magazine"
+    }
+   ]
+  }
+ }
+}

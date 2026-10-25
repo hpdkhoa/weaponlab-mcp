@@ -2332,8 +2332,17 @@ def solve_load_view(LV):
     (1 cm on each axis), not from any axis convention."""
     out = {}
     t_ = math.tan(math.radians(PL.H_FOV / 2.0))
+    # the loading point: a stripper clip's charger, else a magazine's well, else a tube's loading port (the first the
+    # gun has); its face mark by the same choice
+    marks_ = LV["mark"] if isinstance(LV["mark"], list) else [LV["mark"]]
+    mk_ = next((m for m in marks_ if m in facts["marks"]), None)
+    if mk_ is None:
+        return out
+    fm_ = LV.get("face_mark")
+    LV = dict(LV, mark=mk_, face_mark=fm_.get(mk_) if isinstance(fm_, dict) else fm_)
+    off_ = (LV.get("mark_offset_cm") or {}).get(mk_)            # the point to show, from the mark (gun cm)
     for cid_, clip_ in job["clips"].items():
-        if cid_ not in LV["clips"] or LV["mark"] not in facts["marks"]:
+        if cid_ not in LV["clips"]:
             continue
         peak = max(clip_["frames"], key=lambda f: _pose_size(f["gun"]))["gun"]
         base = pulled(peak, cid_)
@@ -2344,7 +2353,7 @@ def solve_load_view(LV):
             q["roll"] = float(base.get("roll", 0.0)) + roll_add
             gun_pose(q)
             bpy.context.view_layer.update()
-            return Vector(L._to(mark_world(LV["mark"]), "view"))
+            return Vector(L._to(mark_world(LV["mark"], offset=off_), "view"))
         # the roll: the face mark's facing toward the eye
         fm = LV.get("face_mark")
         best_roll = 0.0
@@ -2380,7 +2389,7 @@ def solve_load_view(LV):
         except ValueError:
             continue
         P1 = place(list(dm), best_roll)
-        out[cid_] = {"move": [round(v, 2) for v in dm], "roll_add": best_roll, "peak": _pose_size(peak),
+        out[cid_] = {"move": [round(v, 2) for v in dm], "roll_add": best_roll, "peak": _pose_size(peak), "mark": mk_,
                      "mark_view_cm": [round(v, 2) for v in P1],
                      "screen": {"x_share": round((P1.x / P1.y / t_ + 1.0) / 2.0, 3), "y_share_from_top": round((1.0 - P1.z / P1.y / (t_ / PL.ASPECT)) / 2.0, 3)}}
     return out
@@ -2583,7 +2592,7 @@ def mark_of(tg):
 
 if POSE_ENGINE == "fakepose" and PULL and PULL.get("load_view"):
     VIEW_SHIFT.update(solve_load_view(PULL["load_view"]))
-    report["fakepose_load_view"] = {k: {kk: v[kk] for kk in ("move", "roll_add", "mark_view_cm", "screen")} for k, v in VIEW_SHIFT.items()}
+    report["fakepose_load_view"] = {k: {kk: v[kk] for kk in ("mark", "move", "roll_add", "mark_view_cm", "screen")} for k, v in VIEW_SHIFT.items()}
     L.snapshot("load", "hold")
 need = {}
 for cid_, clip in job["clips"].items():

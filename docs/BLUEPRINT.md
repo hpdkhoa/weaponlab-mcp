@@ -17,7 +17,7 @@ blueprint names its source.
 | 4. Blueprint | `blueprint_new`, `blueprint_part`, `blueprint_hole`, `blueprint_mark`, `blueprint_read` | writes the parts (extrude or lathe, clipped where neighbours meet), cuts, marks |
 | Detail | `blueprint_views`, `blueprint_loft`, `blueprint_follow_part`, `blueprint_shape_across`, `blueprint_round_corners`, `blueprint_bevel`, `blueprint_feature`, `blueprint_parts_list`, `blueprint_numbers` | shapes parts by three views or skins them through cross-sections (loft), lays outlines onto the figure's lines, rounds sections, corners and edges, adds grooves, screws and textures, holds every visible listed part to a blueprint part |
 | 5. Check | `blueprint_check` | contract, outline overlap with the reference, length and weight sums, the finish gate, each part's miss off its figure's lines, overlay pictures |
-| 6. Model | `blueprint_build`, `blueprint_render`, `blueprint_showcase` | the model in Blender, one object a part (each with its mesh health), its parts map, labelled pictures (flat, or with the finishes' materials); a GIF and MP4 showcase |
+| 6. Model | `blueprint_photomap`, `blueprint_build`, `blueprint_render`, `blueprint_showcase` | the model in Blender, one object a part (each with its mesh health), its parts map, labelled pictures (flat, or with the finishes' materials); a GIF and MP4 showcase |
 | 7. Motion | `blueprint_to_gunkit` | Gun Kit: rig, hand clips, gun clips, read-back; refused until the finish gate passes |
 
 A gun's files are in `<work>/digitize/<gun>/` (or under `WEAPONLAB_DIGITIZE`): `sources.json`, `blueprint.json`,
@@ -121,6 +121,19 @@ line report call it.
 
 Measured on the M16A2 line art: seven parts read by eye sat 7 to 21 px off their lines (95th percentile); followed,
 1 to 5 px. On the M82A2 photo: 7 to 24 px before, 1 to 6 px after.
+
+## The photo detail layer
+
+A visual copy's flat plates look flat: the real gun's pins, seams, panel steps, markings and wear are too fine for
+the mesh. `blueprint_photomap(gun, figure)` bakes them from a framed and scaled side photo into surface maps
+(`model/photomap/`): a band pass of the photo's brightness as relief (fine grain and the lighting gradient removed;
+dark reads as a recess), its slope as a tangent-space normal map, the tone as a colour multiplier, bright spots as
+worn, shinier metal (a roughness multiplier), all masked to the parts' side outlines. The next `blueprint_build`
+projects them onto every part's sides through a "photo" UV layer; faces turned away from the side take them weakly.
+The side not photographed takes the maps mirrored. The record on the blueprint (`photo_detail`) names the figure and
+marks every map as a derived guess of relief from shading: a photo's shading is not a height field. M107, ATF photo:
+102,354 faces unchanged; the magazine's ribs, the vents' rims, the stock frame's edges and the receiver's panels
+read in the material render where the plain finish showed one flat grey.
 
 ## Edge noise
 

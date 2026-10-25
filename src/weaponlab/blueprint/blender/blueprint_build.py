@@ -61,6 +61,102 @@ def g(x, y, z):
     return Vector((x, -y, z)) / 100.0
 
 
+PHOTO = None if PLAIN else job["blueprint"].get("photo_detail")
+
+
+def _image(path):
+    for im in bpy.data.images:
+        if im.filepath == path:
+            return im
+    im = bpy.data.images.load(path)
+    return im
+
+
+def material_photo(base):
+    """A finish with the photo detail layer (photo_detail): the baked normal map through a tangent-space Normal Map
+    node, the albedo and roughness maps as multipliers on the finish's own colour and roughness. The maps are read
+    through the "photo" UV layer (a projection of the gun's side); faces that face along the bore or up and down
+    take the detail weakly (the side weight: the face normal's x share)."""
+    name = base.name + "_photo"
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+    m = base.copy()
+    m.name = name
+    nt = m.node_tree
+    b = nt.nodes.get("Principled BSDF")
+    uv = nt.nodes.new("ShaderNodeUVMap")
+    uv.uv_map = "photo"
+    def tex(kind, colorspace):
+        t = nt.nodes.new("ShaderNodeTexImage")
+        t.image = _image(PHOTO["files"][kind])
+        t.image.colorspace_settings.name = colorspace
+        t.extension = 'EXTEND'
+        nt.links.new(uv.outputs["UV"], t.inputs["Vector"])
+        return t
+    # the normal: strength falls with the face's turn away from the side (|normal.x|)
+    nm = nt.nodes.new("ShaderNodeNormalMap")
+    nm.space = 'TANGENT'
+    nm.uv_map = "photo"
+    nt.links.new(tex("normal", "Non-Color").outputs["Color"], nm.inputs["Color"])
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    tr = nt.nodes.new("ShaderNodeVectorTransform")
+    tr.vector_type, tr.convert_from, tr.convert_to = 'NORMAL', 'WORLD', 'OBJECT'
+    nt.links.new(geo.outputs["Normal"], tr.inputs["Vector"])
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tr.outputs["Vector"], sep.inputs["Vector"])
+    ab = nt.nodes.new("ShaderNodeMath")
+    ab.operation = 'ABSOLUTE'
+    nt.links.new(sep.outputs["X"], ab.inputs[0])
+    nt.links.new(ab.outputs[0], nm.inputs["Strength"])
+    prev = b.inputs["Normal"].links[0].from_socket if b.inputs["Normal"].links else None
+    nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
+    if prev is not None:                          # a stipple bump already there: the photo normal rides on it
+        bump = prev.node
+        if bump.bl_idname == "ShaderNodeBump":
+            nt.links.new(nm.outputs["Normal"], bump.inputs["Normal"])
+            nt.links.new(bump.outputs["Normal"], b.inputs["Normal"])
+    # the tone and the shine, as multipliers (the maps hold 1.0 at 127.5)
+    col = nt.nodes.new("ShaderNodeMix")
+    col.data_type, col.blend_type = 'RGBA', 'MULTIPLY'
+    col.inputs["Factor"].default_value = 1.0
+    base_col = b.inputs["Base Color"].default_value[:]
+    col.inputs["A"].default_value = base_col
+    scale = nt.nodes.new("ShaderNodeVectorMath")
+    scale.operation = 'SCALE'
+    scale.inputs["Scale"].default_value = 2.0
+    nt.links.new(tex("albedo", "Non-Color").outputs["Color"], scale.inputs["Vector"])
+    nt.links.new(scale.outputs["Vector"], col.inputs["B"])
+    nt.links.new(col.outputs["Result"], b.inputs["Base Color"])
+    rg = nt.nodes.new("ShaderNodeMath")
+    rg.operation = 'MULTIPLY'
+    rg.inputs[1].default_value = 2.0 * b.inputs["Roughness"].default_value
+    rg.use_clamp = True
+    nt.links.new(tex("rough", "Non-Color").outputs["Color"], rg.inputs[0])
+    nt.links.new(rg.outputs[0], b.inputs["Roughness"])
+    m["photo_detail"] = PHOTO["figure"]
+    return m
+
+
+def photo_uv(ob):
+    """The "photo" UV layer: the gun's side projected along x onto the photo map's box (gun cm). The side the photo
+    shows reads it as taken; the other side takes it mirrored (photo_detail.other_side, a guess)."""
+    y0, y1, z0, z1 = PHOTO["box_cm"]
+    me = ob.data
+    layer = me.uv_layers.new(name="photo")
+    right = (PHOTO.get("shows") or "right") == "right"
+    for poly in me.polygons:
+        side = (poly.normal.x < 0) == right         # the photographed side faces -x (right) or +x (left)
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            y, z = -co.y * 100.0, co.z * 100.0
+            u = (y - y0) / (y1 - y0)
+            v = (z - z0) / (z1 - z0)
+            if not side and not PHOTO.get("mirror_other_side", True):
+                u, v = 0.0, 0.0
+            layer.data[li].uv = (u, v)
+    me.uv_layers.active = layer
+
+
 def material(finish):
     name = "M_" + finish
     if name in bpy.data.materials:
@@ -764,6 +860,10 @@ for pid, p in bp["parts"].items():
     ob.data.materials.append(material_textured(p["finish"], tx["pattern"], float(tx.get("pitch_cm") or 0.08)) if tx and not PLAIN else material(p["finish"]))
     for poly in ob.data.polygons:
         poly.material_index = 0
+    if PHOTO and p["role"] != "none":
+        photo_uv(ob)
+        ob.data.materials[0] = material_photo(ob.data.materials[0])
+        report.setdefault("photo_detail", []).append(pid)
     ob["role"] = p["role"]
     ob["finish"] = p["finish"]
     ob.data.validate()

@@ -99,7 +99,7 @@ def proxy(action_id):
         part("trigger", "Trigger", S((0.6, 0.8, 2.0), (0.0, -6.5, -5.5)), axis=[1, 0, 0], turn_deg=12.0, pivot=[0.0, -6.5, -4.5])
         marks.update({"handle": [1.8, -15.5, 3.2], "catch": [2.45, -4.0, -2.5], "release": [-2.5, -1.0, -2.5], "assist": [-2.9, -9.0, 1.5]})
         mark_parts.update({"handle": "handle"})
-    elif action_id == "ak_handle":
+    elif action_id in ("ak_handle", "barrett_handle"):
         part("carrier", "Carrier", S((2.0, 14.0, 2.5), (0.0, -2.0, 2.5)), axis=[0, -1, 0], travel_cm=12.0)
         shapes.append(_box("ChargingHandle", (2.5, 1.5, 1.2), (-3.2, 3.0, 2.5), "carrier"))
         parts["carrier"]["objects"].append("ChargingHandle")
