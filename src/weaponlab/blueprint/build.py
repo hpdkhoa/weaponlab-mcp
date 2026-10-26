@@ -79,6 +79,11 @@ def partsmap(bp, blend):
         # the sight's eye relief from the gun's facts (the middle of its printed range), for the hands' cheek weld
         pm["sights"] = {"eye_relief_cm": round((fx["eye_relief_min"]["value"] + fx["eye_relief_max"]["value"]) / 2.0, 2),
                         "source": "facts eye_relief_min and eye_relief_max"}
+    rnd = store.root() / bp["name"] / "round.json"
+    if rnd.exists():
+        # the round the gun chambers (rounds.py): Gun Kit's rig turns it into a mesh of its own, on the chamber (or the
+        # bolt, where the bolt draws it), so a clip can show the chamber check with the bullet or without
+        pm["round"] = json.loads(rnd.read_text(encoding="utf-8"))
     if bp.get("magazine_lips"):
         pm["magazine"] = {"lips": bp["magazine_lips"]["at"]}
         mag = next((p for p in bp["parts"].values() if p["role"] in ("magazine", "cell")), None)

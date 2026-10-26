@@ -85,8 +85,16 @@ def _side_by_side(gun, size, fig_id, view_png, source_caption=None, copy_caption
 
 
 def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames=60, compare_figure=None, timeout=3600,
-         compare_view="view_left", source_caption=None, copy_caption=None, subtitle=None):
-    """Renders and writes showcase/<gun>.gif and showcase/<gun>.mp4. Needs the gun built and through Gun Kit."""
+         compare_view="view_left", source_caption=None, copy_caption=None, subtitle=None, variant="both"):
+    """Renders and writes showcase/<gun>.gif and showcase/<gun>.mp4 (the round in the chamber where the gun has a
+    round.json) and, with variant both, showcase/<gun>_empty.gif and .mp4 (no round). Needs the gun built and through
+    Gun Kit. The owner, 2026-10-26: the chamber check in two variants, with the bullet and without."""
+    if variant == "both":
+        a = make(gun, title, source_note, fps, size, turn_frames, compare_figure, timeout, compare_view, source_caption, copy_caption, subtitle, "loaded")
+        b = make(gun, title, source_note, fps, size, turn_frames, compare_figure, timeout, compare_view, source_caption, copy_caption, subtitle, "empty")
+        return {"loaded": a, "empty": b}
+    loaded = variant != "empty"
+    suffix = "" if loaded else "_empty"
     from PIL import Image
     from ..gunkit import run as R
     clips_blend = Path(R.folder(gun)) / ("%s_clips.blend" % gun)
@@ -108,7 +116,7 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
     plan = [(a, lab.format(w=run[1]), s, v, r, z, ld, look if close else None) for a, lab, s, v, r, z, ld, close in LONG_CLIPS] if long_gun         else [c + (None,) for c in CLIPS]
     if long_gun and "cycle" in action.get("gun_clips", {}):
         plan[0] = ("fire", "Firing: the trigger breaks (4x slow)") + plan[0][2:]
-    for a, lab, s, v, r, z, loaded, at in plan:
+    for a, lab, s, v, r, z, ld, at in plan:          # ld: the clip's own rule for when the chamber holds the round
         if a not in action.get("gun_clips", {}):
             continue
         free = {}
@@ -116,14 +124,14 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
             bone = (facts.get("magazine") or {}).get("bone") if role in ("magazine", "cell") else facts["parts"].get(role, {}).get("bone")
             if bone:
                 free[bone] = track
-        clips.append({"action": "A_%s_%s" % (gun, a), "label": lab, "slow": s, "view": v, "repeat": r, "zoom": z, "loaded": loaded,
+        clips.append({"action": "A_%s_%s" % (gun, a), "label": lab, "slow": s, "view": v, "repeat": r, "zoom": z, "loaded": ld,
                       "free": free, "free_fps": T.FPS, "look": at})
     # the round in the chamber, where the gun has one (<gun>/round.json: a turned profile in gun cm), and the marks the
     # port view looks at
     rnd = store.root() / gun / "round.json"
-    jf = out / "showcase.job.json"
+    jf = out / ("showcase%s.job.json" % suffix)
     jf.write_text(json.dumps({"out": str(frames_dir), "size": list(size), "fps": fps, "turn_frames": turn_frames, "clips": clips,
-                              "round": json.loads(rnd.read_text(encoding="utf-8")) if rnd.exists() else None,
+                              "round": json.loads(rnd.read_text(encoding="utf-8")) if (rnd.exists() and loaded) else None,
                               "slide_bone": facts["parts"].get(run[0], {}).get("bone"),
                               "port": facts["marks"].get("port")}), encoding="utf-8")
     p = subprocess.run([str(project().blender()), "-b", str(clips_blend), "-P", str(HERE / "blueprint_showcase.py"), "--", str(jf)],
@@ -146,9 +154,9 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
         seq += [sbs] * int(fps * 3)
     for s in shots:
         im = Image.open(frames_dir / ("f%05d.png" % s["frame"])).convert("RGB")
-        seq.append(_label(im, head, "Turned once round" if s["shot"] == "turn" else s["shot"]))
+        seq.append(_label(im, head, ("Turned once round" if s["shot"] == "turn" else s["shot"]) + ("" if loaded else "  (empty chamber)")))
     seq += [card] * int(fps * 1.5)
-    gif = out / ("%s.gif" % gun)
+    gif = out / ("%s%s.gif" % (gun, suffix))
     small = [im.resize((size[0] * 3 // 4, size[1] * 3 // 4), Image.LANCZOS) for im in seq]
     pal = [im.convert("P", palette=Image.ADAPTIVE, colors=128) for im in small]
     pal[0].save(gif, save_all=True, append_images=pal[1:], duration=int(1000 / fps), loop=0, optimize=True)
@@ -158,11 +166,11 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
     comp.mkdir()
     for k, im in enumerate(seq):
         im.save(comp / ("c%05d.png" % k))
-    mp4 = out / ("%s.mp4" % gun)
-    enc = out / "encode.job.json"
+    mp4 = out / ("%s%s.mp4" % (gun, suffix))
+    enc = out / ("encode%s.job.json" % suffix)
     enc.write_text(json.dumps({"frames": str(comp), "count": len(seq), "fps": fps, "size": list(size), "out": str(mp4)}), encoding="utf-8")
     p = subprocess.run([str(project().blender()), "-b", "--factory-startup", "-P", str(HERE / "blueprint_encode.py"), "--", str(enc)],
                        capture_output=True, text=True, timeout=timeout)
     (out / "encode.log").write_text((p.stdout or "") + "\n" + (p.stderr or ""), encoding="utf-8", errors="replace")
     return {"gif": str(gif), "mp4": str(mp4) if mp4.exists() else None, "frames": len(seq), "seconds": round(len(seq) / fps, 1),
-            "gif_mb": round(gif.stat().st_size / 1e6, 2)}
+            "gif_mb": round(gif.stat().st_size / 1e6, 2), "variant": "loaded" if loaded else "empty", "round": bool(rnd.exists() and loaded)}

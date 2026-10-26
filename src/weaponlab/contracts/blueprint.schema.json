@@ -69,6 +69,11 @@
       "type": "object",
       "description": "the check step's last results (written by check)"
     },
+    "cartridge": {
+      "type": "object",
+      "required": ["id", "source"],
+      "description": "the round the gun chambers (rounds.py: 45acp, 5.56x45, 7.62x51, 50bmg, 12ga), drawn in the chamber by the showcase and carried by Gun Kit's rig"
+    },
     "photo_detail": {
       "type": "object",
       "required": [

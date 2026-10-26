@@ -691,13 +691,23 @@ def blueprint_photomap(gun: str, figure: Annotated[str, Field(description="a fra
 
 
 @mcp.tool()
+def blueprint_round(gun: str, cartridge: Annotated[str, Field(description="45acp, 5.56x45, 7.62x51, 50bmg or 12ga (SAAMI dimensions)")]) -> dict:
+    """The round the gun chambers, as a turned profile from the cartridge's published dimensions: the showcase draws
+    it in the chamber (the chamber check with and without the bullet) and Gun Kit's rig carries it as a mesh."""
+    from .blueprint import rounds as RD
+    return _err(RD.write, gun, cartridge)
+
+
+@mcp.tool()
 def blueprint_showcase(gun: str, title: str | None = None, source_note: str | None = None,
-                       compare_figure: Annotated[str | None, Field(description="a source figure shown beside the copy")] = None) -> dict:
+                       compare_figure: Annotated[str | None, Field(description="a source figure shown beside the copy")] = None,
+                       variant: Annotated[str, Field(description="loaded (the round in the chamber), empty, or both (two files: <gun> and <gun>_empty)")] = "both") -> dict:
     """A showcase of a built gun that has been through Gun Kit (minutes in Blender): a title card, the source beside
     the copy, a turn round it, its clips (fire slowed, the reloads, the checks); as a GIF and an MP4, every frame
-    labelled as a Blueprint Lab model view."""
+    labelled as a Blueprint Lab model view. With a round.json (blueprint_round) the chamber check shows the round;
+    variant both also writes the empty-chamber version."""
     from .blueprint import showcase as SC
-    return _err(SC.make, gun, title, source_note, compare_figure=compare_figure)
+    return _err(SC.make, gun, title, source_note, compare_figure=compare_figure, variant=variant)
 
 
 @mcp.tool()

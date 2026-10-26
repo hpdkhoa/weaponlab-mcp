@@ -135,6 +135,16 @@ marks every map as a derived guess of relief from shading: a photo's shading is 
 102,354 faces unchanged; the magazine's ribs, the vents' rims, the stock frame's edges and the receiver's panels
 read in the material render where the plain finish showed one flat grey.
 
+## The round in the chamber
+
+`blueprint_round(gun, cartridge)` writes `<gun>/round.json`, the round as a turned profile (y forward from the breech
+face, r off the bore) from the cartridge's published dimensions (`rounds.py`: 45acp, 5.56x45, 7.62x51, 50bmg, 12ga;
+SAAMI drawings as printed) and records the cartridge on the blueprint. The showcase draws it in the chamber (the
+chamber check shows the case head at the port) and, with `variant` both, writes the empty-chamber version too
+(`<gun>_empty.gif`, `.mp4`). Gun Kit's rig turns it into a mesh of its own, `Round`, on the chamber (or on the bolt
+where a bolt draws it) and exports it as `SK_<gun>_Round.fbx` on the same skeleton, so the game shows or hides it;
+the hands job renders it when asked (`round: true`). The owner, 2026-10-26: "two variants: with bullet and without".
+
 ## Edge noise
 
 A photo printed as a halftone, or a grainy scan, gives a traced outline a chipped edge: the tracer follows the dots.

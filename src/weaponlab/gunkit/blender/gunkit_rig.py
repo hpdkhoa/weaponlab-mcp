@@ -218,6 +218,40 @@ bpy.ops.object.mode_set(mode='OBJECT')
 mesh.parent = arm
 mesh.modifiers.new("Armature", 'ARMATURE').object = arm
 
+# --- the round in the chamber: its own mesh on the same skeleton, in its own FBX (the game shows or hides it) ----------
+round_ob = None
+if pm.get("round"):
+    import math as _m
+    rp = pm["round"]["profile"]
+    seg = 32
+    vs, fs = [], []
+    for y_, r_ in rp:
+        for k in range(seg):
+            a = 2 * _m.pi * k / seg
+            vs.append(g(r_ * _m.cos(a), y_, r_ * _m.sin(a)))
+    for i in range(len(rp) - 1):
+        for k in range(seg):
+            fs.append((i * seg + k, i * seg + (k + 1) % seg, (i + 1) * seg + (k + 1) % seg, (i + 1) * seg + k))
+    fs.append(tuple(reversed(range(seg))))
+    rme = bpy.data.meshes.new("Round")
+    rme.from_pydata([tuple(v) for v in vs], [], fs)
+    rme.validate()
+    for poly in rme.polygons:
+        poly.use_smooth = True
+    rmat = bpy.data.materials.new("M_Round_brass")
+    rmat.diffuse_color = (0.80, 0.60, 0.26, 1.0)
+    rme.materials.append(rmat)
+    round_ob = bpy.data.objects.new("Round", rme)
+    bpy.context.scene.collection.objects.link(round_ob)
+    # the round rides the bolt where a bolt draws it (a bolt action's check shows the round); else it sits in the chamber
+    round_bone = R.bone_name("bolt") if "bolt" in pm["parts"] else "Root"
+    vg = round_ob.vertex_groups.new(name=round_bone)
+    vg.add(list(range(len(rme.vertices))), 1.0, 'REPLACE')
+    round_ob.parent = arm
+    round_ob.modifiers.new("Armature", 'ARMATURE').object = arm
+    facts["round"] = {"cartridge": pm["round"].get("cartridge"), "name": pm["round"].get("name"), "mesh": "Round", "bone": round_bone,
+                      "case_y_cm": pm["round"].get("case_y_cm"), "source": pm["round"].get("source")}
+
 blend = os.path.join(OUT, "%s_rig.blend" % NAME)
 fbx = os.path.join(OUT, "SK_%s_Rig.fbx" % NAME)
 for o in bpy.context.scene.objects:
@@ -226,6 +260,17 @@ arm.select_set(True)
 mesh.select_set(True)
 bpy.ops.export_scene.fbx(filepath=fbx, use_selection=True, object_types={'ARMATURE', 'MESH'}, add_leaf_bones=False,
                          bake_anim=False, mesh_smooth_type='FACE', colors_type='LINEAR')
+if round_ob is not None:
+    rfbx = os.path.join(OUT, "SK_%s_Round.fbx" % NAME)
+    for o in bpy.context.scene.objects:
+        o.select_set(False)
+    arm.select_set(True)
+    round_ob.select_set(True)
+    bpy.ops.export_scene.fbx(filepath=rfbx, use_selection=True, object_types={'ARMATURE', 'MESH'}, add_leaf_bones=False,
+                             bake_anim=False, mesh_smooth_type='FACE', colors_type='LINEAR')
+    facts["round"]["file"] = rfbx
+    round_ob.hide_render = True
+    round_ob.hide_viewport = True
 bpy.ops.wm.save_as_mainfile(filepath=blend)
 facts["model"].update({"blend": blend, "file": fbx, "armature": NAME, "mesh": mesh.name})
 json.dump(facts, open(os.path.join(OUT, "gunfacts.json"), "w", encoding="utf-8"), indent=1)

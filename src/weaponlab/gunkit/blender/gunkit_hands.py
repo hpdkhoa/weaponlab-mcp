@@ -76,6 +76,29 @@ L.steps.meta = {"run": "gunkit hands", "budget_s": BUDGET}
 L.steps.phase("load the arms and the gun")
 L.load_rig("gunkit")
 RA = L.rifle_arm
+# the round in the chamber (the owner, 2026-10-26: the chamber check with the bullet and without): with job round
+# true, the rig's Round FBX (facts round.file) comes in on the gun's own armature, so the eye sees it
+ROUND_OB = None
+if job.get("round") and (facts.get("round") or {}).get("file") and os.path.exists(facts["round"]["file"]):
+    _before = set(bpy.data.objects.keys())
+    bpy.ops.import_scene.fbx(filepath=facts["round"]["file"])
+    _new = [bpy.data.objects[n] for n in bpy.data.objects.keys() if n not in _before]
+    _rm = next((o for o in _new if o.type == 'MESH'), None)
+    _ra2 = next((o for o in _new if o.type == 'ARMATURE'), None)
+    if _rm is not None:
+        _mw = RA.matrix_world @ (_ra2.matrix_world.inverted() @ _rm.matrix_world if _ra2 is not None else _rm.matrix_world)
+        _rm.parent = RA
+        _rm.matrix_world = _mw
+        for _m in _rm.modifiers:
+            if _m.type == 'ARMATURE':
+                _m.object = RA
+        if not any(_m.type == 'ARMATURE' for _m in _rm.modifiers):
+            _rm.modifiers.new("Armature", 'ARMATURE').object = RA
+        _rm.name = "Round"
+        ROUND_OB = _rm
+    if _ra2 is not None:
+        bpy.data.objects.remove(_ra2)
+    bpy.context.view_layer.update()
 report = {"gun": facts["name"], "clips": {}, "notes": []}
 if hasattr(L, "_fitted_radii") and L._fitted_radii():
     report["capsules_cm"] = {k: round(v * 100.0, 2) for k, v in L._fitted_radii().items()}
