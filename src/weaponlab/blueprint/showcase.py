@@ -131,7 +131,8 @@ def make(gun, title=None, source_note=None, fps=15, size=(960, 600), turn_frames
     rnd = store.root() / gun / "round.json"
     jf = out / ("showcase%s.job.json" % suffix)
     jf.write_text(json.dumps({"out": str(frames_dir), "size": list(size), "fps": fps, "turn_frames": turn_frames, "clips": clips,
-                              "round": json.loads(rnd.read_text(encoding="utf-8")) if (rnd.exists() and loaded) else None,
+                              "round": (dict(json.loads(rnd.read_text(encoding="utf-8")), base_y_cm=(facts.get("round") or {}).get("base_y_cm", 0.0))
+                                        if (rnd.exists() and loaded) else None),
                               "slide_bone": facts["parts"].get(run[0], {}).get("bone"),
                               "port": facts["marks"].get("port")}), encoding="utf-8")
     p = subprocess.run([str(project().blender()), "-b", str(clips_blend), "-P", str(HERE / "blueprint_showcase.py"), "--", str(jf)],

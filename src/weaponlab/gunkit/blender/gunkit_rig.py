@@ -182,6 +182,14 @@ for role, p in pm["parts"].items():
         lo = Vector((min(v.x for v in pts), min(v.y for v in pts), min(v.z for v in pts)))
         hi = Vector((max(v.x for v in pts), max(v.y for v in pts), max(v.z for v in pts)))
         centres[role] = gun((lo + hi) / 2.0)
+# the bolt face: the front of the part that runs (the carrier, the bolt or the slide) at rest, measured on the parts
+# before they are joined; the round's case head sits on it
+_runner = next((pm["parts"][r_] for r_ in ("carrier", "bolt", "slide") if r_ in pm["parts"]), None)
+BOLT_FACE_Y = 0.0
+if _runner:
+    _ys = [gun(v.co)[1] for n_ in _runner.get("objects", []) for v in objects[n_].data.vertices]
+    if _ys:
+        BOLT_FACE_Y = max(_ys)
 tri = sum(len(ob.data.polygons) for ob in objects.values())
 facts = R.plan(pm, centres, model={"source": "proxy" if job.get("shapes") else "import", "from": pm.get("model"),
                                    "triangles": tri})
@@ -223,12 +231,15 @@ round_ob = None
 if pm.get("round"):
     import math as _m
     rp = pm["round"]["profile"]
+    # the chamber: the round's case head sits on the bolt face, the front of the part that runs (the carrier, the bolt
+    # or the slide) at rest, measured on the model; a blueprint's origin need not be the bolt face
+    face_y = BOLT_FACE_Y
     seg = 32
     vs, fs = [], []
     for y_, r_ in rp:
         for k in range(seg):
             a = 2 * _m.pi * k / seg
-            vs.append(g(r_ * _m.cos(a), y_, r_ * _m.sin(a)))
+            vs.append(g(r_ * _m.cos(a), y_ + face_y, r_ * _m.sin(a)))
     for i in range(len(rp) - 1):
         for k in range(seg):
             fs.append((i * seg + k, i * seg + (k + 1) % seg, (i + 1) * seg + (k + 1) % seg, (i + 1) * seg + k))
@@ -243,13 +254,16 @@ if pm.get("round"):
     rme.materials.append(rmat)
     round_ob = bpy.data.objects.new("Round", rme)
     bpy.context.scene.collection.objects.link(round_ob)
-    # the round rides the bolt where a bolt draws it (a bolt action's check shows the round); else it sits in the chamber
-    round_bone = R.bone_name("bolt") if "bolt" in pm["parts"] else "Root"
+    # the round rides the part that runs (the extractor holds the case: a press check draws the case head back into
+    # the port with the bolt, on a bolt action as on an AR; a pistol's slide the same)
+    _rr = next((r_ for r_ in ("carrier", "bolt", "slide") if r_ in pm["parts"]), None)
+    round_bone = R.bone_name(_rr) if _rr else "Root"
     vg = round_ob.vertex_groups.new(name=round_bone)
     vg.add(list(range(len(rme.vertices))), 1.0, 'REPLACE')
     round_ob.parent = arm
     round_ob.modifiers.new("Armature", 'ARMATURE').object = arm
     facts["round"] = {"cartridge": pm["round"].get("cartridge"), "name": pm["round"].get("name"), "mesh": "Round", "bone": round_bone,
+                      "base_y_cm": round(face_y, 3), "base_source": "the front of the running part's mesh at rest (the bolt face)",
                       "case_y_cm": pm["round"].get("case_y_cm"), "source": pm["round"].get("source")}
 
 blend = os.path.join(OUT, "%s_rig.blend" % NAME)

@@ -107,10 +107,22 @@ def turned(name, profile, color):
 
 ROUND = []
 if job.get("round"):
-    rp, cy = job["round"]["profile"], job["round"]["case_y_cm"][1]
+    _by = float(job["round"].get("base_y_cm") or 0.0)          # the case head on the bolt face (Gun Kit's measure), else the origin
+    rp = [[y + _by, r] for y, r in job["round"]["profile"]]
+    cy = job["round"]["case_y_cm"][1] + _by
     case = [q for q in rp if q[0] <= cy + 1e-6]
     bullet = [[cy, 0.0]] + [q for q in rp if q[0] > cy + 1e-6]
     ROUND = [turned("Round_case", case, (0.80, 0.60, 0.26, 1.0)), turned("Round_bullet", bullet, (0.72, 0.42, 0.26, 1.0))]
+    # the round rides the part that runs (the extractor holds the case): parented to its bone, so a check draws the
+    # case head back into the port with the bolt
+    _rb = job.get("slide_bone")
+    if _rb and _rb in arm.pose.bones:
+        for _o in ROUND:
+            _mw = _o.matrix_world.copy()
+            _o.parent = arm
+            _o.parent_type = 'BONE'
+            _o.parent_bone = _rb
+            _o.matrix_world = _mw
 
 
 def show_round(on):

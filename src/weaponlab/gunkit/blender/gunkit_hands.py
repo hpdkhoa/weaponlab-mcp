@@ -99,7 +99,11 @@ if job.get("round") and (facts.get("round") or {}).get("file") and os.path.exist
     if _ra2 is not None:
         bpy.data.objects.remove(_ra2)
     bpy.context.view_layer.update()
+    report_round = {"imported": ROUND_OB is not None, "vertices": len(ROUND_OB.data.vertices) if ROUND_OB is not None else 0,
+                    "bone": facts["round"].get("bone"), "groups": [vg.name for vg in ROUND_OB.vertex_groups] if ROUND_OB is not None else []}
 report = {"gun": facts["name"], "clips": {}, "notes": []}
+if job.get("round"):
+    report["round"] = locals().get("report_round", {"imported": False, "why": "no round file in the facts"})
 if hasattr(L, "_fitted_radii") and L._fitted_radii():
     report["capsules_cm"] = {k: round(v * 100.0, 2) for k, v in L._fitted_radii().items()}
 STYLE = job.get("style")
