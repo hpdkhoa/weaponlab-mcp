@@ -2565,6 +2565,9 @@ def pose_rules_report():
     clips_ = {cid: v.get("frames_with_clip", 0) for cid, v in ce.items()}
     judge(9, all(v == 0 for v in clips_.values()), clips_, "zero clipping seen from the eye, every frame")
     judge(10, True, None, "every hand has a target each action, the palm on the held part: by the presets and the timeline")
+    gates = {k: v.get("gate") for k, v in (report.get("fakepose", {}).get("holds") or {}).items() if isinstance(v, dict) and v.get("gate")}
+    judge(11, bool(gates) and all(g_["pass"] for g_ in gates.values()), {k: (g_["pass"], g_["fails"][:2]) for k, g_ in gates.items()},
+          "the hand gate (the owner, 2026-10-26): every hold's digits touch their part, none inside the mesh, none twisted, the thumb on the gun, the joints inside their limits")
     out["passed"] = sum(1 for r in out["rules"].values() if r["pass"])
     out["failed"] = [n for n, r in out["rules"].items() if not r["pass"]]
     return out
