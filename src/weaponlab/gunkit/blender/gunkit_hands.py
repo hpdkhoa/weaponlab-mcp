@@ -2948,7 +2948,9 @@ for cid, clip in job["clips"].items():
                 row_ = {"t": round(fr["t"], 3), "seen_before_fix": ec_["clip_pixels"], "sides": ec_.get("sides")}
                 if ec_["clip_pixels"]:
                     # the market's fix: the hand the eye sees clipping set back off the gun, then checked again
-                    row_["moved_cm"], ec_ = FP.unclip_seen(ec_, res=tuple(job.get("eye_res_clips", (96, 54))))
+                    # a hand holding nothing (in transit) may be set back further than one on a hold
+                    _transit = any(0.0 < fr["hands"][sd_]["w"] < 1.0 and fr["hands"][sd_]["a"] != fr["hands"][sd_]["b"] for sd_ in ("r", "l"))
+                    row_["moved_cm"], ec_ = FP.unclip_seen(ec_, res=tuple(job.get("eye_res_clips", (96, 54))), max_cm=8.0 if _transit else 4.0)
                 row_.update({"clip_pixels": ec_["clip_pixels"], "deepest_seen_cm": ec_["deepest_seen_cm"]})
                 row_["rules"] = rule_numbers(ec_)
                 eye_frames.append(row_)
