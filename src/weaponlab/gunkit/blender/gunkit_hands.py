@@ -2510,6 +2510,8 @@ def pose_rules_report():
     judge(7, bool(hp) and all(v >= 0.5 for v in hp.values()), hp, "check and charge: a hand on screen on at least half the frames")
     worst = {}
     for cid, rs in rows.items():
+        if cid in ("equip", "holster", "run"):
+            continue                      # the hands leave the gun for targets off it (a pouch, the chest): not the bar's clips
         for r in rs:
             for sd, lm in (r.get("limits") or {}).items():
                 w = worst.setdefault(sd, {"wrist_bend_deg": 0.0, "elbow_bend_deg": [999.0, 0.0], "elbow_under_cm": 999.0})
@@ -2832,7 +2834,17 @@ for cid, clip in job["clips"].items():
                 # each frame's arm starts from the hold's, as the solver's does: the forearm's roll is the hand's
                 # turn from there, not the sum of every frame's change (that wound the forearm the long way round)
                 arm_from_hold(side)
-            L._put_hand(side, H)
+            short_ = L._put_hand(side, H)
+            in_transit = 0.0 < h["w"] < 1.0 and h["a"] != h["b"]
+            if in_transit and lift is not None and short_ > 0.0:
+                # the lift took the hand past the arm's reach: the way goes lower (the lift cut to what the arm reaches)
+                H = Matrix.Translation(-lift * min(1.0, short_ / max(lift.length * 100.0, 1e-6))) @ H
+                if L._put_hand(side, H) > 0.0:
+                    H = blend(Ma, Mb, wm)                 # still short: no lift at all on this frame
+                    L._put_hand(side, H)
+            if in_transit and POSE_ENGINE == "fakepose" and FP is not None and hasattr(FP, "relax_wrist"):
+                # a hand holding nothing relaxes its wrist on the way (the owner's joint limits, 2026-10-25)
+                FP.relax_wrist(side)
             if STYLE and job.get("shoulder_reach", True):
                 shoulder_reach(side, H)                   # an arm at full stretch: the shoulder reaches too
             on_gun = h["b"].get("space") == "gun"
