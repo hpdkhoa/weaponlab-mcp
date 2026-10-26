@@ -2081,6 +2081,15 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
     FP.set_eye()
     if hasattr(FP, "install_limits") and job.get("joint_limits", True):
         FP.install_limits()          # the owner, 2026-10-25: the market's IK with a body's joint limits
+        # the clips' own sway at rest (the idle's breathing, the walk's bob): the farthest a resting clip moves the
+        # gun, kept as the support slide's margin so the arm stays bent through it
+        _sway = 0.0
+        for _cid_, _c_ in job["clips"].items():
+            if _cid_ in ("idle", "walk", "run", "fire"):
+                for _f_ in _c_["frames"]:
+                    _mv_ = _f_["gun"].get("move", [0.0, 0.0, 0.0])
+                    _sway = max(_sway, math.sqrt(sum(float(v) ** 2 for v in _mv_)))
+        FP.REST_SWAY_CM = round(_sway, 2)
         if job.get("hand_turn_max_deg") is not None:
             FP.TURN_MAX = float(job["hand_turn_max_deg"])
     FP.aim_place("r")
@@ -2409,6 +2418,9 @@ def solve_load_view(LV):
 
 
 RULES_BAR = {"cover": [0.10, 0.20], "rest_sight_view_cm": [3.8, 13.1, -4.4], "rest_tol_cm": 2.0, "wrist_max_deg": 30.0,
+             # the share of the clip's frames with the pulling hand on screen, as the game's own clips have it
+             # (Pose Lab over the check and charge, 2026-10-26: 0.44 and 0.58)
+             "hand_on_screen_share": {"check_chamber": 0.44, "charge": 0.58, "cycle": 0.44},
              "elbow_bend_deg": [5.0, 150.0], "elbow_under_cm": 2.0, "port_visible_min": 0.6,
              "source": "the game's AR-15 clips measured with Pose Lab, 2026-10-25 (fakepose-mcp/docs/POSE_RULES.md)"}
 
@@ -2507,7 +2519,8 @@ def pose_rules_report():
         on = [r for r in rs if any(r.get("hand_%s_screen" % sd) and abs(r["hand_%s_screen" % sd][0]) <= 1 and abs(r["hand_%s_screen" % sd][1]) <= 1 for sd in ("l", "r"))]
         if rs:
             hp[cid] = round(len(on) / len(rs), 2)
-    judge(7, bool(hp) and all(v >= 0.5 for v in hp.values()), hp, "check and charge: a hand on screen on at least half the frames")
+    judge(7, bool(hp) and all(v >= B["hand_on_screen_share"].get(c_, 0.44) - 0.05 for c_, v in hp.items()), hp,
+          "check and charge: the pulling hand on screen on as many frames as the game's clips (check 0.44, charge 0.58, within 0.05)")
     worst = {}
     for cid, rs in rows.items():
         if cid in ("equip", "holster", "run"):
@@ -2842,6 +2855,12 @@ for cid, clip in job["clips"].items():
                 if L._put_hand(side, H) > 0.0:
                     H = blend(Ma, Mb, wm)                 # still short: no lift at all on this frame
                     L._put_hand(side, H)
+            if (not in_transit) and short_ > 0.0 and mark_of(h["b"]) == "support" and POSE_ENGINE == "fakepose":
+                # a sway (the walk's bob) takes the support hold past the arm's reach: the hand slips back along the
+                # handguard by the shortfall and a little, as a hand does, instead of locking the elbow straight
+                F_ = (RA.matrix_world.to_quaternion() @ g((0.0, 100.0, 0.0))).normalized()
+                H = Matrix.Translation(-F_ * ((short_ + 0.5) / 100.0)) @ H
+                short_ = L._put_hand(side, H)
             if in_transit and POSE_ENGINE == "fakepose" and FP is not None and hasattr(FP, "relax_wrist"):
                 # a hand holding nothing relaxes its wrist on the way (the owner's joint limits, 2026-10-25)
                 FP.relax_wrist(side)
