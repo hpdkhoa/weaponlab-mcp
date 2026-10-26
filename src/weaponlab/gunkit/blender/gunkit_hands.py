@@ -2849,18 +2849,33 @@ for cid, clip in job["clips"].items():
                 arm_from_hold(side)
             short_ = L._put_hand(side, H)
             in_transit = 0.0 < h["w"] < 1.0 and h["a"] != h["b"]
-            if in_transit and lift is not None and short_ > 0.0:
+
+            def _bend_now():
+                return float(((getattr(FP, "last_limits", {}) or {}).get(side) or {}).get("elbow_bend_deg", 90.0)) if FP is not None else 90.0
+            straight_ = short_ > 0.0 or _bend_now() < 15.0     # at or past the arm's reach: the elbow all but locked
+            if straight_ and side == "l" and len(report.get("straight_debug", [])) < 12:
+                report.setdefault("straight_debug", []).append({"t": round(fr["t"], 3), "short": round(short_, 2), "bend": _bend_now(), "in_transit": in_transit,
+                                                                 "b": h["b"].get("name"), "mark_of_b": mark_of(h["b"]), "engine": POSE_ENGINE})
+            if in_transit and lift is not None and straight_:
                 # the lift took the hand past the arm's reach: the way goes lower (the lift cut to what the arm reaches)
-                H = Matrix.Translation(-lift * min(1.0, short_ / max(lift.length * 100.0, 1e-6))) @ H
-                if L._put_hand(side, H) > 0.0:
-                    H = blend(Ma, Mb, wm)                 # still short: no lift at all on this frame
-                    L._put_hand(side, H)
-            if (not in_transit) and short_ > 0.0 and mark_of(h["b"]) == "support" and POSE_ENGINE == "fakepose":
-                # a sway (the walk's bob) takes the support hold past the arm's reach: the hand slips back along the
-                # handguard by the shortfall and a little, as a hand does, instead of locking the elbow straight
-                F_ = (RA.matrix_world.to_quaternion() @ g((0.0, 100.0, 0.0))).normalized()
-                H = Matrix.Translation(-F_ * ((short_ + 0.5) / 100.0)) @ H
+                H = Matrix.Translation(-lift * min(1.0, max(short_, 0.5) / max(lift.length * 100.0, 1e-6))) @ H
                 short_ = L._put_hand(side, H)
+                if short_ > 0.0 or _bend_now() < 15.0:
+                    H = blend(Ma, Mb, wm)                 # still short: no lift at all on this frame
+                    short_ = L._put_hand(side, H)
+            if (not in_transit) and mark_of(h["b"]) == "support" and POSE_ENGINE == "fakepose" and (short_ > 0.0 or _bend_now() < 15.0):
+                # a sway (the walk's bob) takes the support hold to the arm's reach: the hand slips back along the
+                # handguard, 1 cm at a time (at most 6), until the elbow bends again, as a hand does
+                F_ = (RA.matrix_world.to_quaternion() @ g((0.0, 100.0, 0.0))).normalized()
+                _dbg = {"t": round(fr["t"], 3), "side": side, "short": round(short_, 2), "bend_before": _bend_now(), "steps": 0}
+                for _k_ in range(6):
+                    H = Matrix.Translation(-F_ * 0.01) @ H
+                    short_ = L._put_hand(side, H)
+                    _dbg["steps"] += 1
+                    if short_ <= 0.0 and _bend_now() >= 15.0:
+                        break
+                _dbg["bend_after"] = _bend_now()
+                report.setdefault("slip_debug", []).append(_dbg)
             if in_transit and POSE_ENGINE == "fakepose" and FP is not None and hasattr(FP, "relax_wrist"):
                 # a hand holding nothing relaxes its wrist on the way (the owner's joint limits, 2026-10-25)
                 FP.relax_wrist(side)
@@ -2970,6 +2985,23 @@ for cid, clip in job["clips"].items():
                     # a hand holding nothing (in transit) may be set back further than one on a hold
                     _transit = any(0.0 < fr["hands"][sd_]["w"] < 1.0 and fr["hands"][sd_]["a"] != fr["hands"][sd_]["b"] for sd_ in ("r", "l"))
                     row_["moved_cm"], ec_ = FP.unclip_seen(ec_, res=tuple(job.get("eye_res_clips", (96, 54))), max_cm=8.0 if _transit else 4.0)
+                    # the fix set a resting hand off its hold and the arm straightened to follow: the hand slips back
+                    # along the bore, 1 cm at a time (at most 6), until the elbow bends again (the joint limits)
+                    for sd_ in [k_ for k_ in (row_["moved_cm"] or {}) if k_ in ("r", "l")]:
+                        h_ = fr["hands"][sd_]
+                        if 0.0 < h_["w"] < 1.0 and h_["a"] != h_["b"]:
+                            continue
+                        lim_ = (getattr(FP, "last_limits", {}) or {}).get(sd_) or {}
+                        if lim_.get("elbow_bend_deg", 90.0) >= 15.0:
+                            continue
+                        F_ = (RA.matrix_world.to_quaternion() @ g((0.0, 100.0, 0.0))).normalized()
+                        Hs_ = L._bw(L._n("hand", sd_)).copy()
+                        for _k_ in range(6):
+                            Hs_ = Matrix.Translation(-F_ * 0.01) @ Hs_
+                            L._put_hand(sd_, Matrix.LocRotScale(Hs_.translation, Hs_.to_quaternion(), L._unit()))
+                            if ((getattr(FP, "last_limits", {}) or {}).get(sd_) or {}).get("elbow_bend_deg", 0.0) >= 15.0:
+                                break
+                        row_.setdefault("slipped_cm", {})[sd_] = (_k_ + 1) * 1.0
                 row_.update({"clip_pixels": ec_["clip_pixels"], "deepest_seen_cm": ec_["deepest_seen_cm"]})
                 row_["rules"] = rule_numbers(ec_)
                 eye_frames.append(row_)
