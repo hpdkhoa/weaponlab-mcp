@@ -2458,6 +2458,8 @@ def rule_numbers(ec=None):
             row[mk + "_screen"] = _screen_of(pw)
     for sd in ("l", "r"):
         row["hand_%s_screen" % sd] = _screen_of(L._bw(L._n("hand", sd)).translation)
+        row["hand_%s_view_cm" % sd] = [round(x, 1) for x in L._to(L._bw(L._n("hand", sd)).translation, "view")]
+        row["shoulder_%s_view_cm" % sd] = [round(x, 1) for x in L._to(L._bw(L._n("upperarm", sd)).translation, "view")]
     nrm = (facts.get("normals") or {}).get("port")
     if nrm and "port" in facts["marks"]:
         P_ = mark_world("port")
