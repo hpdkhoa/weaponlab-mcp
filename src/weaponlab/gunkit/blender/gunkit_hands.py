@@ -2122,6 +2122,10 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
         if job.get("shoulder_back_max_cm") is not None:
             # the owner's shoulder-back move (2026-10-27), its limit per job (0 turns it off, for a before/after)
             FP.SHOULDER_BACK_MAX_CM = float(job["shoulder_back_max_cm"])
+    # the right hand's skin points (palm_skin, web_fold) measured on these arms before any preset hold reads them
+    # (a captured hold needs none; a fresh arms file has no cached measure)
+    L.natural_open("r", index_extended=False)
+    L.measure_hand("r")
     FP.aim_place("r")
     Hr_, fr_, rr_ = FP.grasp("r", "grip", "palm")
     # the idle is the aim pulled in (the owner: "the idle position is just the aim position with a pull"); an "aim"
