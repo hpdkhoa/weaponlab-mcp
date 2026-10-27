@@ -2119,6 +2119,9 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
         FP.REST_SWAY_CM = round(_sway, 2)
         if job.get("hand_turn_max_deg") is not None:
             FP.TURN_MAX = float(job["hand_turn_max_deg"])
+        if job.get("shoulder_back_max_cm") is not None:
+            # the owner's shoulder-back move (2026-10-27), its limit per job (0 turns it off, for a before/after)
+            FP.SHOULDER_BACK_MAX_CM = float(job["shoulder_back_max_cm"])
     FP.aim_place("r")
     Hr_, fr_, rr_ = FP.grasp("r", "grip", "palm")
     # the idle is the aim pulled in (the owner: "the idle position is just the aim position with a pull"); an "aim"
