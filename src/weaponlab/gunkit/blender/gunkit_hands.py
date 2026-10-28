@@ -2084,6 +2084,69 @@ FP = None
 PULL = None
 KIND = {}
 report["pose_engine"] = POSE_ENGINE
+def arm_view(path, size=(1600, 900)):
+    """A wide dev view from the right, fixed on the eye and the bore (the same camera whatever the arm does), with the
+    arm's joints' screen positions written beside it (path + .json) so a picture can carry markers. Not a game view."""
+    from bpy_extras.object_utils import world_to_camera_view as _w2c
+    sc = bpy.context.scene
+    cam_d = bpy.data.cameras.get("armview") or bpy.data.cameras.new("armview")
+    cam = bpy.data.objects.get("armview") or bpy.data.objects.new("armview", cam_d)
+    if cam.name not in sc.collection.objects:
+        sc.collection.objects.link(cam)
+    G = L._gun()
+    try:
+        bore = L._point("bore")
+    except Exception:
+        bore = Vector(L._gun().translation)                      # the Gun Kit rig has no bore point: the gun bone's origin
+    eye = Vector(L.eye)
+    up = Vector((0.0, 0.0, 1.0))
+    centre = (bore + eye) * 0.5 - up * 0.08
+    rightd = (G.to_quaternion() @ PL.ue(Vector((-70.0, 10.0, 25.0)))).normalized()
+    cam_d.type, cam_d.lens_unit, cam_d.angle, cam_d.clip_start = "PERSP", "FOV", math.radians(50.0), 0.01
+    cam.location = centre + rightd * 1.25
+    zc = (cam.location - centre).normalized()
+    xc = up.cross(zc).normalized()
+    cam.rotation_euler = Matrix((xc, zc.cross(xc), zc)).transposed().to_euler()
+    old_cam, old_res = sc.camera, (sc.render.resolution_x, sc.render.resolution_y)
+    sc.camera = cam
+    sc.render.resolution_x, sc.render.resolution_y = size
+    sc.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+    sc.camera, (sc.render.resolution_x, sc.render.resolution_y) = old_cam, old_res
+    pts = {"eye": eye, "bore": bore}
+    for sd in ("r", "l"):
+        for nm, bn in (("shoulder", "upperarm"), ("elbow", "lowerarm"), ("wrist", "hand"), ("knuckle", "middle_01")):
+            try:
+                pts[nm + "_" + sd] = L._bw(bn + "_" + sd).translation
+            except Exception:
+                pass
+        try:
+            pts["clavicle_" + sd] = L._bw("clavicle_" + sd).translation
+        except Exception:
+            pass
+        for f_ in ("thumb", "index", "middle", "ring", "pinky"):
+            try:
+                pts["%s_tip_%s" % (f_, sd)] = L.arm.matrix_world @ L.arm.pose.bones["%s_03_%s" % (f_, sd)].tail
+            except Exception:
+                pass
+    out = {"size": list(size), "points": {}, "world_cm": {}}
+    for k, v in pts.items():
+        c = _w2c(sc, cam, Vector(v))
+        out["points"][k] = [round(c.x * size[0], 1), round((1.0 - c.y) * size[1], 1)]
+        out["world_cm"][k] = [round(x * 100.0, 2) for x in v]
+    def ang(a, b, c):
+        u, w = (Vector(a) - Vector(b)), (Vector(c) - Vector(b))
+        return round(math.degrees(u.angle(w)), 1) if u.length > 1e-6 and w.length > 1e-6 else None
+    for sd in ("r", "l"):
+        if all(("%s_%s" % (n, sd)) in pts for n in ("shoulder", "elbow", "wrist", "knuckle")):
+            S, E, Wr, K = (pts["%s_%s" % (n, sd)] for n in ("shoulder", "elbow", "wrist", "knuckle"))
+            out["elbow_deg_" + sd] = ang(S, E, Wr)
+            out["wrist_bend_deg_" + sd] = round(180.0 - ang(E, Wr, K), 1)       # 0 = the hand in line with the forearm
+            out["shoulder_hand_cm_" + sd] = round((Wr - S).length * 100.0, 1)
+    json.dump(out, open(path + ".json", "w", encoding="utf-8"), indent=1)
+    return out
+
+
 if POSE_ENGINE == "fakepose" and not job.get("experiment"):
     # the hold made the way games make it (fakepose-mcp): the gun at aim, authored grips on its marks, the fingers
     # closed to contact, the arms by IK; the clipping the first-person camera sees checked (the owner's rule (b))
@@ -2091,7 +2154,6 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
         raise RuntimeError("pose_engine is fakepose but fakepose-mcp is not installed (pip install -e fakepose-mcp)")
     sys.path.insert(0, job["fakepose"])
     import fakepose as FPM
-
     def _move_gun(D):
         global REST0
         L.rifle_rest = D @ L.rifle_rest
@@ -2233,7 +2295,59 @@ if STYLE and STYLE.get("trigger_clips") and (STYLE["hands"].get("r") or {}).get(
     apply_style("r", trigger=True)
     TRIGGER = {n: L.arm.pose.bones[n].rotation_quaternion.copy() for n in FINGER_BONES["r"] if n.startswith("index")}
     L.snapshot("load", "before_trigger")
+if FP is not None:
+    # the gate after the last change to the hand (the owner, 2026-10-28: "gate must behind all changed"): the
+    # re-placement above turns the hand on its palm after the grasp's gate measured it (the M24 grip: 47.9 at the
+    # grasp, 40.5 as saved); the gate that counts (rule 11) measures the hold the clips start from, and the clips play
+    # the hold as this gate leaves it. The grasp's own gate is kept as gate_at_solve
+    report["gate_final"] = {}
+    for _sd, _mk in (("r", "grip"), ("l", facts.get("home_l", "support"))):
+        _key = (_sd, _mk, None, ())
+        if _key not in GRASPS or _mk not in facts["marks"] or not ((_sd == "r" and home_r) or (_sd == "l" and home_l)):
+            continue
+        _kd = KIND.get((_sd, _mk), "palm")
+        try:
+            _g = FP.gate_again(_sd, _mk, _kd, fix=True, tag="final")
+        except Exception as e_:
+            report["gate_final"][_sd] = {"mark": _mk, "error": repr(e_)[:160]}
+            continue
+        bpy.context.view_layer.update()
+        _h = (FP.report.get("holds") or {}).get("%s:%s:%s" % (_sd, _mk, _kd))
+        if isinstance(_h, dict):
+            _h["gate_at_solve"] = _h.get("gate")
+            _h["gate"] = _g
+        _rel = bone_world(mark_bone(_mk)).inverted() @ L._bw(L._n("hand", _sd)).copy()
+        _fq = {n_: L.arm.pose.bones[n_].rotation_quaternion.copy() for n_ in FINGER_BONES[_sd]}
+        GRASPS[_key] = (_rel, _fq, bool(_g.get("pass")))
+        report["gate_final"][_sd] = {"mark": _mk, "pass": _g.get("pass"), "fails": _g.get("fails"), "fixed": _g.get("fixed"),
+                                     "limits": (_g.get("after") or {}).get("limits")}
+    if home_r:
+        home_r = GRASPS.get(("r", "grip", None, ()), home_r)
+    if home_l:
+        home_l = GRASPS.get(("l", facts.get("home_l", "support"), None, ()), home_l)
 L.snapshot("save", "hold")
+if FP is not None:
+    # the arm as the hold leaves it, read off the bones, beside the last placement's predicted limits (2026-10-27:
+    # the M24 grip's gate and clip disagreed on the wrist)
+    _hc = {}
+    for _sd in ("r", "l"):
+        try:
+            _S, _E, _W = (L._bw(L._n(b_, _sd)).translation for b_ in ("upperarm", "lowerarm", "hand"))
+            _K = L._bw(L._n("finger", _sd, "middle", "01")).translation
+            _hc[_sd] = {"wrist_bones_deg": round(math.degrees((_W - _E).angle(_K - _W)), 1),
+                        "elbow_bones_deg": round(180.0 - math.degrees((_S - _E).angle(_W - _E)), 1),
+                        "shoulder_cm": [round(x * 100.0, 2) for x in _S], "elbow_cm": [round(x * 100.0, 2) for x in _E],
+                        "hand_cm": [round(x * 100.0, 2) for x in _W], "predicted": dict((getattr(FP, "last_limits", {}) or {}).get(_sd) or {})}
+        except Exception as e_:
+            _hc[_sd] = {"error": repr(e_)[:80]}
+    _hc["gun_cm"] = [round(x * 100.0, 2) for x in L._gun().translation]
+    _hc["grip_mark_cm"] = [round(x * 100.0, 2) for x in mark_world("grip")] if "grip" in facts["marks"] else None
+    if job.get("arm_view"):
+        try:
+            _hc["arm_view"] = arm_view(os.path.join(OUT, "arm_hold.png"))
+        except Exception as e_:
+            _hc["arm_view"] = {"error": repr(e_)[:120]}
+    report["hold_arm_check"] = _hc
 # the fire grip: from each passed home hold, the wrapping fingers close further as the hand squeezes to fight the
 # recoil, until each pad has sunk its give at FIRE_N (FIRE_FALLBACK_N if FIRE_N breaks a wall); every wall read at
 # that grip; the skin's press at that grip kept as its own morph (press_<side>_fire). A grip that breaks a wall at
@@ -2573,8 +2687,10 @@ def pose_rules_report():
     judge(9, all(v == 0 for v in clips_.values()), clips_, "zero clipping seen from the eye, every frame")
     judge(10, True, None, "every hand has a target each action, the palm on the held part: by the presets and the timeline")
     gates = {k: v.get("gate") for k, v in (report.get("fakepose", {}).get("holds") or {}).items() if isinstance(v, dict) and v.get("gate")}
+    # the home holds at the pulled gun place the clips play (the owner, 2026-10-28: "gate the pulled hold too")
+    gates.update({k + ":pulled": v["gate_pulled"] for k, v in (report.get("fakepose", {}).get("holds") or {}).items() if isinstance(v, dict) and v.get("gate_pulled")})
     judge(11, bool(gates) and all(g_["pass"] for g_ in gates.values()), {k: (g_["pass"], g_["fails"][:2]) for k, g_ in gates.items()},
-          "the hand gate (the owner, 2026-10-26): every hold's digits touch their part, none inside the mesh, none twisted, the thumb on the gun, the joints inside their limits")
+          "the hand gate (the owner, 2026-10-26): every hold's digits touch their part, none inside the mesh, none twisted, the thumb on the gun, the joints inside their limits; run after the last change to the hand, and again at the pulled gun place the clips play (2026-10-28)")
     out["passed"] = sum(1 for r in out["rules"].values() if r["pass"])
     out["failed"] = [n for n, r in out["rules"].items() if not r["pass"]]
     return out
@@ -2833,6 +2949,41 @@ for (side, mk), (fr, cid_, _) in sorted(need.items()):
     grasp(side, mk, start="at_use")
 L.snapshot("load", "hold")
 report["holds"] = {"%s:%s" % (k[0], k[1]): ("found" if v[2] else "laid") for k, v in GRASPS.items()}
+
+if FP is not None and PULL:
+    # the pulled hold gated too (the owner, 2026-10-28: "gate the pulled hold too"): every clip but the aim clips plays
+    # the gun pulled in by the idle pull with the hands re-placed on it each frame, where the hold's gate above
+    # measured the aim place only. Measured as the clips play it (no mending here: the clips take the hold's fingers
+    # as the final gate left them); a FAIL is reported, in rule 11 with the hold's
+    L.snapshot("save", "_pre_pulled")
+    gun_pose(pulled({}, "_pulled_gate"))
+    rest_parts()
+    report["gate_pulled"] = {"gun_cm": [round(x * 100.0, 2) for x in L._gun().translation], "pull": dict(PULL)}
+    for _sd, _mk in (("r", "grip"), ("l", facts.get("home_l", "support"))):
+        _key = (_sd, _mk, None, ())
+        if _key not in GRASPS or _mk not in facts["marks"]:
+            continue
+        _rel, _fq, _ = GRASPS[_key]
+        arm_from_hold(_sd)
+        L._put_hand(_sd, bone_world(mark_bone(_mk)) @ _rel)
+        for n_, q_ in (_fq or {}).items():
+            L.arm.pose.bones[n_].rotation_quaternion = q_
+        bpy.context.view_layer.update()
+        try:
+            _g = FP.gate_again(_sd, _mk, KIND.get((_sd, _mk), "palm"), fix=False, tag="pulled")
+            report["gate_pulled"][_sd] = {"mark": _mk, "pass": _g.get("pass"), "fails": _g.get("fails"),
+                                          "limits": (_g.get("after") or {}).get("limits"),
+                                          "digits": {d_: v_.get("tip_gap_cm") for d_, v_ in ((_g.get("after") or {}).get("digits") or {}).items()}}
+        except Exception as e_:
+            report["gate_pulled"][_sd] = {"mark": _mk, "error": repr(e_)[:160]}
+    if job.get("arm_view"):
+        try:
+            report["gate_pulled"]["arm_view"] = arm_view(os.path.join(OUT, "arm_pulled.png"))
+        except Exception as e_:
+            report["gate_pulled"]["arm_view"] = {"error": repr(e_)[:120]}
+    L.snapshot("load", "_pre_pulled")
+    gun_pose({})
+    rest_parts()
 
 # --- the clips -------------------------------------------------------------------------------------------------
 L.steps.phase("clips")
@@ -3203,6 +3354,7 @@ for cid, clip in job["clips"].items():
 L.steps.end_all()
 report["steps"] = L.steps.write(os.path.join(OUT, "steps.json"), {"run": "gunkit hands", "gun": facts["name"],
                                                                    "clips": list(job["clips"])})["wall_s"]
+
 if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET - _time.time() > 60:
     # the first-person camera on each written clip, at its start, middle and end: the evidence the eye check counts
     import shutil as _sh
@@ -3262,6 +3414,11 @@ if POSE_ENGINE == "fakepose" and job.get("eye_pictures", True) and T0 + BUDGET -
             if round(_fr["t"], 5) in _tf:
                 pose_parts(_tf[round(_fr["t"], 5)])
             bpy.context.view_layer.update()
+            if job.get("arm_view") and _i == int(job.get("arm_view_frame", len(_clip["frames"]) // 2)):
+                try:
+                    report.setdefault("arm_views", {})[_cid] = arm_view(os.path.join(_ad, "arm_%04d.png" % _i))
+                except Exception as e_:
+                    report.setdefault("arm_views", {})[_cid] = {"error": repr(e_)}
             _r = L.render(views=tuple(_views), size=tuple(job.get("anim_size", (960, 540))))
             _row = {"t": round(_fr["t"], 4)}
             for _im in _r["images"]:
