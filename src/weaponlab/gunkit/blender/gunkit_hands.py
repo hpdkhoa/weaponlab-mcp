@@ -2184,6 +2184,9 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
         if job.get("shoulder_back_max_cm") is not None:
             # the owner's shoulder-back move (2026-10-27), its limit per job (0 turns it off, for a before/after)
             FP.SHOULDER_BACK_MAX_CM = float(job["shoulder_back_max_cm"])
+        if job.get("aim_drop_cm") is not None:
+            # the gun lowered against the eye at the aim (the owner, 2026-10-28: "try ... lower"), cm
+            FP.AIM_DROP_CM = float(job["aim_drop_cm"])
     # the right hand's skin points (palm_skin, web_fold) measured on these arms before any preset hold reads them
     # (a captured hold needs none; a fresh arms file has no cached measure)
     L.natural_open("r", index_extended=False)
