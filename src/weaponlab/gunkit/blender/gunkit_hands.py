@@ -2195,7 +2195,16 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
                           "view": (PL.VIEW_RIGHT, PL.VIEW_FWD, PL.VIEW_UP), "fov": (PL.H_FOV, PL.ASPECT)})
     if start:
         L.snapshot("load", start)
+    if job.get("body"):
+        # the owner, 2026-10-28: "lower right shoulder": the anatomical body (the rig's rest: pelvis, spine, neck, head,
+        # collarbones) instead of the first-person template's idle, whose right shoulder sits 10.8 cm over the eye
+        FP.presets["body"] = job["body"]
     FP.body_rest()
+    try:
+        _sh = {sd_: [round(x * 100.0, 2) for x in L._bw(L._n("upperarm", sd_)).translation] for sd_ in ("r", "l")}
+        report["shoulders_cm"] = dict(_sh, body=FP.presets.get("body", "template"))
+    except Exception as e_:
+        report["shoulders_cm"] = {"error": repr(e_)[:100]}
     FP.set_eye()
     if hasattr(FP, "install_limits") and job.get("joint_limits", True):
         FP.install_limits()          # the owner, 2026-10-25: the market's IK with a body's joint limits
@@ -2404,7 +2413,7 @@ if FP is not None:
         # extra fixed views of the hold (name, side right|left, centre_mark, fov_deg)
         try:
             report.setdefault("arm_views_extra", {})[_ev["name"]] = arm_view(os.path.join(OUT, "arm_%s.png" % _ev["name"]), side=_ev.get("side", "left"),
-                                                                             centre_mark=_ev.get("centre_mark", "grip"), fov_deg=float(_ev.get("fov_deg", 30.0)))
+                                                                             centre_mark=_ev.get("centre_mark"), fov_deg=float(_ev.get("fov_deg", 50.0)))
         except Exception as e_:
             report.setdefault("arm_views_extra", {})[_ev["name"]] = {"error": repr(e_)[:120]}
 # the fire grip: from each passed home hold, the wrapping fingers close further as the hand squeezes to fight the
