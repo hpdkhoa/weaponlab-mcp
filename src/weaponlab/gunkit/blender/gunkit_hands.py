@@ -2084,7 +2084,7 @@ FP = None
 PULL = None
 KIND = {}
 report["pose_engine"] = POSE_ENGINE
-def arm_view(path, size=(1600, 900)):
+def arm_view(path, size=(1600, 900), side="right", centre_mark=None, fov_deg=50.0):
     """A wide dev view from the right, fixed on the eye and the bore (the same camera whatever the arm does), with the
     arm's joints' screen positions written beside it (path + .json) so a picture can carry markers. Not a game view."""
     from bpy_extras.object_utils import world_to_camera_view as _w2c
@@ -2101,9 +2101,12 @@ def arm_view(path, size=(1600, 900)):
     eye = Vector(L.eye)
     up = Vector((0.0, 0.0, 1.0))
     centre = (bore + eye) * 0.5 - up * 0.08
-    rightd = (G.to_quaternion() @ PL.ue(Vector((-70.0, 10.0, 25.0)))).normalized()
-    cam_d.type, cam_d.lens_unit, cam_d.angle, cam_d.clip_start = "PERSP", "FOV", math.radians(50.0), 0.01
-    cam.location = centre + rightd * 1.25
+    if centre_mark:
+        centre = Vector(mark_world(centre_mark))                 # a close view on one mark (the owner, 2026-10-28: the thumb from the left)
+    spot = (-70.0, 10.0, 25.0) if side == "right" else (70.0, 10.0, 25.0)
+    rightd = (G.to_quaternion() @ PL.ue(Vector(spot))).normalized()
+    cam_d.type, cam_d.lens_unit, cam_d.angle, cam_d.clip_start = "PERSP", "FOV", math.radians(fov_deg), 0.01
+    cam.location = centre + rightd * (1.25 if not centre_mark else 0.6)
     zc = (cam.location - centre).normalized()
     xc = up.cross(zc).normalized()
     cam.rotation_euler = Matrix((xc, zc.cross(xc), zc)).transposed().to_euler()
@@ -2397,6 +2400,13 @@ if FP is not None:
         except Exception as e_:
             _hc["arm_view"] = {"error": repr(e_)[:120]}
     report["hold_arm_check"] = _hc
+    for _ev in (job.get("arm_view_extra") or []):
+        # extra fixed views of the hold (name, side right|left, centre_mark, fov_deg)
+        try:
+            report.setdefault("arm_views_extra", {})[_ev["name"]] = arm_view(os.path.join(OUT, "arm_%s.png" % _ev["name"]), side=_ev.get("side", "left"),
+                                                                             centre_mark=_ev.get("centre_mark", "grip"), fov_deg=float(_ev.get("fov_deg", 30.0)))
+        except Exception as e_:
+            report.setdefault("arm_views_extra", {})[_ev["name"]] = {"error": repr(e_)[:120]}
 # the fire grip: from each passed home hold, the wrapping fingers close further as the hand squeezes to fight the
 # recoil, until each pad has sunk its give at FIRE_N (FIRE_FALLBACK_N if FIRE_N breaks a wall); every wall read at
 # that grip; the skin's press at that grip kept as its own morph (press_<side>_fire). A grip that breaks a wall at
