@@ -2230,6 +2230,10 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
     L.natural_open("r", index_extended=False)
     L.measure_hand("r")
     FP.aim_place("r")
+    if job.get("butt_lock_cm") is not None and hasattr(FP, "body_blade"):
+        # the owner's option 2 (2026-10-29): the body bladed until the butt locks target cm ahead of the shoulder joint
+        report["body_blade"] = FP.body_blade("r", float(job["butt_lock_cm"]))
+        FP.aim_place("r")
     if hasattr(FP, "measure_line_b") and (FP.tuning("r", "grip").get("place") in ("index_on_line_b", "web_a_index_b", "web_a_thumb_arrow")
                                           or ((FP.tuning("r", "grip").get("fingers") or {}).get("index") or {}).get("rule") == "along_bore"):
         # touch points first (the owner's rule, 2026-10-22): line B measured on this gun and checked against its
