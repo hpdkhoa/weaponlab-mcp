@@ -2108,6 +2108,12 @@ def arm_view(path, size=(1600, 900)):
     xc = up.cross(zc).normalized()
     cam.rotation_euler = Matrix((xc, zc.cross(xc), zc)).transposed().to_euler()
     old_cam, old_res = sc.camera, (sc.render.resolution_x, sc.render.resolution_y)
+    # the lab's plain look (workbench, studio light): before the first lab render the scene has no lights and the
+    # view came out black (the touch-point picture, 2026-10-28)
+    sc.render.engine = "BLENDER_WORKBENCH"
+    sh_ = sc.display.shading
+    sh_.light, sh_.show_cavity, sh_.cavity_type, sh_.show_shadows, sh_.shadow_intensity, sh_.show_specular_highlight = "STUDIO", True, "BOTH", True, 0.35, True
+    sc.display.render_aa = "16"
     sc.camera = cam
     sc.render.resolution_x, sc.render.resolution_y = size
     sc.render.filepath = path
@@ -2139,6 +2145,12 @@ def arm_view(path, size=(1600, 900)):
             if ("r", "grip") in getattr(FP, "_b_holds", set()):
                 for k_, v_ in L.index_pad_line("r")["pads"].items():
                     pts["index_pad_%s_r" % k_] = Vector(list(v_))
+                try:
+                    pts["web_fold_r"] = Vector(list(L._anchor("r", "web_fold")))
+                except Exception:
+                    pass
+            if getattr(FP, "point_a", {}).get("r"):
+                pts["point_a"] = Vector(list(FP.point_a_world("r")[0]))
         except Exception as e_:
             pts.setdefault("_line_b_error", None)
             print("arm_view line B markers:", repr(e_)[:120])
@@ -2206,11 +2218,17 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
     L.natural_open("r", index_extended=False)
     L.measure_hand("r")
     FP.aim_place("r")
-    if hasattr(FP, "measure_line_b") and FP.tuning("r", "grip").get("place") == "index_on_line_b":
+    if hasattr(FP, "measure_line_b") and FP.tuning("r", "grip").get("place") in ("index_on_line_b", "web_a_index_b"):
         # touch points first (the owner's rule, 2026-10-22): line B measured on this gun and checked against its
         # definition before any hand is placed; a miss stops the run, pictured (arm_touch.png: the gun at the aim, no
         # hand on it yet)
         report["line_b"] = FP.measure_line_b("r")
+        if FP.tuning("r", "grip").get("place") == "web_a_index_b":
+            # point A, the back of the grip (the owner, 2026-10-28), measured and checked before any hand
+            report["point_a"] = FP.measure_point_a("r")
+            if not report["point_a"]["check"]["ok"]:
+                json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
+                raise ValueError("point A misses its definition on %s: %s" % (facts["name"], json.dumps(report["point_a"]["check"])))
         if job.get("arm_view"):
             try:
                 report["line_b"]["arm_view"] = arm_view(os.path.join(OUT, "arm_touch.png"))
