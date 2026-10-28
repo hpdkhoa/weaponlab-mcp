@@ -2129,6 +2129,20 @@ def arm_view(path, size=(1600, 900)):
                 pts["%s_tip_%s" % (f_, sd)] = L.arm.matrix_world @ L.arm.pose.bones["%s_03_%s" % (f_, sd)].tail
             except Exception:
                 pass
+    if FP is not None and getattr(FP, "line_b", None):
+        # line B and the ring's middle (the touch points), and the index's pads, for the markers
+        try:
+            lb_ = FP.line_b_world("r")
+            for k_ in ("B0", "B1", "mid", "ring", "bottom"):
+                if lb_.get(k_) is not None:
+                    pts["line_b_" + k_] = Vector(list(lb_[k_]))
+            if ("r", "grip") in getattr(FP, "_b_holds", set()):
+                for k_, v_ in L.index_pad_line("r")["pads"].items():
+                    pts["index_pad_%s_r" % k_] = Vector(list(v_))
+        except Exception as e_:
+            pts.setdefault("_line_b_error", None)
+            print("arm_view line B markers:", repr(e_)[:120])
+    pts = {k: v for k, v in pts.items() if v is not None}
     out = {"size": list(size), "points": {}, "world_cm": {}}
     for k, v in pts.items():
         c = _w2c(sc, cam, Vector(v))
@@ -2192,6 +2206,19 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
     L.natural_open("r", index_extended=False)
     L.measure_hand("r")
     FP.aim_place("r")
+    if hasattr(FP, "measure_line_b") and FP.tuning("r", "grip").get("place") == "index_on_line_b":
+        # touch points first (the owner's rule, 2026-10-22): line B measured on this gun and checked against its
+        # definition before any hand is placed; a miss stops the run, pictured (arm_touch.png: the gun at the aim, no
+        # hand on it yet)
+        report["line_b"] = FP.measure_line_b("r")
+        if job.get("arm_view"):
+            try:
+                report["line_b"]["arm_view"] = arm_view(os.path.join(OUT, "arm_touch.png"))
+            except Exception as e_:
+                report["line_b"]["arm_view"] = {"error": repr(e_)[:120]}
+        if not report["line_b"]["check"]["ok"]:
+            json.dump(report, open(os.path.join(OUT, "hands.json"), "w", encoding="utf-8"), indent=1, default=str)
+            raise ValueError("line B misses its definition on %s: %s" % (facts["name"], json.dumps(report["line_b"]["check"])))
     Hr_, fr_, rr_ = FP.grasp("r", "grip", "palm")
     # the idle is the aim pulled in (the owner: "the idle position is just the aim position with a pull"); an "aim"
     # clip (the idle's frames, not pulled) keeps the aim itself
