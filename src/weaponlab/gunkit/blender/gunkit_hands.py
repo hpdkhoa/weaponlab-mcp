@@ -2237,13 +2237,13 @@ if POSE_ENGINE == "fakepose" and not job.get("experiment"):
         if job.get("gun_to_shoulder") and hasattr(FP, "gun_to_shoulder"):
             # the owner, 2026-10-29: "push the gun forward": the rest of the way on the gun, the eye relief grows
             report["gun_to_shoulder"] = FP.gun_to_shoulder("r", float(job["butt_lock_cm"]))
-    if hasattr(FP, "measure_line_b") and (FP.tuning("r", "grip").get("place") in ("index_on_line_b", "web_a_index_b", "web_a_thumb_arrow")
+    if hasattr(FP, "measure_line_b") and (FP.tuning("r", "grip").get("place") in ("index_on_line_b", "web_a_index_b", "web_a_thumb_arrow", "solve")
                                           or ((FP.tuning("r", "grip").get("fingers") or {}).get("index") or {}).get("rule") == "along_bore"):
         # touch points first (the owner's rule, 2026-10-22): line B measured on this gun and checked against its
         # definition before any hand is placed; a miss stops the run, pictured (arm_touch.png: the gun at the aim, no
         # hand on it yet)
         report["line_b"] = FP.measure_line_b("r")
-        if FP.tuning("r", "grip").get("place") in ("web_a_index_b", "web_a_thumb_arrow"):
+        if FP.tuning("r", "grip").get("place") in ("web_a_index_b", "web_a_thumb_arrow", "solve"):
             # point A, the back of the grip (the owner, 2026-10-28), measured and checked before any hand
             report["point_a"] = FP.measure_point_a("r")
             if not report["point_a"]["check"]["ok"]:
